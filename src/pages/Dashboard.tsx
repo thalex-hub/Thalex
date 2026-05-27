@@ -552,15 +552,17 @@ export default function Dashboard() {
       // Calculate salaries of all users
       const totalSalary = monthAttendance.length === 0 ? 0 : users.reduce((sum, u) => {
         const userAtt = monthAttendance.filter(a => a.userId === u.uid);
+        const userAdvances = advanceRequests.filter((r: any) => r.userId === u.uid);
+        const userReimbursements = reimbursementRequests.filter((r: any) => r.userId === u.uid);
         const stats = calculateSalary(
-          { ...u, allAdvanceRequests: [], allReimbursementRequests: [] },
+          { ...u, allAdvanceRequests: userAdvances, allReimbursementRequests: userReimbursements },
           userAtt,
           orders,
           departments,
           month,
           paymentRequests
         );
-        const userSalaryCost = Math.max(0, stats.remainingNetSalary);
+        const userSalaryCost = stats.remainingNetSalary;
         return sum + userSalaryCost;
       }, 0);
 
@@ -583,7 +585,7 @@ export default function Dashboard() {
     });
 
     return monthlyList;
-  }, [selectedYear, users, departments, attendance, orders, paymentRequests]);
+  }, [selectedYear, users, departments, attendance, orders, paymentRequests, advanceRequests, reimbursementRequests]);
 
   // Section 3: Detailed Expenses structure
   const expensesSummary = React.useMemo(() => {

@@ -46,6 +46,8 @@ export default function BusinessExpenses() {
   const [attendance, setAttendance] = React.useState<any[]>([]);
   const [allDepartments, setAllDepartments] = React.useState<any[]>([]);
   const [allOrders, setAllOrders] = React.useState<any[]>([]);
+  const [advanceRequests, setAdvanceRequests] = React.useState<any[]>([]);
+  const [reimbursementRequests, setReimbursementRequests] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     if (!appUser) return;
@@ -93,6 +95,20 @@ export default function BusinessExpenses() {
       }
     );
 
+    // Sub to advance requests
+    const unsubAdvances = onSnapshot(collection(db, 'advance_requests'), (snap) => {
+      setAdvanceRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, 'advance_requests', false);
+    });
+
+    // Sub to reimbursement requests
+    const unsubReimbursements = onSnapshot(collection(db, 'reimbursement_requests'), (snap) => {
+      setReimbursementRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, 'reimbursement_requests', false);
+    });
+
     // Listen to attendance for the whole current year to calculate multi-month data
     const yearStart = format(startOfYear(currentDate), 'yyyy-MM-dd');
     const yearEnd = format(endOfYear(currentDate), 'yyyy-MM-dd');
@@ -117,21 +133,26 @@ export default function BusinessExpenses() {
       unsubDepts();
       unsubOrders();
       unsubPayments();
+      unsubAdvances();
+      unsubReimbursements();
       unsubAttendance();
     };
   }, [currentDate.getFullYear(), appUser, isDirector, isAccountant, hasPermission]); // Refetch when year or user permissions change
 
   const calculateSalaryForUserAndMonth = React.useCallback((user: any, month: Date, userAttendance: any[]) => {
+    const userAdvances = advanceRequests.filter(r => r.userId === user.uid);
+    const userReimbursements = reimbursementRequests.filter(r => r.userId === user.uid);
+
     const stats = calculateSalary(
-      { ...user, allAdvanceRequests: [], allReimbursementRequests: [] },
+      { ...user, allAdvanceRequests: userAdvances, allReimbursementRequests: userReimbursements },
       userAttendance,
       allOrders,
       allDepartments,
       month,
       paymentRequests
     );
-    return Math.max(0, stats.remainingNetSalary);
-  }, [allOrders, allDepartments, paymentRequests]);
+    return stats.remainingNetSalary;
+  }, [allOrders, allDepartments, paymentRequests, advanceRequests, reimbursementRequests]);
 
   const monthlyBreakdown = React.useMemo(() => {
     const breakdown: Record<string, MonthlyExpense> = {};
@@ -388,8 +409,8 @@ export default function BusinessExpenses() {
                <Building2 size={120} className="text-indigo-600" />
             </div>
             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Vận hành văn phòng</p>
-            <h3 className="text-2xl font-black text-gray-900">{formatCurrency(currentExpense.office_rent + currentExpense.electricity + currentExpense.water + currentExpense.office_supplies)}</h3>
-            <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase">Tiền nhà, điện, nước, VPP</p>
+            <h3 className="text-2xl font-black text-gray-900">{formatCurrency(currentExpense.office_rent + currentExpense.electricity + currentExpense.water + currentExpense.office_supplies + currentExpense.delivery)}</h3>
+            <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase">Tiền nhà, điện, nước, VPP, chuyển phát</p>
          </div>
 
          <div className="bg-indigo-600 p-6 rounded-3xl shadow-xl shadow-indigo-100 relative overflow-hidden group">
@@ -451,12 +472,14 @@ export default function BusinessExpenses() {
                <div className="overflow-x-auto">
                   <table className="w-full text-left">
                      <thead>
-                        <tr className="bg-gray-50/50 text-[10px] text-gray-400 font-black uppercase tracking-wider">
+                        <tr className="bg-gray-50/50 text-[10px] text-gray-400 font-black uppercase tracking-wider border-b border-gray-100">
                            <th className="px-6 py-4">Tháng</th>
-                           <th className="px-6 py-4 text-right">Lương NV</th>
-                           <th className="px-6 py-4 text-right">Mặt bằng</th>
-                           <th className="px-6 py-4 text-right">Điện/Nước</th>
-                           <th className="px-6 py-4 text-right font-black text-blue-600 uppercase">Tổng cộng</th>
+                           <th className="px-6 py-4 text-right">Lương</th>
+                           <th className="px-6 py-4 text-right">Thuê văn phòng</th>
+                           <th className="px-6 py-4 text-right">Điện</th>
+                           <th className="px-6 py-4 text-right">Nước</th>
+                           <th className="px-6 py-4 text-right">Văn phòng phẩm</th>
+                           <th className="px-6 py-4 text-right">Chuyển phát</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-gray-50">
@@ -468,16 +491,28 @@ export default function BusinessExpenses() {
                              <td className="px-6 py-4">
                                 <p className="text-xs font-black text-gray-900">Tháng {key.split('-')[1]}</p>
                              </td>
-                             <td className="px-6 py-4 text-right text-xs font-bold text-gray-600">
+                             <td className="px-6 py-4 text-right text-xs font-semibold text-gray-600">
                                 {formatCurrency(val.salary)}
                              </td>
-                             <td className="px-6 py-4 text-right text-xs font-bold text-gray-600">
+                             <td className="px-6 py-4 text-right text-xs font-semibold text-gray-600">
                                 {formatCurrency(val.office_rent)}
                              </td>
-                             <td className="px-6 py-4 text-right text-xs font-bold text-gray-600">
-                                {formatCurrency(val.electricity + val.water)}
+                             <td className="px-6 py-4 text-right text-xs font-semibold text-gray-600">
+                                {formatCurrency(val.electricity)}
                              </td>
-                             <td className="px-6 py-4 text-right text-sm font-black text-gray-900">
+                             <td className="px-6 py-4 text-right text-xs font-semibold text-gray-600">
+                                {formatCurrency(val.water)}
+                             </td>
+                             <td className="px-6 py-4 text-right text-xs font-semibold text-gray-600">
+                                {formatCurrency(val.office_supplies)}
+                             </td>
+                             <td className="px-6 py-4 text-right text-xs font-semibold text-gray-600">
+                                {formatCurrency(val.delivery)}
+                             </td>
+                             <td className="px-6 py-4 text-right text-xs font-semibold text-gray-600">
+                                {formatCurrency(val.other)}
+                             </td>
+                             <td className="px-6 py-4 text-right text-sm font-black text-gray-900 bg-gray-50/5">
                                 {formatCurrency(val.total)}
                              </td>
                           </tr>

@@ -226,36 +226,86 @@ export default function Payroll() {
   const handleExport = () => {
     if (activeTab === 'personal') {
       const exportData = [
-        { 'Hạng mục': 'Lương cứng theo tháng', 'Giá trị': stats.baseSalary },
-        { 'Hạng mục': 'Thưởng tháng này', 'Giá trị': stats.monthlyBonus },
-        { 'Hạng mục': 'Hoa hồng doanh thu', 'Giá trị': stats.commission },
-        { 'Hạng mục': 'Tổng tiền phạt vi phạm', 'Giá trị': -stats.totalPenalties },
-        { 'Hạng mục': 'Khấu trừ Bảo hiểm (BHXH, BHYT, BHTN)', 'Giá trị': -stats.totalInsurance },
-        { 'Hạng mục': 'Số ngày công yêu cầu', 'Giá trị': stats.requiredDays },
-        { 'Hạng mục': 'Số ngày công thực tế', 'Giá trị': stats.actualDays },
-        { 'Hạng mục': 'Lương thực nhận dự kiến', 'Giá trị': Math.max(0, stats.finalSalary) }
+        { 'Hạng mục / Thông tin': 'Nhân viên', 'Giá trị': appUser?.fullName || user?.displayName || '' },
+        { 'Hạng mục / Thông tin': 'Tháng tính lương', 'Giá trị': format(currentMonth, 'MM/yyyy') },
+        { 'Hạng mục / Thông tin': 'Số ngày công yêu cầu (ngày)', 'Giá trị': stats.requiredDays },
+        { 'Hạng mục / Thông tin': 'Số ngày công thực tế (ngày)', 'Giá trị': stats.actualDays },
+        { 'Hạng mục / Thông tin': 'Đơn giá lương ngày (đ)', 'Giá trị': stats.daySalary },
+        { 'Hạng mục / Thông tin': 'Lương cứng theo tháng (đ)', 'Giá trị': stats.baseSalary },
+        { 'Hạng mục / Thông tin': 'Doanh thu tính hoa hồng (đ)', 'Giá trị': stats.monthlyRevenue || 0 },
+        { 'Hạng mục / Thông tin': 'Hoa hồng doanh thu (đ)', 'Giá trị': stats.commission || 0 },
+        { 'Hạng mục / Thông tin': 'Thưởng tháng này (đ)', 'Giá trị': stats.monthlyBonus || 0 },
+        { 'Hạng mục / Thông tin': 'Tổng tiền phạt vi phạm (đ)', 'Giá trị': -stats.totalPenalties },
+        { 'Hạng mục / Thông tin': 'Số lần vi phạm kỷ luật (lần)', 'Giá trị': stats.violations.length },
+        { 'Hạng mục / Thông tin': 'Hệ số lương đóng BHXH (đ)', 'Giá trị': stats.insuranceSalary || 0 },
+        { 'Hạng mục / Thông tin': 'Khấu trừ BHXH (8%) (đ)', 'Giá trị': -stats.bhxh },
+        { 'Hạng mục / Thông tin': 'Khấu trừ BHYT (1.5%) (đ)', 'Giá trị': -stats.bhyt },
+        { 'Hạng mục / Thông tin': 'Khấu trừ BHTN (1%) (đ)', 'Giá trị': -stats.bhtn },
+        { 'Hạng mục / Thông tin': 'Tổng tiền bảo hiểm khấu trừ (đ)', 'Giá trị': -stats.totalInsurance },
+        { 'Hạng mục / Thông tin': 'Dư nợ tạm ứng trước đó (đ)', 'Giá trị': stats.advanceDebt || 0 },
+        { 'Hạng mục / Thông tin': 'Lương đã tạm ứng tháng này (đ)', 'Giá trị': -(stats.paidSalary || 0) },
+        { 'Hạng mục / Thông tin': 'Khấu trừ nợ tháng trước chuyển sang (đ)', 'Giá trị': -(stats.previousMonthDebt || 0) },
+        { 'Hạng mục / Thông tin': 'LƯƠNG THỰC NHẬN CÒN LẠI (đ)', 'Giá trị': stats.remainingNetSalary }
       ];
       
-      const violationRows = stats.violations.map(v => ({
-        'Ngày': v.date,
-        'Lỗi vi phạm': v.type,
-        'Tiền phạt': -v.penalty
-      }));
+      let violationRows: any[] = [];
+      if (stats.violations.length > 0) {
+        violationRows.push({ 'Hạng mục / Thông tin': '', 'Giá trị': '' });
+        violationRows.push({ 'Hạng mục / Thông tin': 'CHI TIẾT CÁC LỖI VI PHẠM TRONG THÁNG', 'Giá trị': '' });
+        stats.violations.forEach((v, idx) => {
+          violationRows.push({
+            'Hạng mục / Thông tin': `Lỗi ${idx + 1}: Ngày ${v.date} - ${v.type}`,
+            'Giá trị': -v.penalty
+          });
+        });
+      }
 
       exportToExcel([...exportData, ...violationRows], `PhieuLuong_${format(currentMonth, 'MM_yyyy')}`, 'Phiếu lương');
     } else {
-      const exportData = collectiveStats.map(s => ({
-        'Họ tên': s.fullName,
-        'Email': s.email,
-        'Lương cứng': s.baseSalary,
-        'Thưởng': s.monthlyBonus,
-        'Hoa hồng': s.commission,
-        'Lỗi vi phạm': -s.totalPenalties,
-        'Khấu trừ BH': -s.totalInsurance,
-        'Lương thực nhận': Math.max(0, s.finalSalary),
-        'Công thực tế/Yêu cầu': `${s.actualDays}/${s.requiredDays}`
-      }));
-      exportToExcel(exportData, `BangLuong_TongHop_${format(currentMonth, 'MM_yyyy')}`, 'Bảng lương tổng hợp');
+      const monthKey = format(currentMonth, 'yyyy-MM');
+      const exportData = collectiveStats.map(s => {
+        const u = allUsers.find(user => user.uid === s.uid);
+        const statusStr = isUserProbationInMonth(u, monthKey) ? 'Thử việc' : 'Chính thức';
+        return {
+          'Nhân sự': s.fullName,
+          'Email': s.email,
+          'Trạng thái': statusStr,
+          'Công thực tế': s.actualDays,
+          'Công yêu cầu': s.requiredDays,
+          'Đơn giá lương ngày': s.daySalary,
+          'Lương cứng': s.baseSalary,
+          'Hoa hồng': s.commission || 0,
+          'Doanh thu tính hoa hồng': s.monthlyRevenue || 0,
+          'Thưởng tháng': s.monthlyBonus || 0,
+          'Vi phạm (Phạt)': -s.totalPenalties,
+          'Khấu trừ Bảo hiểm': -s.totalInsurance,
+          'Lương tạm ứng': -(s.paidSalary || 0),
+          'Nợ tạm ứng (Cần hoàn yêu cầu)': s.advanceDebt || 0,
+          'Trừ nợ tháng trước': -(s.previousMonthDebt || 0),
+          'Lương thực nhận/Còn lại': s.remainingNetSalary
+        };
+      });
+
+      const totalRow = {
+        'Nhân sự': 'TỔNG CỘNG TOÀN BỘ',
+        'Email': '',
+        'Trạng thái': '',
+        'Công thực tế': collectiveStats.reduce((acc, s) => acc + s.actualDays, 0),
+        'Công yêu cầu': collectiveStats.reduce((acc, s) => acc + s.requiredDays, 0),
+        'Đơn giá lương ngày': '',
+        'Lương cứng': collectiveStats.reduce((acc, s) => acc + s.baseSalary, 0),
+        'Hoa hồng': collectiveStats.reduce((acc, s) => acc + (s.commission || 0), 0),
+        'Doanh thu tính hoa hồng': collectiveStats.reduce((acc, s) => acc + (s.monthlyRevenue || 0), 0),
+        'Thưởng tháng': collectiveStats.reduce((acc, s) => acc + s.monthlyBonus, 0),
+        'Vi phạm (Phạt)': -collectiveStats.reduce((acc, s) => acc + s.totalPenalties, 0),
+        'Khấu trừ Bảo hiểm': -collectiveStats.reduce((acc, s) => acc + s.totalInsurance, 0),
+        'Lương tạm ứng': -collectiveStats.reduce((acc, s) => acc + (s.paidSalary || 0), 0),
+        'Nợ tạm ứng (Cần hoàn yêu cầu)': collectiveStats.reduce((acc, s) => acc + (s.advanceDebt || 0), 0),
+        'Trừ nợ tháng trước': -collectiveStats.reduce((acc, s) => acc + (s.previousMonthDebt || 0), 0),
+        'Lương thực nhận/Còn lại': collectiveStats.reduce((acc, s) => acc + s.remainingNetSalary, 0)
+      };
+
+      exportToExcel([...exportData, totalRow], `BangLuong_TongHop_${format(currentMonth, 'MM_yyyy')}`, 'Bảng lương tổng hợp');
     }
   };
 

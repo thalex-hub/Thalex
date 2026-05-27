@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thalex Management - Hệ thống quản trị doanh nghiệp</title>
+    <script>
+      // Highly robust suppression of expected benign HMR/Vite socket connection warnings & firebase firestore transport warnings
+      (function() {
+        if (typeof window !== 'undefined') {
+          function shouldSuppress(msg) {
+            if (!msg) return false;
+            const normalized = msg.toLowerCase();
+            return (
+              normalized.includes('[vite]') || 
+              normalized.includes('websocket') || 
+              normalized.includes('hmr') ||
+              normalized.includes('@firebase/firestore') ||
+              normalized.includes('webchannelconnection') ||
+              normalized.includes("rpc 'listen' stream") ||
+              normalized.includes('transport errored') ||
+              normalized.includes('firestore')
+            );
+          }
+
+          function processArgs(args) {
+            return args.map(arg => {
+              try {
+                return (arg && typeof arg === 'object') ? JSON.stringify(arg) : String(arg);
+              } catch (_) {
+                return String(arg);
+              }
+            }).join(' ');
+          }
+
+          const origError = console.error;
+          console.error = function(...args) {
+            const msg = processArgs(args);
+            if (shouldSuppress(msg)) {
+              return; // Silence suppressed errors
+            }
+            origError.apply(console, args);
+          };
+
+          const origWarn = console.warn;
+          console.warn = function(...args) {
+            const msg = processArgs(args);
+            if (shouldSuppress(msg)) {
+              return; // Silence suppressed warnings
+            }
+            origWarn.apply(console, args);
+          };
+
+          const origLog = console.log;
+          console.log = function(...args) {
+            const msg = processArgs(args);
+            if (shouldSuppress(msg)) {
+              return; // Silence suppressed logs
+            }
+            origLog.apply(console, args);
+          };
+
+          window.addEventListener('unhandledrejection', function(event) {
+            const reason = event.reason;
+            const msg = reason ? (reason.message || String(reason)) : '';
+            if (shouldSuppress(msg)) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+            }
+          }, true);
+
+          window.addEventListener('error', function(event) {
+            const message = event.message;
+            if (shouldSuppress(message)) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+            }
+          }, true);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

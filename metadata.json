@@ -1,0 +1,6 @@
+{
+  "name": "Thalex Management",
+  "description": "Hệ thống quản trị doanh nghiệp toàn diện Thalex: Quản lý triển khai đơn hàng, dòng tiền chi tiết, nhân sự, chấm công và CRM.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

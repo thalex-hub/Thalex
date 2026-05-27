@@ -1,0 +1,374 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 0.1 Heartland Heartbeat - Allow read for everyone to test connectivity
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // Global helpers
+    function isSignedIn() { return request.auth != null; }
+    function isEmailVerified() { return request.auth.token.email_verified == true; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128; }
+    
+    // Identity integrity
+    function isOwner(data) { 
+      return isSignedIn() && (
+        (data.get('userId', '') == request.auth.uid) || 
+        (data.get('createdBy', '') == request.auth.uid) ||
+        (data.get('assignedTo', '') == request.auth.uid) ||
+        (data.get('uid', '') == request.auth.uid) ||
+        (request.auth.token.get('email', '').lower() != '' && data.get('email', '').lower() == request.auth.token.get('email', '').lower()) ||
+        (request.auth.token.get('email', '').lower() != '' && data.get('userEmail', '').lower() == request.auth.token.get('email', '').lower())
+      ); 
+    }
+
+    // Role check helpers
+    function existsUserDoc() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('roleId', 'Staff');
+    }
+
+    function isDirectorRole(role) {
+      return role in ['SuperAdmin', 'Director', 'ViceDirector'];
+    }
+
+    function isManagerRole(role) {
+      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'Manager', 'GeneralManager', 'HRManager', 'ChiefAccountant', 'SalesManager', 'TechnicalManager'] || 
+             role.matches('.*_Manager');
+    }
+
+    function isAccountantRole(role) {
+      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'ChiefAccountant', 'Accountant', 'AccountantStaff'] || 
+             role.matches('.*_Accountant');
+    }
+
+    function isHRRole(role) {
+      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'HRManager', 'HR', 'HRStaff'] || 
+             role.matches('.*_HR');
+    }
+
+    function isFinanceStaffRole(role) {
+      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'ChiefAccountant', 'Accountant', 'AccountantStaff', 'GeneralManager', 'Manager'] || 
+             role.matches('.*_Accountant');
+    }
+
+    // Read permission for user's role from role_permissions, falling back to standard defaults if the doc doesn't exist
+    function hasPermission(perm) {
+      return isSignedIn() && existsUserDoc() && (
+        getUserRole() in ['SuperAdmin', 'Director', 'ViceDirector', 'GeneralManager', 'Manager'] ||
+        (exists(/databases/$(database)/documents/role_permissions/$(getUserRole())) &&
+         perm in get(/databases/$(database)/documents/role_permissions/$(getUserRole())).data.get('permissions', [])) ||
+        
+        // Fallback for orders
+        ((perm == 'view_orders' || perm == 'menu_orders_view' || perm == 'menu_orders') && 
+          (getUserRole() in ['SalesManager', 'SalesStaff', 'ChiefAccountant', 'AccountantStaff', 'Accountant', 'TechnicalManager', 'TechnicalStaff', 'GeneralStaff', 'Staff'] || 
+           getUserRole().matches('.*_Manager') || getUserRole().matches('.*_Staff') || getUserRole().matches('.*_Accountant'))) ||
+        (perm == 'approve_orders' && (getUserRole() == 'SalesManager' || getUserRole().matches('.*_Manager'))) ||
+        
+        // Fallback for finance
+        ((perm == 'view_cashflow' || perm == 'menu_cash_flow_view' || perm == 'view_financial_reports' || perm == 'menu_business_expenses_view') && 
+          (getUserRole() in ['ChiefAccountant', 'AccountantStaff', 'Accountant'] || getUserRole().matches('.*_Accountant'))) ||
+        ((perm == 'manage_cashflow' || perm == 'menu_cash_flow_edit' || perm == 'approve_disbursements' || perm == 'menu_disbursements_edit') && 
+          getUserRole() in ['ChiefAccountant', 'Accountant']) ||
+        
+        // Fallback for proposals
+        ((perm == 'view_advances' || perm == 'view_reimbursements' || perm == 'view_payment_requests' || perm == 'menu_proposals_view') && 
+          (getUserRole() in ['ChiefAccountant', 'AccountantStaff', 'Accountant', 'SalesManager', 'SalesStaff', 'TechnicalManager', 'GeneralStaff', 'Staff'] || 
+           getUserRole().matches('.*_Manager') || getUserRole().matches('.*_Staff') || getUserRole().matches('.*_Accountant'))) ||
+        ((perm == 'approve_advances' || perm == 'approve_reimbursements' || perm == 'approve_payment_requests') && 
+          (getUserRole() in ['ChiefAccountant', 'Accountant', 'SalesManager'] || getUserRole().matches('.*_Manager'))) ||
+        ((perm == 'disburse_advances' || perm == 'disburse_reimbursements' || perm == 'disburse_payment_requests') && 
+          (getUserRole() in ['ChiefAccountant', 'Accountant', 'AccountantStaff'] || getUserRole().matches('.*_Accountant'))) ||
+        
+        // Fallback for HR / Users / Attendance
+        ((perm == 'view_users' || perm == 'menu_hr_view' || perm == 'view_attendance' || perm == 'menu_attendance_view') && 
+          (getUserRole() in ['HRManager', 'HRStaff', 'HR', 'ChiefAccountant', 'Accountant', 'AccountantStaff'] || getUserRole().matches('.*_HR'))) ||
+        ((perm == 'manage_users' || perm == 'menu_hr_edit' || perm == 'manage_attendance' || perm == 'menu_attendance_edit' || perm == 'approve_leave_requests') && 
+          (getUserRole() in ['HRManager', 'HR'] || getUserRole().matches('.*_HR'))) ||
+        
+        // Fallback for Tasks / Warehouse / Storage
+        (perm in ['view_tasks', 'menu_tasks_view', 'view_warehouse', 'menu_warehouse_view', 'view_storage', 'menu_storage_view']) ||
+        ((perm == 'manage_tasks' || perm == 'menu_tasks_edit') && 
+          (getUserRole() in ['HRManager', 'HRStaff', 'HR', 'SalesManager', 'TechnicalManager'] || getUserRole().matches('.*_Manager'))) ||
+        ((perm == 'manage_warehouse' || perm == 'menu_warehouse_edit') && 
+          (getUserRole() in ['ChiefAccountant', 'Accountant', 'TechnicalManager'] || getUserRole().matches('.*_Accountant'))) ||
+        ((perm == 'manage_storage' || perm == 'menu_storage_edit') && 
+          (getUserRole() in ['HRManager', 'ChiefAccountant', 'TechnicalManager'] || 
+           getUserRole().matches('.*_Manager') || getUserRole().matches('.*_HR') || getUserRole().matches('.*_Accountant')))
+      );
+    }
+
+    // Admin bootstrap
+    function isAdmin() { 
+      return isSignedIn() && (
+        request.auth.token.get('email', '').lower() == 'thangcd11@gmail.com'.lower() || 
+        request.auth.token.get('email', '').lower() == 'info.vinasglobal@gmail.com'.lower() || 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (existsUserDoc() && (
+          isDirectorRole(getUserRole()) || 
+          getUserRole() == 'HRManager' || 
+          getUserRole() == 'HR' || 
+          getUserRole().matches('.*_HR')
+        ))
+      ); 
+    }
+
+    function isDirector() { 
+      return isSignedIn() && (
+        request.auth.token.get('email', '').lower() == 'thangcd11@gmail.com'.lower() || 
+        request.auth.token.get('email', '').lower() == 'info.vinasglobal@gmail.com'.lower() || 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (existsUserDoc() && isDirectorRole(getUserRole()))
+      );
+    }
+
+    function isManager() { 
+      return isDirector() || (existsUserDoc() && isManagerRole(getUserRole())); 
+    }
+    
+    function isAccountant() { 
+      return isDirector() || (existsUserDoc() && isAccountantRole(getUserRole())); 
+    }
+    
+    function isHR() { 
+      return isDirector() || (existsUserDoc() && isHRRole(getUserRole())); 
+    }
+    
+    function isFinanceStaff() { 
+      return isDirector() || (existsUserDoc() && isFinanceStaffRole(getUserRole()));
+    }
+
+    // --- Entity Specific Rules ---
+
+    // Users
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isDirector() || isHR() || (isSignedIn() && request.auth.uid == userId);
+      allow delete: if isAdmin() || isDirector() ||
+                    (isSignedIn() && resource != null && resource.data.get('email', '').lower() == request.auth.token.get('email', '').lower());
+    }
+
+    // Admins helper collection
+    match /admins/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Attendance
+    match /attendance/{id} {
+      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing());
+      allow create: if isSignedIn();
+      allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing());
+      allow delete: if isDirector() || isHR();
+    }
+
+    // Tasks
+    match /tasks/{taskId} {
+      function isTaskLeader() { return isDirector() || isManager() || isHR(); }
+      function isTaskInvolved() {
+        return isSignedIn() && (
+          isTaskLeader() || 
+          existing().get('assigneeId', '') == request.auth.uid || 
+          existing().get('assignerId', '') == request.auth.uid ||
+          existing().get('responsibleUserId', '') == request.auth.uid ||
+          request.auth.uid in existing().get('followers', [])
+        );
+      }
+      
+      allow read: if isTaskInvolved() || isFinanceStaff();
+      allow create: if isTaskLeader() || isFinanceStaff();
+      allow update: if isTaskInvolved() || isFinanceStaff();
+      allow delete: if isTaskLeader() || (isSignedIn() && existing().assignerId == request.auth.uid);
+    }
+
+    // Task Comments
+    match /task_comments/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && existing().userId == request.auth.uid;
+      allow delete: if isDirector() || isHR() || (isSignedIn() && existing().userId == request.auth.uid);
+    }
+
+    // Customers
+    match /customers/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing());
+      allow delete: if isDirector() || isHR() || isFinanceStaff();
+    }
+
+    // Leave Requests
+    match /leave_requests/{id} {
+      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
+                   hasPermission('approve_leave_requests') || hasPermission('menu_proposals_view') ||
+                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+      allow create: if isSignedIn();
+      allow update: if isDirector() || isHR() || isManager() || isOwner(existing()) || 
+                   hasPermission('approve_leave_requests') ||
+                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+      allow delete: if isDirector() || isHR() || isOwner(existing());
+    }
+
+    // Advance, Payment, Reimbursement Requests
+    match /advance_requests/{id} {
+      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
+                   hasPermission('view_advances') || hasPermission('menu_proposals_view') ||
+                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+      allow create: if isSignedIn();
+      allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
+                   hasPermission('approve_advances') || hasPermission('disburse_advances') ||
+                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+      allow delete: if isDirector() || isFinanceStaff() || isOwner(existing());
+    }
+    
+    match /payment_requests/{id} {
+      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
+                   hasPermission('view_payment_requests') || hasPermission('menu_proposals_view') ||
+                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+      allow create: if isSignedIn();
+      allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
+                   hasPermission('approve_payment_requests') || hasPermission('disburse_payment_requests') ||
+                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+      allow delete: if isDirector() || isFinanceStaff() || isOwner(existing());
+    }
+
+    match /reimbursement_requests/{id} {
+      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
+                   hasPermission('view_reimbursements') || hasPermission('menu_proposals_view') ||
+                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+      allow create: if isSignedIn();
+      allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
+                   hasPermission('approve_reimbursements') || hasPermission('disburse_reimbursements') ||
+                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+      allow delete: if isDirector() || isFinanceStaff() || isOwner(existing());
+    }
+
+    // Order Proposals
+    match /order_proposals/{id} {
+      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
+                   hasPermission('view_orders') || hasPermission('menu_orders_view') ||
+                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+      allow create: if isSignedIn();
+      allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
+                   hasPermission('approve_orders') || hasPermission('menu_orders_edit');
+      allow delete: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing());
+    }
+    
+    // Orders
+    match /orders/{id} {
+      allow read: if isDirector() || isHR() || isFinanceStaff() || 
+                   hasPermission('view_orders') || hasPermission('menu_orders_view') || hasPermission('menu_orders') ||
+                   (isSignedIn() && (
+                     existing().get('responsibleUserId', '') == request.auth.uid || 
+                     request.auth.uid in existing().get('followers', []) ||
+                     existing().get('customerId', '') == request.auth.uid
+                   ));
+      allow create: if isDirector() || isHR() || isFinanceStaff() || hasPermission('create_orders') || hasPermission('menu_orders_edit');
+      allow update: if isDirector() || isHR() || isFinanceStaff() || hasPermission('edit_orders') || hasPermission('menu_orders_edit') || 
+                   (isSignedIn() && (
+                     existing().get('responsibleUserId', '') == request.auth.uid || 
+                     request.auth.uid in existing().get('followers', [])
+                   ));
+      allow delete: if isDirector() || hasPermission('delete_orders');
+      
+      match /comments/{commentId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    // Payments
+    match /payments/{id} {
+      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || hasPermission('view_cashflow') || hasPermission('manage_cashflow');
+      allow create: if isDirector() || isFinanceStaff() || hasPermission('manage_cashflow');
+      allow update: if isDirector() || isFinanceStaff() || hasPermission('manage_cashflow');
+      allow delete: if isDirector();
+    }
+    
+    // User Activity Logs
+    match /user_activity_logs/{id} {
+      allow read: if isDirector() || isHR() || (isSignedIn() && existing().userId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow delete: if isDirector() || isHR();
+    }
+
+    // CRM Activity
+    match /customer_activities/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Task Reports
+    match /task_reports/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isDirector() || isHR();
+    }
+
+    // Static data collections
+    match /departments/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR(); }
+    match /positions/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR(); }
+    match /roles/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR(); }
+    match /permissions/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR(); }
+    match /role_permissions/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR(); }
+    match /approvals/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR(); }
+    
+    // Settings
+    match /settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHR();
+    }
+
+    // Warehouse & Inventory
+    match /warehouses/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff(); }
+    match /product_categories/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff(); }
+    match /products/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff(); }
+    match /inventory/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff(); }
+    match /stock_transactions/{id} {
+      allow read: if isDirector() || isHR() || isFinanceStaff();
+      allow create: if isDirector() || isHR() || isFinanceStaff();
+      allow update: if isDirector() || isFinanceStaff();
+      allow delete: if isDirector();
+    }
+    match /stock_items/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff(); }
+
+    // Business Expenses
+    match /business_expenses/{id} {
+      allow read: if isDirector() || isHR() || isFinanceStaff();
+      allow write: if isDirector() || isFinanceStaff();
+    }
+
+    // Files & Folders
+    match /stored_files/{id} {
+      allow read: if isSignedIn() && (
+        resource.data.get('type', '') == 'company' || 
+        resource.data.get('ownerId', '') == request.auth.uid || 
+        (request.auth.uid in resource.data.get('sharedWith', [])) ||
+        ('all' in resource.data.get('sharedWith', []))
+      );
+      allow create: if isSignedIn();
+      allow update, delete: if isDirector() || isHR() || (isSignedIn() && existing().get('ownerId', '') == request.auth.uid);
+    }
+
+    match /folders/{id} {
+      allow read: if isSignedIn() && (
+        resource.data.get('type', '') == 'company' || 
+        resource.data.get('ownerId', '') == request.auth.uid || 
+        (request.auth.uid in resource.data.get('sharedWith', [])) ||
+        ('all' in resource.data.get('sharedWith', []))
+      );
+      allow create: if isSignedIn();
+      allow update, delete: if isDirector() || isHR() || (isSignedIn() && existing().get('ownerId', '') == request.auth.uid);
+    }
+  }
+}

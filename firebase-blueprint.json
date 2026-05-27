@@ -1,0 +1,584 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user / employee information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "employeeCode": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "avatar": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "positionId": { "type": "string" },
+        "roleId": { "type": "string" },
+        "managerId": { "type": "string" },
+        "workStatus": { "type": "string", "enum": ["probation", "official", "resigned"] },
+        "accountStatus": { "type": "string", "enum": ["pending", "active", "locked"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "birthDate": { "type": "string", "format": "date" },
+        "contractUrl": { "type": "string" },
+        "annualLeaveAllowance": { "type": "number" },
+        "baseSalary": { "type": "number" },
+        "insuranceSalary": { "type": "number" },
+        "yearlyBaseSalaries": { "type": "object", "description": "Yearly base salary overrides" },
+        "monthlyBonuses": { "type": "object", "description": "Manual monthly bonuses" },
+        "bonusPercentage": { "type": "object", "description": "KPI bonus percentage" },
+        "kpiRevenue": { "type": "object", "description": "KPI revenue targets" },
+        "needsAttendance": { "type": "boolean", "description": "Whether user needs to check in/out" },
+        "bankName": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "accountName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastLoginAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "email", "roleId"]
+    },
+    "Department": {
+      "title": "Department",
+      "description": "Company departments",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "managerId": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["name", "status"]
+    },
+    "Position": {
+      "title": "Position",
+      "description": "Job positions within departments",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "level": { "type": "integer" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["name", "departmentId", "status"]
+    },
+    "Role": {
+      "title": "Role",
+      "description": "Application roles for permissions",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "level": { "type": "integer" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["name", "level", "status"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily attendance records",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "workDate": { "type": "string", "format": "date" },
+        "checkInTime": { "type": "string", "format": "date-time" },
+        "checkOutTime": { "type": "string", "format": "date-time" },
+        "workHours": { "type": "number" },
+        "lateMinutes": { "type": "integer" },
+        "earlyLeaveMinutes": { "type": "integer" },
+        "location": { "type": "object" },
+        "status": { "type": "string", "enum": ["valid", "pending_verification"] }
+      },
+      "required": ["userId", "workDate", "checkInTime", "status"]
+    },
+    "LeaveRequest": {
+      "title": "LeaveRequest",
+      "description": "Employee leave requests",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["annual", "sick", "personal"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "totalDays": { "type": "number" },
+        "reason": { "type": "string" },
+        "approverId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      },
+      "required": ["userId", "type", "startDate", "endDate", "status"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Managed tasks and project work",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "assignerId": { "type": "string" },
+        "assigneeId": { "type": "string" },
+        "assigneeName": { "type": "string" },
+        "assigneeAvatar": { "type": "string" },
+        "responsibleUserId": { "type": "string" },
+        "responsibleUserName": { "type": "string" },
+        "assignerId": { "type": "string" },
+        "assignerName": { "type": "string" },
+        "followers": { "type": "array", "items": { "type": "string" } },
+        "parentId": { "type": "string" },
+        "checklist": { "type": "array", "items": { "type": "object" } },
+        "attachments": { "type": "array", "items": { "type": "object" } },
+        "customerId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "progress": { "type": "integer" },
+        "status": { "type": "string", "enum": ["new", "assigned", "in_progress", "awaiting_confirmation", "completed", "overdue"] }
+      },
+      "required": ["name", "assignerId", "assigneeId", "status"]
+    },
+    "TaskReport": {
+      "title": "TaskReport",
+      "description": "Progress updates for tasks",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "userId": { "type": "string" },
+        "reportDate": { "type": "string", "format": "date-time" },
+        "content": { "type": "string" },
+        "progressUpdate": { "type": "integer" },
+        "attachment": { "type": "string" }
+      },
+      "required": ["taskId", "userId", "reportDate", "content"]
+    },
+    "AdvanceRequest": {
+      "title": "AdvanceRequest",
+      "description": "Salary/expenditure advance requests",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "purpose": { "type": "string" },
+        "relatedOrderId": { "type": "string" },
+        "requestDate": { "type": "string", "format": "date-time" },
+        "approverId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "disbursed"] },
+        "paymentStatus": { "type": "string", "enum": ["not_disbursed", "disbursed", "repaid"] },
+        "paymentMethod": { "type": "string", "enum": ["cash", "transfer"] },
+        "bankName": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "accountName": { "type": "string" },
+        "isSettled": { "type": "boolean" },
+        "actualSpentAmount": { "type": "number" },
+        "differenceAmount": { "type": "number" },
+        "settlementNotes": { "type": "string" },
+        "settledAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "purpose", "requestDate", "status"]
+    },
+    "payment_requests": {
+      "title": "PaymentRequest",
+      "description": "Supplier or cost payment requests",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["supplier", "reimbursement", "operating_cost"] },
+        "supplierName": { "type": "string" },
+        "amount": { "type": "number" },
+        "reason": { "type": "string" },
+        "relatedOrderId": { "type": "string" },
+        "invoiceFile": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "paid"] }
+      },
+      "required": ["userId", "type", "amount", "status"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Actual financial transactions (income/expense)",
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "amount": { "type": "number" },
+        "method": { "type": "string", "enum": ["cash", "transfer"] },
+        "paymentDate": { "type": "string", "format": "date-time" },
+        "note": { "type": "string" }
+      },
+      "required": ["type", "amount", "method", "paymentDate"]
+    },
+    "OrderProposal": {
+      "title": "OrderProposal",
+      "description": "Draft orders/sales proposals with financial estimates",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "name": { "type": "string" },
+        "sellingPrice": { "type": "number" },
+        "sellingVAT": { "type": "number" },
+        "contractValueWithVAT": { "type": "number" },
+        "payment1Percentage": { "type": "number" },
+        "payment1Amount": { "type": "number" },
+        "remainingDebt": { "type": "number" },
+        "costPrice": { "type": "number" },
+        "costVAT": { "type": "number" },
+        "totalCostWithVAT": { "type": "number" },
+        "financialCost": { "type": "number" },
+        "warrantyCost": { "type": "number" },
+        "contingencyCost": { "type": "number" },
+        "customerAcquisitionCost": { "type": "number" },
+        "otherCosts": { "type": "number" },
+        "expectedProfit": { "type": "number" },
+        "profitMargin": { "type": "number" },
+        "expectedProfitAfterCIT": { "type": "number" },
+        "profitMarginAfterCIT": { "type": "number" },
+        "note": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "contractDraft": { "type": "object" },
+        "businessPlan": { "type": "object" },
+        "followers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerId", "createdBy", "name", "sellingPrice", "costPrice", "status", "contractDraft", "businessPlan"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Official business orders",
+      "type": "object",
+      "properties": {
+        "proposalId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "totalValue": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "remainingAmount": { "type": "number" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["contract_signed", "implementing", "completed", "cancelled"] },
+        "isInvoiced": { "type": "boolean" },
+        "invoicedAt": { "type": "string", "format": "date-time" },
+        "invoiceFileUrl": { "type": "string" },
+        "responsibleUserId": { "type": "string" },
+        "followers": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["customerId", "code", "name", "totalValue", "status"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "CRM Customer data",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "companyName": { "type": "string" },
+        "billingAddress": { "type": "string" },
+        "officeAddress": { "type": "string" },
+        "taxCode": { "type": "string" },
+        "billingEmail": { "type": "string", "format": "email" },
+        "customerType": { "type": "string", "enum": ["supplier", "agent", "brand", "investor"] },
+        "customerClass": { "type": "string", "enum": ["VIP", "regular"] },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "email": { "type": "string", "format": "email" },
+              "phone": { "type": "string" }
+            },
+            "required": ["name", "email", "phone"]
+          }
+        },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "source": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "status": { "type": "string", "enum": ["new", "nurturing", "purchased", "stopped"] },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "companyName", "billingAddress", "officeAddress", "taxCode", "customerType", "customerClass", "contacts", "status"]
+    },
+    "CustomerActivity": {
+      "title": "CustomerActivity",
+      "description": "CRM activities history",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "userId": { "type": "string" },
+        "activityDate": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["call", "meeting", "quote", "care"] },
+        "content": { "type": "string" },
+        "nextActionDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerId", "userId", "activityDate", "type", "content"]
+    },
+    "Permission": {
+      "title": "Permission",
+      "description": "Individual permission definition",
+      "type": "object",
+      "properties": {
+        "permissionId": { "type": "string" },
+        "moduleName": { "type": "string" },
+        "action": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["permissionId", "moduleName", "action"]
+    },
+    "RolePermission": {
+      "title": "RolePermission",
+      "description": "Mapping from roles to permissions",
+      "type": "object",
+      "properties": {
+        "roleId": { "type": "string" },
+        "permissionId": { "type": "string" },
+        "status": { "type": "boolean" }
+      },
+      "required": ["roleId", "permissionId", "status"]
+    },
+    "Approval": {
+      "title": "Approval",
+      "description": "Central approval log",
+      "type": "object",
+      "properties": {
+        "requestType": { "type": "string" },
+        "requestId": { "type": "string" },
+        "requestedBy": { "type": "string" },
+        "approverId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "approvedDate": { "type": "string", "format": "date-time" },
+        "comment": { "type": "string" }
+      },
+      "required": ["requestType", "requestId", "requestedBy", "status"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Log of user activity in the system",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "path": { "type": "string" }
+      },
+      "required": ["userId", "action", "timestamp"]
+    },
+    "CompanySettings": {
+      "title": "CompanySettings",
+      "description": "Global company settings like name and logo",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logo": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "website": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "geofenceRadius": { "type": "number", "description": "Radius in meters for attendance check-in" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Warehouse": {
+      "title": "Warehouse",
+      "description": "Storage locations for products",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "managerId": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["name", "status"]
+    },
+    "ProductCategory": {
+      "title": "ProductCategory",
+      "description": "Categories for product classification",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Items in the product catalog",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "unit": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "purchasePrice": { "type": "number" },
+        "minStockLevel": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "name", "unit", "status"]
+    },
+    "StockTransaction": {
+      "title": "StockTransaction",
+      "description": "Records of items moving in/out of warehouses",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["inbound", "outbound", "transfer", "adjustment"] },
+        "warehouseId": { "type": "string" },
+        "toWarehouseId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "note": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "productName": { "type": "string" },
+              "sn": { "type": "string" },
+              "quantity": { "type": "number" },
+              "unitPrice": { "type": "number" }
+            },
+            "required": ["productId", "quantity", "sn"]
+          }
+        },
+        "transactionDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] }
+      },
+      "required": ["userId", "type", "warehouseId", "items", "transactionDate", "status"]
+    },
+    "Inventory": {
+      "title": "Inventory",
+      "description": "Current stock levels for products in warehouses",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "warehouseId": { "type": "string" },
+        "quantity": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["productId", "warehouseId", "quantity"]
+    },
+    "StockItem": {
+      "title": "StockItem",
+      "description": "Individual product instance (usually by serial number) in stock",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "productCode": { "type": "string" },
+        "productName": { "type": "string" },
+        "warehouseId": { "type": "string" },
+        "sn": { "type": "string" },
+        "entryDate": { "type": "string", "format": "date-time" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["productId", "warehouseId", "sn", "entryDate"]
+    },
+    "BusinessExpense": {
+      "title": "BusinessExpense",
+      "description": "Company operating expenses by category and month",
+      "type": "object",
+      "properties": {
+        "month": { "type": "string", "description": "Format yyyy-MM" },
+        "type": { "type": "string", "enum": ["salary", "rent", "electricity", "water", "supplies", "shipping", "other"] },
+        "amount": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["month", "type", "amount"]
+    },
+    "StoredFile": {
+      "title": "StoredFile",
+      "description": "Uploaded files for personal or company storage",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["personal", "company"] },
+        "category": { "type": "string", "enum": ["templates", "regulations", "notifications", "culture", "other"] },
+        "folderId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "sharedWith": { "type": "array", "items": { "type": "string" } },
+        "url": { "type": "string" },
+        "size": { "type": "number" },
+        "mimeType": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "type", "url", "createdAt"]
+    },
+    "Folder": {
+      "title": "Folder",
+      "description": "User created folders for organizing files",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["personal", "company"] },
+        "category": { "type": "string", "enum": ["templates", "regulations", "notifications", "culture", "other"] },
+        "ownerId": { "type": "string" },
+        "parentFolderId": { "type": "string", "description": "ID of parent folder for nested structures" },
+        "sharedWith": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "type", "ownerId", "createdAt"]
+    },
+    "TaskComment": {
+      "title": "TaskComment",
+      "description": "Comments on tasks",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userAvatar": { "type": "string" },
+        "text": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "object" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["taskId", "userId", "text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "settings": { "schema": "CompanySettings", "description": "Global application settings" },
+    "users": { "schema": "User", "description": "System users" },
+    "departments": { "schema": "Department", "description": "Company departments" },
+    "positions": { "schema": "Position", "description": "Job positions" },
+    "roles": { "schema": "Role", "description": "User roles" },
+    "permissions": { "schema": "Permission", "description": "Permission definitions" },
+    "role_permissions": { "schema": "RolePermission", "description": "Role-Permission mapping" },
+    "attendance": { "schema": "Attendance", "description": "Employee attendance" },
+    "leave_requests": { "schema": "LeaveRequest", "description": "Leave requests" },
+    "tasks": { "schema": "Task", "description": "Tasks" },
+    "task_reports": { "schema": "TaskReport", "description": "Task progress reports" },
+    "task_comments": { "schema": "TaskComment", "description": "Task comments and discussions" },
+    "advance_requests": { "schema": "AdvanceRequest", "description": "Advance requests" },
+    "payment_requests": { "schema": "PaymentRequest", "description": "Payment requests" },
+    "payments": { "schema": "Payment", "description": "Financial payments" },
+    "order_proposals": { "schema": "OrderProposal", "description": "Order proposals" },
+    "orders": { "schema": "Order", "description": "Orders" },
+    "customers": { "schema": "Customer", "description": "CRM Customers" },
+    "customer_activities": { "schema": "CustomerActivity", "description": "CRM Activities" },
+    "approvals": { "schema": "Approval", "description": "Approval history" },
+    "user_activity_logs": { "schema": "ActivityLog", "description": "System activity logs" },
+    "warehouses": { "schema": "Warehouse", "description": "Warehouse locations" },
+    "product_categories": { "schema": "ProductCategory", "description": "Product categories" },
+    "products": { "schema": "Product", "description": "Product catalog" },
+    "stock_transactions": { "schema": "StockTransaction", "description": "Stock movements" },
+    "inventory": { "schema": "Inventory", "description": "Stock levels" },
+    "stock_items": { "schema": "StockItem", "description": "Individual stock entries for aging tracking" },
+    "business_expenses": { "schema": "BusinessExpense", "description": "Operating expenses tracking" },
+    "stored_files": { "schema": "StoredFile", "description": "Personal and company files" },
+    "folders": { "schema": "Folder", "description": "User folders" }
+  }
+}

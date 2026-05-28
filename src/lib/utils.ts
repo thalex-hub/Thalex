@@ -128,12 +128,11 @@ export function getApiUrl(path: string): string {
     return cleanPath;
   }
 
-  // For custom domains (like thalex.com.vn), since Cloudflare Workers/Pages
-  // only hosts static assets and doesn't run the Node.js Express server, relative paths (/api/*)
-  // would result in a 405 Method Not Allowed error on POST requests.
-  // Instead, we route requests directly to the secure Cloud Run production backend, which fully supports Cross-Origin Resource Sharing (CORS).
-  const defaultBackend = "https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app";
-  return `${defaultBackend}${cleanPath}`;
+  // For custom domains (like thalex.com.vn) hosted on Cloudflare Pages,
+  // we use Cloudflare Functions (/functions/api/[[path]].ts) to proxy the requests securely
+  // to the Cloud Run backend. This avoids CORS issues entirely since the browser
+  // makes a same-origin request.
+  return cleanPath;
 }
 
 /**

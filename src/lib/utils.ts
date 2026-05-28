@@ -84,28 +84,12 @@ export function getApiUrl(path: string): string {
     return cleanPath;
   }
   const hostname = window.location.hostname;
-  // If we are developing locally or in standard run.app containers, relative paths are perfect
-  if (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.endsWith('.run.app') ||
-    hostname.endsWith('.gitpod.io') ||
-    hostname.includes('webcontainer')
-  ) {
-    return cleanPath;
+  
+  // Khi chạy trên tên miền chính thức của bạn (thalex.com.vn), chuyển hướng trực tiếp đến máy chủ Render
+  if (hostname.includes('thalex.com.vn')) {
+    return `https://thalex-a4zw.onrender.com${cleanPath}`;
   }
   
-  // Custom domains (like thalex.com.vn)
-  // We MUST use relative path proxying because direct CORS requests to the Cloud Run preview URL (https://ais-pre-...)
-  // are blocked by Google's preview proxy authentication layer, resulting in "Failed to fetch".
-  // To resolve the "405 Method Not Allowed" error on their custom domain, the user's Nginx server must be configured
-  // to correctly proxy `/business/api/` requests to the Cloud Run backend.
-  const pathname = window.location.pathname;
-  const match = pathname.match(/^\/([^/]+)/);
-  const baseSegment = match ? match[1] : '';
-  if (baseSegment && baseSegment !== 'api') {
-    return `/${baseSegment}${cleanPath}`;
-  }
   return cleanPath;
 }
 

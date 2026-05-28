@@ -3,7 +3,8 @@ import { getApiUrl } from './utils';
 export async function generateGeminiContent(prompt: string, history?: any[]) {
   const response = await fetch(getApiUrl('/api/gemini'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    // MUST use text/plain instead of application/json to bypass strict CORS OPTIONS preflight
+    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ prompt, history }),
   });
   

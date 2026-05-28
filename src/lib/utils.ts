@@ -103,13 +103,6 @@ export function getApiUrl(path: string): string {
     }
   } catch (e) {}
 
-  // ALWAYS proxy on custom domains (like thalex.com.vn) via Cloudflare Functions.
-  // This guarantees same-origin requests and bypasses all CORS "Load failed" errors.
-  // We ignore VITE_API_URL on custom domains to force using the relative proxy.
-  if (!isLocal && !isCloudRun) {
-    return cleanPath;
-  }
-
   // If running on a custom domain (such as thalex.com.vn)
   // Check if an API URL is explicitly configured in VITE_API_URL
   let envApiUrl = (import.meta as any).env?.VITE_API_URL;
@@ -122,6 +115,14 @@ export function getApiUrl(path: string): string {
       const base = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
       return `${base}${cleanPath}`;
     }
+  }
+
+  // ALWAYS use absolute URL proxy on custom domains (like thalex.com.vn) if VITE_API_URL is missing.
+  // We cannot use relative paths because standard static hosting servers (Vercel, cPanel, Netlify)
+  // will throw 405 Method Not Allowed for POST requests to static files.
+  if (!isLocal && !isCloudRun) {
+    const defaultBackend = "https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app";
+    return `${defaultBackend}${cleanPath}`;
   }
 
   // If local development or directly on the Cloud Run preview, use relative path dynamically
@@ -150,6 +151,17 @@ export async function safeFetchJson<T = any>(
   options?: RequestInit
 ): Promise<{ success: boolean; data?: T; error?: string; status?: number }> {
   try {
+    // If the request has body and headers explicitly set to application/json, 
+    // we rewrite it to text/plain to bypass CORS preflight OPTIONS requests,
+    // which are often aggressively blocked by strict reverse proxies on custom domains.
+    if (options?.headers) {
+      const headers = new Headers(options.headers);
+      if (headers.get('Content-Type') === 'application/json') {
+        headers.set('Content-Type', 'text/plain');
+        options.headers = headers;
+      }
+    }
+
     const res = await fetch(url, options);
     const contentType = res.headers.get("content-type") || "";
     

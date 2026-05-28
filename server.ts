@@ -362,12 +362,12 @@ app.post("/api/send-account-email", async (req, res) => {
                     <span class="label">Tên đăng nhập:</span>
                     <span class="value" style="color: #0f172a;">${email}</span>
                   </div>
-                  \${password ? \`
+                  ${password ? `
                   <div class="row" style="margin-bottom: 0;">
                     <span class="label">Mật khẩu đăng nhập:</span>
                     <span class="code-value">${password}</span>
                   </div>
-                  \` : ''}
+                  ` : ''}
                 </div>
 
                 <div class="button-wrapper">

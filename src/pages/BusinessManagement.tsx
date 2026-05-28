@@ -435,9 +435,12 @@ export default function BusinessManagement() {
           });
           const mailData = await mailRes.json();
           if (mailData.simulated) {
-            emailSuccessMsg = ' (Đã ghi nhận, SMTP chưa cấu hình nên gửi email giả lập)';
-          } else if (mailData.success) {
-            emailSuccessMsg = ' (Email thông tin tài khoản đã gửi tới nhân sự!)';
+            emailSuccessMsg = ' (Môi trường kiểm thử: Ghi nhận và in thông tin email giả lập ở log)';
+          } else if (mailRes.ok && mailData.success) {
+            emailSuccessMsg = ' (Thành công! Email thông tin kích hoạt đã gửi tới hòm thư nhân sự)';
+          } else {
+            console.error("SMTP setup error details:", mailData.error);
+            emailSuccessMsg = ` (Lỗi gửi email: ${mailData.error || 'Vui lòng kiểm tra lại cấu hình SMTP.'})`;
           }
         } else {
           emailSuccessMsg = ' (Tự động gửi email giới thiệu đang tắt)';
@@ -466,6 +469,60 @@ export default function BusinessManagement() {
       console.error("Create user error:", err);
       alert('Lỗi khởi tạo tài khoản: ' + (err.message || String(err)));
       // handleFirestoreError(err, OperationType.CREATE, 'users'); // Keep for debugging if needed, but alert first
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendWelcomeEmail = async (userId: string, userEmail: string, userFullName: string, userTempPassword?: string) => {
+    if (!userTempPassword) {
+      alert("Tài khoản này không lưu mật khẩu tạm thời hoặc đã đổi mật khẩu (đã được kích hoạt).");
+      return;
+    }
+    setLoading(true);
+    try {
+      const companyProfileSnap = await getDoc(doc(db, 'settings', 'company_profile'));
+      const companyProfile = companyProfileSnap.exists() ? companyProfileSnap.data() : null;
+
+      if (!companyProfile?.smtpEnabled) {
+        alert("Bên quản trị chưa kích hoạt tính năng gửi Email tự động trong mục 'Cài đặt hệ thống'!");
+        setLoading(false);
+        return;
+      }
+
+      const mailRes = await fetch('/api/send-account-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: userEmail,
+          fullName: userFullName,
+          password: userTempPassword,
+          customAppUrl: window.location.origin,
+          smtpConfig: {
+            host: companyProfile.smtpHost,
+            port: companyProfile.smtpPort,
+            user: companyProfile.smtpUser,
+            pass: companyProfile.smtpPass,
+            from: companyProfile.smtpFrom,
+            templateSubject: companyProfile.welcomeTemplateSubject,
+            templateBody: companyProfile.welcomeTemplateBody,
+          }
+        })
+      });
+
+      const mailData = await mailRes.json();
+      if (mailData.simulated) {
+        alert("SMTP chưa cấu hình, email mô phỏng đã được ghi lại trên nhật ký máy chủ.");
+      } else if (mailRes.ok && mailData.success) {
+        alert(`Đã gửi lại thành công email kích hoạt tài khoản tới nhân sự: ${userEmail}`);
+      } else {
+        alert(`Lỗi gửi mail: ${mailData.error || 'Vui lòng kiểm tra lại cấu hình SMTP.'}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`Gặp vấn đề khi gửi lại email: ${err.message || String(err)}`);
     } finally {
       setLoading(false);
     }
@@ -863,6 +920,16 @@ export default function BusinessManagement() {
                         </td>
                         <td className="px-6 py-4 text-right">
                            <div className="flex justify-end gap-2">
+                             {u.accountStatus === 'pending' && u.tempPassword && (
+                               <button 
+                                 onClick={() => handleResendWelcomeEmail(u.uid, u.email, u.fullName, u.tempPassword)}
+                                 disabled={loading}
+                                 className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                                 title="Gửi lại email thông tin tài khoản"
+                               >
+                                 <Mail size={18} />
+                               </button>
+                             )}
                              <button 
                                onClick={() => {
                                  const currentYear = new Date().getFullYear().toString();
@@ -1654,6 +1721,18 @@ export default function BusinessManagement() {
                     >
                       Hủy bỏ
                     </button>
+                    {editingUser?.accountStatus === 'pending' && editingUser?.tempPassword && (
+                      <button 
+                        type="button" 
+                        onClick={() => handleResendWelcomeEmail(editingUser.uid, editingUser.email, editingUser.fullName, editingUser.tempPassword)}
+                        disabled={loading}
+                        className="flex-1 py-3 bg-orange-50 text-orange-600 rounded-xl font-bold hover:bg-orange-100 transition-all flex items-center justify-center gap-2"
+                        title="Gửi lại thông tin tài khoản qua email"
+                      >
+                        <Mail size={16} />
+                        Gửi lại Email
+                      </button>
+                    )}
                     <button 
                       type="submit" 
                       disabled={loading} 

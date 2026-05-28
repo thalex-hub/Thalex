@@ -96,14 +96,10 @@ export function getApiUrl(path: string): string {
   }
   
   // Custom domains (like thalex.com.vn)
-  // OPTION 1 (Default - RECOMMENDED FOR QUICK SETUP): Route directly to Cloud Run backend using CORS.
-  // This guarantees that any custom server Nginx configuration (which may incorrectly treat API paths as static folders 
-  // and trigger 405 Method Not Allowed) will be bypassed smoothly.
-  return `https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app${cleanPath}`;
-
-  /*
-  // OPTION 2 (RECOMMENDED FOR PRODUCTION): Relative path proxy.
-  // If your Nginx is configured to correctly proxy both static files and api routes, you can use relative paths:
+  // We MUST use relative path proxying because direct CORS requests to the Cloud Run preview URL (https://ais-pre-...)
+  // are blocked by Google's preview proxy authentication layer, resulting in "Failed to fetch".
+  // To resolve the "405 Method Not Allowed" error on their custom domain, the user's Nginx server must be configured
+  // to correctly proxy `/business/api/` requests to the Cloud Run backend.
   const pathname = window.location.pathname;
   const match = pathname.match(/^\/([^/]+)/);
   const baseSegment = match ? match[1] : '';
@@ -111,7 +107,6 @@ export function getApiUrl(path: string): string {
     return `/${baseSegment}${cleanPath}`;
   }
   return cleanPath;
-  */
 }
 
 /**

@@ -88,21 +88,28 @@ export function getApiUrl(path: string): string {
   const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
   const isCloudRun = hostname.endsWith('run.app');
 
-  // If there's an explicitly configured API URL env variable, we respect it
+  // If local development or directly on the Cloud Run preview, use relative path dynamically
+  if (isLocal || isCloudRun) {
+    const pathname = window.location.pathname;
+    const match = pathname.match(/^\/([^/]+)/);
+    const baseSegment = match ? match[1] : '';
+    if (baseSegment && baseSegment !== 'api') {
+      return `/${baseSegment}${cleanPath}`;
+    }
+    return cleanPath;
+  }
+
+  // If running on a custom domain (such as thalex.com.vn)
+  // Check if an API URL is explicitly configured in VITE_API_URL
   const envApiUrl = import.meta.env.VITE_API_URL;
-  if (envApiUrl && !isLocal && !isCloudRun) {
+  if (envApiUrl) {
     const base = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
     return `${base}${cleanPath}`;
   }
 
-  // Force relative paths with matching base segments for routing to work seamlessly via proxy
-  const pathname = window.location.pathname;
-  const match = pathname.match(/^\/([^/]+)/);
-  const baseSegment = match ? match[1] : '';
-  if (baseSegment && baseSegment !== 'api') {
-    return `/${baseSegment}${cleanPath}`;
-  }
-  return cleanPath;
+  // Fallback to the absolute Cloud Run backend URL to bypass Cloudflare Pages' static environment
+  const absoluteBackend = 'https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app';
+  return `${absoluteBackend}${cleanPath}`;
 }
 
 /**

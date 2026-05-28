@@ -8,6 +8,19 @@ export async function onRequest(context: { request: Request; env: any; params: a
   // Override Host header to point to the backend server
   headers.set('Host', 'ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app');
 
+  // Handle CORS preflight requests directly
+  if (context.request.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept, Origin',
+        'Access-Control-Max-Age': '86400',
+      }
+    });
+  }
+
   // Set up request options for the proxy fetch
   const requestOptions: RequestInit = {
     method: context.request.method,

@@ -210,6 +210,24 @@ export default function NotificationManager() {
     setIsLoaded(true);
   }, [currentUser?.uid]);
 
+  // Listen to system reset event to clear local notifications and notified sets
+  React.useEffect(() => {
+    const handleClearNotifications = () => {
+      setNotifications([]);
+      setNotifiedTasks(new Set());
+      setNotifiedLeave(new Set());
+      setNotifiedApprovals(new Set());
+      notifiedTasksRef.current = new Set();
+      notifiedLeaveRef.current = new Set();
+      notifiedApprovalsRef.current = new Set();
+    };
+    
+    window.addEventListener('clear-local-notifications', handleClearNotifications);
+    return () => {
+      window.removeEventListener('clear-local-notifications', handleClearNotifications);
+    };
+  }, []);
+
   // Save user-isolated notification state
   React.useEffect(() => {
     if (!currentUser || !isLoaded) return;

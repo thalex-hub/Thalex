@@ -113,6 +113,34 @@ export default function Settings() {
       });
       await usersBatch.commit();
 
+      // Clear browser local storage keys for notifications
+      try {
+        const uid = user?.uid;
+        if (uid) {
+          localStorage.removeItem(`notification_history_${uid}`);
+          localStorage.removeItem(`notified_tasks_${uid}`);
+          localStorage.removeItem(`notified_leave_${uid}`);
+          localStorage.removeItem(`notified_approvals_${uid}`);
+        }
+        // Also clear any other users' or general notification storage keys
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && (
+            key.startsWith('notification_history_') ||
+            key.startsWith('notified_tasks_') ||
+            key.startsWith('notified_leave_') ||
+            key.startsWith('notified_approvals_')
+          )) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch (e) {
+        console.error("Lỗi khi xoá localStorage sau reset:", e);
+      }
+
+      // Dispatch event to immediately clear NotificationManager active state
+      window.dispatchEvent(new Event('clear-local-notifications'));
+
       setResetSuccess(true);
       setResetConfirmInput('');
       setResetMessage('');

@@ -1,5 +1,6 @@
 import { db } from './firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { getApiUrl } from './utils';
 
 interface ProposalNotificationData {
   proposalType: string;         // 'leave_requests' | 'payment_requests' | 'advance_requests' | 'reimbursement_requests' | 'order_proposals'
@@ -122,7 +123,7 @@ export async function sendProposalEmailNotification(data: ProposalNotificationDa
       console.log(`Sending proposal status update to approver: ${userObj.email} (${userObj.fullName})`);
       
       try {
-        await fetch('/api/send-proposal-email', {
+        await fetch(getApiUrl('/api/send-proposal-email'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

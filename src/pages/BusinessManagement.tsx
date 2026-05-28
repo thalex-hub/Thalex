@@ -7,7 +7,7 @@ import {
   Trash2, X, Settings2, Calendar, FileText, Download, Clock, FileSpreadsheet,
   LayoutGrid, Building2, UserPlus, Key, Upload, FileUp, Search, Check, Save, Info
 } from 'lucide-react';
-import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../lib/utils';
+import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, getApiUrl, safeFetchJson } from '../lib/utils';
 import { AppUser, UserRole } from '../types';
 
 const ROLE_NAMES: Record<UserRole, string> = {
@@ -412,7 +412,7 @@ export default function BusinessManagement() {
         const companyProfile = companyProfileSnap.exists() ? companyProfileSnap.data() : null;
 
         if (companyProfile?.smtpEnabled) {
-          const mailRes = await fetch('/api/send-account-email', {
+          const { success, data: mailData, error: fetchErr } = await safeFetchJson(getApiUrl('/api/send-account-email'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -433,14 +433,16 @@ export default function BusinessManagement() {
               }
             })
           });
-          const mailData = await mailRes.json();
-          if (mailData.simulated) {
-            emailSuccessMsg = ' (Môi trường kiểm thử: Ghi nhận và in thông tin email giả lập ở log)';
-          } else if (mailRes.ok && mailData.success) {
-            emailSuccessMsg = ' (Thành công! Email thông tin kích hoạt đã gửi tới hòm thư nhân sự)';
+          
+          if (!success) {
+            console.error("Failed to send welcome email:", fetchErr);
+            emailSuccessMsg = ` (Lỗi gửi email: ${fetchErr})`;
+          } else if (mailData?.simulated) {
+            emailSuccessMsg = ' (Môi trường kiểm thử: Ghi nhận và in thông tin thông tin tài khoản ở log)';
+          } else if (mailData?.success) {
+            emailSuccessMsg = ' (Thành công! Email kích hoạt tài khoản đã gửi tới nhân sự)';
           } else {
-            console.error("SMTP setup error details:", mailData.error);
-            emailSuccessMsg = ` (Lỗi gửi email: ${mailData.error || 'Vui lòng kiểm tra lại cấu hình SMTP.'})`;
+            emailSuccessMsg = ` (Lỗi gửi email: ${mailData?.error || 'Vui lòng kiểm tra lại cấu hình SMTP.'})`;
           }
         } else {
           emailSuccessMsg = ' (Tự động gửi email giới thiệu đang tắt)';
@@ -490,7 +492,7 @@ export default function BusinessManagement() {
         return;
       }
 
-      const mailRes = await fetch('/api/send-account-email', {
+      const { success, data: mailData, error: fetchErr } = await safeFetchJson(getApiUrl('/api/send-account-email'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -512,13 +514,14 @@ export default function BusinessManagement() {
         })
       });
 
-      const mailData = await mailRes.json();
-      if (mailData.simulated) {
-        alert("SMTP chưa cấu hình, email mô phỏng đã được ghi lại trên nhật ký máy chủ.");
-      } else if (mailRes.ok && mailData.success) {
-        alert(`Đã gửi lại thành công email kích hoạt tài khoản tới nhân sự: ${userEmail}`);
+      if (!success) {
+        alert(`Lỗi kết nối hoặc gửi email: ${fetchErr}`);
+      } else if (mailData?.simulated) {
+        alert("SMTP chưa cấu hình, thông tin tài khoản tạm thời đã được ghi lại trên nhật ký máy chủ để kiểm thử.");
+      } else if (mailData?.success) {
+        alert(`Đã gửi lại thành công email thông tin kích hoạt tài khoản tới: ${userEmail}`);
       } else {
-        alert(`Lỗi gửi mail: ${mailData.error || 'Vui lòng kiểm tra lại cấu hình SMTP.'}`);
+        alert(`Lỗi từ máy chủ SMTP: ${mailData?.error || 'Vui lòng kiểm tra lại cấu hình SMTP.'}`);
       }
     } catch (err: any) {
       console.error(err);

@@ -4,7 +4,7 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { Layout, Building2, Upload, Save, Trash2, MapPin, Compass, Crosshair, Mail, Server, Send, Eye, EyeOff } from 'lucide-react';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { motion } from 'motion/react';
-import { cn } from '../lib/utils';
+import { cn, getApiUrl, safeFetchJson } from '../lib/utils';
 
 interface CompanySettings {
   name: string;
@@ -237,7 +237,7 @@ export default function CompanyProfile() {
     setTestStatus('idle');
     setTestMessage('');
     try {
-      const res = await fetch('/api/test-smtp', {
+      const { success, data, error: fetchErr } = await safeFetchJson(getApiUrl('/api/test-smtp'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -253,13 +253,12 @@ export default function CompanyProfile() {
           targetEmail: testEmail,
         }),
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (success && data?.success) {
         setTestStatus('success');
         setTestMessage(data.message);
       } else {
         setTestStatus('error');
-        setTestMessage(data.error || 'Kiểm tra thất bại. Vui lòng xem lại thông tin.');
+        setTestMessage(fetchErr || data?.error || 'Kiểm tra thất bại. Vui lòng xem lại thông tin.');
       }
     } catch (err: any) {
       setTestStatus('error');
@@ -274,9 +273,8 @@ export default function CompanyProfile() {
   const handleLoadEnvConfig = async () => {
     setLoadingEnv(true);
     try {
-      const res = await fetch('/api/smtp-env-config');
-      if (res.ok) {
-        const data = await res.json();
+      const { success, data, error: fetchErr } = await safeFetchJson(getApiUrl('/api/smtp-env-config'));
+      if (success && data) {
         setSettings(prev => ({
           ...prev,
           smtpHost: data.smtpHost || prev.smtpHost,
@@ -288,7 +286,7 @@ export default function CompanyProfile() {
         }));
         alert('Đã tải hoàn hảo cấu hình SMTP từ Biến môi trường hệ thống!');
       } else {
-        alert('Không thể tải cấu hình SMTP từ môi trường hệ thống.');
+        alert(fetchErr || 'Không thể tải cấu hình SMTP từ môi trường hệ thống.');
       }
     } catch (err) {
       console.error(err);

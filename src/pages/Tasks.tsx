@@ -7,7 +7,7 @@ import { logActivity } from '../services/activityLogger';
 const DroppableComponent = DroppableBase as any;
 const DraggableComponent = DraggableBase as any;
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, subDays } from 'date-fns';
-import { cn, formatPercent } from '../lib/utils';
+import { cn, formatPercent, getApiUrl } from '../lib/utils';
 import { Task, AppUser } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -584,7 +584,7 @@ export default function Tasks() {
               ? format(new Date(newTask.dueDate), 'dd/MM/yyyy') 
               : 'Không có';
 
-            await fetch('/api/send-task-email', {
+            await fetch(getApiUrl('/api/send-task-email'), {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -681,7 +681,7 @@ export default function Tasks() {
               ? format(new Date(editingTask.dueDate), 'dd/MM/yyyy') 
               : 'Không có';
 
-            await fetch('/api/send-task-email', {
+            await fetch(getApiUrl('/api/send-task-email'), {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

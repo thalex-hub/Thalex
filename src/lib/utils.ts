@@ -74,3 +74,66 @@ export function formatPercent(value: number | string | undefined | null) {
   if (num === undefined || num === null || isNaN(num)) return '0%';
   return num.toFixed(1) + '%';
 }
+
+/**
+ * Returns the absolute URL for the API endpoint on custom domains, and relative paths otherwise.
+ */
+export function getApiUrl(path: string): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  if (typeof window === 'undefined') {
+    return cleanPath;
+  }
+  const hostname = window.location.hostname;
+  // If we are developing locally or in standard run.app containers, relative paths are perfect
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.endsWith('.run.app') ||
+    hostname.endsWith('.gitpod.io') ||
+    hostname.includes('webcontainer')
+  ) {
+    return cleanPath;
+  }
+  // Fallback to the real Cloud Run backend URL on custom domains (like thalex.com.vn)
+  return `https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app${cleanPath}`;
+}
+
+/**
+ * Perform a fetch to JSON API safely, handles non-JSON HTML (404/502 etc.) gracefully, and catches DOMExceptions.
+ */
+export async function safeFetchJson<T = any>(
+  url: string,
+  options?: RequestInit
+): Promise<{ success: boolean; data?: T; error?: string; status?: number }> {
+  try {
+    const res = await fetch(url, options);
+    const contentType = res.headers.get("content-type") || "";
+    
+    if (!contentType.includes("application/json")) {
+      const text = await res.text();
+      console.error(`Received non-JSON response from ${url}:`, text);
+      return { 
+        success: false, 
+        status: res.status,
+        error: `Máy chủ phản hồi định dạng không hợp lệ (Mã lỗi ${res.status}).\nVui lòng liên hệ kỹ thuật hoặc thử lại sau.` 
+      };
+    }
+    
+    const data = await res.json();
+    if (!res.ok) {
+      return { 
+        success: false, 
+        status: res.status,
+        data, 
+        error: data.error || data.message || `Lỗi từ máy chủ (Mã ${res.status})` 
+      };
+    }
+    return { success: true, status: res.status, data };
+  } catch (err: any) {
+    console.error(`Fetch API Error (${url}):`, err);
+    return { 
+      success: false, 
+      error: `Lỗi kết nối mạng: ${err.message || String(err)}` 
+    };
+  }
+}

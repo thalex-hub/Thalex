@@ -92,17 +92,29 @@ export function getApiUrl(path: string): string {
   try {
     const localOverride = localStorage.getItem('THALEX_API_URL');
     if (localOverride) {
-      const base = localOverride.endsWith('/') ? localOverride.slice(0, -1) : localOverride;
-      return `${base}${cleanPath}`;
+      let base = localOverride.trim();
+      if (base) {
+        if (!/^(https?:)?\/\//i.test(base)) {
+          base = `https://${base}`;
+        }
+        base = base.endsWith('/') ? base.slice(0, -1) : base;
+        return `${base}${cleanPath}`;
+      }
     }
   } catch (e) {}
 
   // If running on a custom domain (such as thalex.com.vn)
   // Check if an API URL is explicitly configured in VITE_API_URL
-  const envApiUrl = (import.meta as any).env?.VITE_API_URL;
+  let envApiUrl = (import.meta as any).env?.VITE_API_URL;
   if (envApiUrl) {
-    const base = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
-    return `${base}${cleanPath}`;
+    envApiUrl = envApiUrl.trim();
+    if (envApiUrl) {
+      if (!/^(https?:)?\/\//i.test(envApiUrl)) {
+        envApiUrl = `https://${envApiUrl}`;
+      }
+      const base = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
+      return `${base}${cleanPath}`;
+    }
   }
 
   // If local development or directly on the Cloud Run preview, use relative path dynamically

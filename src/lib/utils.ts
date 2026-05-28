@@ -76,10 +76,26 @@ export function formatPercent(value: number | string | undefined | null) {
 }
 
 /**
- * Returns the relative path for the API endpoint, ensuring single-origin requests that prevent CORS issues on custom domains.
+ * Returns the absolute URL for the API endpoint on custom domains, and relative paths otherwise.
  */
 export function getApiUrl(path: string): string {
-  return path.startsWith('/') ? path : `/${path}`;
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  if (typeof window === 'undefined') {
+    return cleanPath;
+  }
+  const hostname = window.location.hostname;
+  // If we are developing locally or in standard run.app containers, relative paths are perfect
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.endsWith('.run.app') ||
+    hostname.endsWith('.gitpod.io') ||
+    hostname.includes('webcontainer')
+  ) {
+    return cleanPath;
+  }
+  // Fallback to the real Cloud Run backend URL on custom domains (like thalex.com.vn)
+  return `https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app${cleanPath}`;
 }
 
 /**

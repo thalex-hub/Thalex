@@ -85,9 +85,14 @@ export function getApiUrl(path: string): string {
   }
   const hostname = window.location.hostname;
   
-  // Khi chạy trên tên miền chính thức của bạn (thalex.com.vn), chuyển hướng trực tiếp đến máy chủ Render
-  if (hostname.includes('thalex.com.vn')) {
-    return `https://thalex-a4zw.onrender.com${cleanPath}`;
+  // Custom domains (like thalex.com.vn)
+  // We use relative path proxying so that Cloudflare can intercept `/business/api/...`
+  // and proxy it directly to the Cloud Run backend without CORS issues.
+  const pathname = window.location.pathname;
+  const match = pathname.match(/^\/([^/]+)/);
+  const baseSegment = match ? match[1] : '';
+  if (baseSegment && baseSegment !== 'api') {
+    return `/${baseSegment}${cleanPath}`;
   }
   
   return cleanPath;

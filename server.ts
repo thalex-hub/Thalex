@@ -26,6 +26,19 @@ app.use((req, res, next) => {
   next();
 });
 
+// Middleware to rewrite reverse-proxied paths (e.g. /business/api/send-account-email -> /api/send-account-email)
+app.use((req, res, next) => {
+  if (req.url.includes("/api/")) {
+    const apiIndex = req.url.indexOf("/api/");
+    const cleanUrl = req.url.substring(apiIndex);
+    if (req.url !== cleanUrl) {
+      console.log(`[API REWRITE] Rewriting ${req.url} -> ${cleanUrl}`);
+      req.url = cleanUrl;
+    }
+  }
+  next();
+});
+
 // Middleware for parsing JSON bodies
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));

@@ -76,7 +76,7 @@ export function formatPercent(value: number | string | undefined | null) {
 }
 
 /**
- * Returns the absolute URL for the API endpoint on custom domains, and relative paths otherwise.
+ * Returns the relative or absolute path for the API endpoint, supporting reverse proxies on custom domains dynamically.
  */
 export function getApiUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
@@ -94,8 +94,21 @@ export function getApiUrl(path: string): string {
   ) {
     return cleanPath;
   }
-  // Fallback to the real Cloud Run backend URL on custom domains (like thalex.com.vn)
-  return `https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app${cleanPath}`;
+  
+  // Custom domains (like thalex.com.vn)
+  // Check the first subdirectory path, e.g. "/business"
+  const pathname = window.location.pathname;
+  const match = pathname.match(/^\/([^/]+)/);
+  const baseSegment = match ? match[1] : '';
+  
+  // If we are under a subdirectory like /business or /attendance, prepend it
+  // This guarantees the request remains proxied through the same path that loaded the app.
+  if (baseSegment && baseSegment !== 'api') {
+    return `/${baseSegment}${cleanPath}`;
+  }
+  
+  // Fallback to relative path
+  return cleanPath;
 }
 
 /**

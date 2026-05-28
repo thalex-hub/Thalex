@@ -119,7 +119,7 @@ export function getApiUrl(path: string): string {
 
   // ALWAYS use absolute URL proxy on custom domains (like thalex.com.vn) if VITE_API_URL is missing.
   // We cannot use relative paths because standard static hosting servers (Vercel, cPanel, Netlify)
-  // will throw 405 Method Not Allowed for POST requests to static files.
+  // will throw 405 Method Not Allowed for POST requests to static files unless Cloudflare Functions are set up.
   if (!isLocal && !isCloudRun) {
     const defaultBackend = "https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app";
     return `${defaultBackend}${cleanPath}`;
@@ -151,18 +151,34 @@ export async function safeFetchJson<T = any>(
   options?: RequestInit
 ): Promise<{ success: boolean; data?: T; error?: string; status?: number }> {
   try {
-    // If the request has body and headers explicitly set to application/json, 
-    // we rewrite it to text/plain to bypass CORS preflight OPTIONS requests,
-    // which are often aggressively blocked by strict reverse proxies on custom domains.
+    // Normalize headers to a clean, plain JavaScript object
+    // to prevent any serialization or class mismatch issues in Safari/WebKit
+    const finalHeaders: Record<string, string> = {};
     if (options?.headers) {
-      const headers = new Headers(options.headers);
-      if (headers.get('Content-Type') === 'application/json') {
-        headers.set('Content-Type', 'text/plain');
-        options.headers = headers;
+      if (options.headers instanceof Headers) {
+        options.headers.forEach((value, key) => {
+          finalHeaders[key] = value;
+        });
+      } else if (Array.isArray(options.headers)) {
+        options.headers.forEach(([key, value]) => {
+          finalHeaders[key] = value;
+        });
+      } else {
+        Object.assign(finalHeaders, options.headers);
       }
     }
 
-    const res = await fetch(url, options);
+    // Default JSON headers if body exists
+    if (options?.body && !finalHeaders["Content-Type"]) {
+      finalHeaders["Content-Type"] = "application/json";
+    }
+
+    const fetchOptions: RequestInit = {
+      ...options,
+      headers: finalHeaders,
+    };
+
+    const res = await fetch(url, fetchOptions);
     const contentType = res.headers.get("content-type") || "";
     
     if (!contentType.includes("application/json")) {

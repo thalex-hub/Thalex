@@ -88,6 +88,23 @@ export function getApiUrl(path: string): string {
   const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
   const isCloudRun = hostname.endsWith('run.app');
 
+  // Check manual troubleshooting override from local storage
+  try {
+    const localOverride = localStorage.getItem('THALEX_API_URL');
+    if (localOverride) {
+      const base = localOverride.endsWith('/') ? localOverride.slice(0, -1) : localOverride;
+      return `${base}${cleanPath}`;
+    }
+  } catch (e) {}
+
+  // If running on a custom domain (such as thalex.com.vn)
+  // Check if an API URL is explicitly configured in VITE_API_URL
+  const envApiUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envApiUrl) {
+    const base = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
+    return `${base}${cleanPath}`;
+  }
+
   // If local development or directly on the Cloud Run preview, use relative path dynamically
   if (isLocal || isCloudRun) {
     const pathname = window.location.pathname;
@@ -99,17 +116,10 @@ export function getApiUrl(path: string): string {
     return cleanPath;
   }
 
-  // If running on a custom domain (such as thalex.com.vn)
-  // Check if an API URL is explicitly configured in VITE_API_URL
-  const envApiUrl = (import.meta as any).env?.VITE_API_URL;
-  if (envApiUrl) {
-    const base = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
-    return `${base}${cleanPath}`;
-  }
-
-  // Fallback to the absolute Cloud Run backend URL to bypass Cloudflare Pages' static environment
-  const absoluteBackend = 'https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app';
-  return `${absoluteBackend}${cleanPath}`;
+  // For custom domains (like thalex.com.vn), we prefer relative paths (/api/*)
+  // because the newly added Cloudflare Pages Functions (/functions/api/[[path]].ts) 
+  // proxies the backend on the exact same origin, which guarantees no CORS or Safari "Load failed" errors.
+  return cleanPath;
 }
 
 /**

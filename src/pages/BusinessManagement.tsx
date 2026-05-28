@@ -51,6 +51,7 @@ export default function BusinessManagement() {
   const [departments, setDepartments] = React.useState<any[]>([]);
   const [positions, setPositions] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [sendingEmailId, setSendingEmailId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [editingUser, setEditingUser] = React.useState<AppUser | null>(null);
   const [showAddUserModal, setShowAddUserModal] = React.useState(false);
@@ -481,14 +482,14 @@ export default function BusinessManagement() {
       alert("Tài khoản này không lưu mật khẩu tạm thời hoặc đã đổi mật khẩu (đã được kích hoạt).");
       return;
     }
-    setLoading(true);
+    setSendingEmailId(userId);
     try {
       const companyProfileSnap = await getDoc(doc(db, 'settings', 'company_profile'));
       const companyProfile = companyProfileSnap.exists() ? companyProfileSnap.data() : null;
 
       if (!companyProfile?.smtpEnabled) {
         alert("Bên quản trị chưa kích hoạt tính năng gửi Email tự động trong mục 'Cài đặt hệ thống'!");
-        setLoading(false);
+        setSendingEmailId(null);
         return;
       }
 
@@ -527,7 +528,7 @@ export default function BusinessManagement() {
       console.error(err);
       alert(`Gặp vấn đề khi gửi lại email: ${err.message || String(err)}`);
     } finally {
-      setLoading(false);
+      setSendingEmailId(null);
     }
   };
 
@@ -834,6 +835,23 @@ export default function BusinessManagement() {
             exit={{ opacity: 0, x: 10 }}
             className="space-y-4"
           >
+            {sendingEmailId && (
+              <div className="bg-amber-50 text-amber-800 p-4 rounded-2xl border border-amber-200 text-xs font-bold leading-normal flex items-start gap-4 shadow-sm animate-pulse">
+                <div className="bg-amber-100 p-1.5 rounded-lg shrink-0 mt-0.5">
+                  <svg className="animate-spin h-4 w-4 text-amber-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-amber-955 font-black uppercase tracking-wide mb-1 text-[10px]">Đang kết nối hệ thống gửi thư...</p>
+                  <p className="font-semibold text-gray-700 leading-relaxed">
+                    Hệ thống đang kết nối đến hệ thống máy chủ của bạn trên Render (<span className="text-blue-600 font-extrabold">thalex-a4zw.onrender.com</span>) để kích hoạt hòm thư và gửi tài khoản. Nếu máy chủ của bạn vừa khởi động từ chế độ ngủ (Render Free tier), quá trình này sẽ cần khoảng <strong>30 giây tới 1 phút</strong> để phản hồi. Xin vui lòng đợi trong giây lát!
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between items-center bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
                <div className="flex items-center gap-4">
                   <div className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-sm font-black">
@@ -926,11 +944,20 @@ export default function BusinessManagement() {
                              {u.accountStatus === 'pending' && u.tempPassword && (
                                <button 
                                  onClick={() => handleResendWelcomeEmail(u.uid, u.email, u.fullName, u.tempPassword)}
-                                 disabled={loading}
-                                 className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                                 disabled={sendingEmailId !== null || loading}
+                                 className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all disabled:opacity-50"
                                  title="Gửi lại email thông tin tài khoản"
                                >
-                                 <Mail size={18} />
+                                 {sendingEmailId === u.uid ? (
+                                   <div className="flex items-center justify-center">
+                                     <svg className="animate-spin h-4.5 w-4.5 text-orange-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                     </svg>
+                                   </div>
+                                 ) : (
+                                   <Mail size={18} />
+                                 )}
                                </button>
                              )}
                              <button 
@@ -939,14 +966,16 @@ export default function BusinessManagement() {
                                  const effectiveSalary = u.yearlyBaseSalaries?.[currentYear] || u.baseSalary || 0;
                                  setEditingUser({ ...u, baseSalary: effectiveSalary });
                                }}
-                               className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                               disabled={sendingEmailId !== null || loading}
+                               className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all disabled:opacity-50"
                                title="Chỉnh sửa thông tin"
                              >
                                <Settings2 size={18} />
                              </button>
                              <button 
                                onClick={() => handleDeleteUser(u.uid, u.fullName)}
-                               className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                               disabled={sendingEmailId !== null || loading}
+                               className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all disabled:opacity-50"
                                title="Xóa tài khoản"
                              >
                                <Trash2 size={18} />

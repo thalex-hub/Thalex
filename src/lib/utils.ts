@@ -84,33 +84,31 @@ export function getApiUrl(path: string): string {
     return cleanPath;
   }
 
-  // 1. Check if an API URL is explicitly configured in environment variables
+  const hostname = window.location.hostname;
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
+  const isCloudRun = hostname.endsWith('run.app');
+
+  // 1. ALWAYS use relative path for local development or direct Cloud Run preview URLs
+  if (isLocal || isCloudRun) {
+    const pathname = window.location.pathname;
+    const match = pathname.match(/^\/([^/]+)/);
+    const baseSegment = match ? match[1] : '';
+    if (baseSegment && baseSegment !== 'api') {
+      return `/${baseSegment}${cleanPath}`;
+    }
+    return cleanPath;
+  }
+
+  // 2. For custom domains (like Cloudflare Pages thalex.com.vn), check for configured VITE_API_URL env variable
   const envApiUrl = import.meta.env.VITE_API_URL;
   if (envApiUrl) {
     const base = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
     return `${base}${cleanPath}`;
   }
 
-  const hostname = window.location.hostname;
-  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
-  const isCloudRun = hostname.endsWith('run.app');
-
-  // 2. If running on a custom domain (like thalex.com.vn, not localhost and not *.run.app),
-  // we redirect directly to the absolute Cloud Run backend URL to avoid unsupported Cloudflare Page proxying.
-  if (!isLocal && !isCloudRun) {
-    const absoluteBackend = 'https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app';
-    return `${absoluteBackend}${cleanPath}`;
-  }
-  
-  // 3. For local or direct Cloud Run preview URLs, keep using relative path
-  const pathname = window.location.pathname;
-  const match = pathname.match(/^\/([^/]+)/);
-  const baseSegment = match ? match[1] : '';
-  if (baseSegment && baseSegment !== 'api') {
-    return `/${baseSegment}${cleanPath}`;
-  }
-  
-  return cleanPath;
+  // 3. Fallback absolute backend for custom domains if no env variable is set
+  const absoluteBackend = 'https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app';
+  return `${absoluteBackend}${cleanPath}`;
 }
 
 /**

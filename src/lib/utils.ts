@@ -120,7 +120,11 @@ export async function safeFetchJson<T = any>(
   options?: RequestInit
 ): Promise<{ success: boolean; data?: T; error?: string; status?: number }> {
   try {
-    const res = await fetch(url, options);
+    const fetchOptions: RequestInit = {
+      credentials: 'include',
+      ...options,
+    };
+    const res = await fetch(url, fetchOptions);
     const contentType = res.headers.get("content-type") || "";
     
     if (!contentType.includes("application/json")) {

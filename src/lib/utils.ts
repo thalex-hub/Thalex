@@ -83,11 +83,26 @@ export function getApiUrl(path: string): string {
   if (typeof window === 'undefined') {
     return cleanPath;
   }
+
+  // 1. Check if an API URL is explicitly configured in environment variables
+  const envApiUrl = import.meta.env.VITE_API_URL;
+  if (envApiUrl) {
+    const base = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
+    return `${base}${cleanPath}`;
+  }
+
   const hostname = window.location.hostname;
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
+  const isCloudRun = hostname.endsWith('run.app');
+
+  // 2. If running on a custom domain (like thalex.com.vn, not localhost and not *.run.app),
+  // we redirect directly to the absolute Cloud Run backend URL to avoid unsupported Cloudflare Page proxying.
+  if (!isLocal && !isCloudRun) {
+    const absoluteBackend = 'https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app';
+    return `${absoluteBackend}${cleanPath}`;
+  }
   
-  // Custom domains (like thalex.com.vn)
-  // We use relative path proxying so that Cloudflare can intercept `/business/api/...`
-  // and proxy it directly to the Cloud Run backend without CORS issues.
+  // 3. For local or direct Cloud Run preview URLs, keep using relative path
   const pathname = window.location.pathname;
   const match = pathname.match(/^\/([^/]+)/);
   const baseSegment = match ? match[1] : '';

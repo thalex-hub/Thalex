@@ -96,19 +96,22 @@ export function getApiUrl(path: string): string {
   }
   
   // Custom domains (like thalex.com.vn)
-  // Check the first subdirectory path, e.g. "/business"
+  // OPTION 1 (Default - RECOMMENDED FOR QUICK SETUP): Route directly to Cloud Run backend using CORS.
+  // This guarantees that any custom server Nginx configuration (which may incorrectly treat API paths as static folders 
+  // and trigger 405 Method Not Allowed) will be bypassed smoothly.
+  return `https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app${cleanPath}`;
+
+  /*
+  // OPTION 2 (RECOMMENDED FOR PRODUCTION): Relative path proxy.
+  // If your Nginx is configured to correctly proxy both static files and api routes, you can use relative paths:
   const pathname = window.location.pathname;
   const match = pathname.match(/^\/([^/]+)/);
   const baseSegment = match ? match[1] : '';
-  
-  // If we are under a subdirectory like /business or /attendance, prepend it
-  // This guarantees the request remains proxied through the same path that loaded the app.
   if (baseSegment && baseSegment !== 'api') {
     return `/${baseSegment}${cleanPath}`;
   }
-  
-  // Fallback to relative path
   return cleanPath;
+  */
 }
 
 /**

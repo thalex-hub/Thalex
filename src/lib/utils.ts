@@ -101,7 +101,7 @@ export function getApiUrl(path: string): string {
 
   // If running on a custom domain (such as thalex.com.vn)
   // Check if an API URL is explicitly configured in VITE_API_URL
-  const envApiUrl = import.meta.env.VITE_API_URL;
+  const envApiUrl = (import.meta as any).env?.VITE_API_URL;
   if (envApiUrl) {
     const base = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
     return `${base}${cleanPath}`;

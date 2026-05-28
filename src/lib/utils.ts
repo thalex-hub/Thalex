@@ -88,27 +88,21 @@ export function getApiUrl(path: string): string {
   const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
   const isCloudRun = hostname.endsWith('run.app');
 
-  // 1. ALWAYS use relative path for local development or direct Cloud Run preview URLs
-  if (isLocal || isCloudRun) {
-    const pathname = window.location.pathname;
-    const match = pathname.match(/^\/([^/]+)/);
-    const baseSegment = match ? match[1] : '';
-    if (baseSegment && baseSegment !== 'api') {
-      return `/${baseSegment}${cleanPath}`;
-    }
-    return cleanPath;
-  }
-
-  // 2. For custom domains (like Cloudflare Pages thalex.com.vn), check for configured VITE_API_URL env variable
+  // If there's an explicitly configured API URL env variable, we respect it
   const envApiUrl = import.meta.env.VITE_API_URL;
-  if (envApiUrl) {
+  if (envApiUrl && !isLocal && !isCloudRun) {
     const base = envApiUrl.endsWith('/') ? envApiUrl.slice(0, -1) : envApiUrl;
     return `${base}${cleanPath}`;
   }
 
-  // 3. Fallback absolute backend for custom domains if no env variable is set
-  const absoluteBackend = 'https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app';
-  return `${absoluteBackend}${cleanPath}`;
+  // Force relative paths with matching base segments for routing to work seamlessly via proxy
+  const pathname = window.location.pathname;
+  const match = pathname.match(/^\/([^/]+)/);
+  const baseSegment = match ? match[1] : '';
+  if (baseSegment && baseSegment !== 'api') {
+    return `/${baseSegment}${cleanPath}`;
+  }
+  return cleanPath;
 }
 
 /**

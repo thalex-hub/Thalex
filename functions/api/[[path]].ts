@@ -25,11 +25,11 @@ export async function onRequest(context: any) {
   const headers = new Headers(context.request.headers);
   headers.set("Host", new URL(backendBase).hostname);
 
-  // Initialize request options
-  const requestOptions: RequestInit = {
+  // Initialize request options (safely bypass TS definition errors using Record/any)
+  const requestOptions: any = {
     method: context.request.method,
     headers: headers,
-    redirect: "manual" as RequestRedirect,
+    redirect: "manual",
   };
 
   // Add body for POST/PUT requests

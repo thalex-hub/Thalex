@@ -103,6 +103,13 @@ export function getApiUrl(path: string): string {
     }
   } catch (e) {}
 
+  // ALWAYS proxy on custom domains (like thalex.com.vn) via Cloudflare Functions.
+  // This guarantees same-origin requests and bypasses all CORS "Load failed" errors.
+  // We ignore VITE_API_URL on custom domains to force using the relative proxy.
+  if (!isLocal && !isCloudRun) {
+    return cleanPath;
+  }
+
   // If running on a custom domain (such as thalex.com.vn)
   // Check if an API URL is explicitly configured in VITE_API_URL
   let envApiUrl = (import.meta as any).env?.VITE_API_URL;

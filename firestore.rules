@@ -186,7 +186,7 @@ service cloud.firestore {
         );
       }
       
-      allow read: if isTaskInvolved() || isFinanceStaff();
+      allow read: if isDirector() || isTaskInvolved() || isFinanceStaff();
       allow create: if isTaskLeader() || isFinanceStaff();
       allow update: if isTaskInvolved() || isFinanceStaff();
       allow delete: if isTaskLeader() || (isSignedIn() && existing().assignerId == request.auth.uid);
@@ -350,23 +350,23 @@ service cloud.firestore {
 
     // Files & Folders
     match /stored_files/{id} {
-      allow read: if isSignedIn() && (
+      allow read: if isDirector() || isHR() || (isSignedIn() && (
         resource.data.get('type', '') == 'company' || 
         resource.data.get('ownerId', '') == request.auth.uid || 
         (request.auth.uid in resource.data.get('sharedWith', [])) ||
         ('all' in resource.data.get('sharedWith', []))
-      );
+      ));
       allow create: if isSignedIn();
       allow update, delete: if isDirector() || isHR() || (isSignedIn() && existing().get('ownerId', '') == request.auth.uid);
     }
 
     match /folders/{id} {
-      allow read: if isSignedIn() && (
+      allow read: if isDirector() || isHR() || (isSignedIn() && (
         resource.data.get('type', '') == 'company' || 
         resource.data.get('ownerId', '') == request.auth.uid || 
         (request.auth.uid in resource.data.get('sharedWith', [])) ||
         ('all' in resource.data.get('sharedWith', []))
-      );
+      ));
       allow create: if isSignedIn();
       allow update, delete: if isDirector() || isHR() || (isSignedIn() && existing().get('ownerId', '') == request.auth.uid);
     }

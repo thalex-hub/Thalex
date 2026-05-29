@@ -1508,8 +1508,8 @@ export default function BusinessManagement() {
         {editingUser && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setEditingUser(null)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden p-8 max-h-[90vh] overflow-y-auto">
-               <div className="flex items-center justify-between mb-8">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+               <div className="flex items-center justify-between p-6 md:p-8 border-b border-gray-100 flex-shrink-0 bg-white z-10">
                   <div className="flex items-center gap-4">
                     <img src={editingUser.avatar} className="w-16 h-16 rounded-2xl border-2 border-gray-100" alt="" referrerPolicy="no-referrer" />
                     <div>
@@ -1520,7 +1520,8 @@ export default function BusinessManagement() {
                   <button onClick={() => setEditingUser(null)} className="p-2 bg-gray-50 text-gray-400 hover:text-gray-600 rounded-xl transition-all"><X /></button>
                </div>
                
-               <form onSubmit={handleUpdateUsers} className="space-y-6">
+               <div className="p-6 md:p-8 overflow-y-auto">
+                 <form id="edit-user-form" onSubmit={handleUpdateUsers} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Họ và tên</label>
@@ -1796,35 +1797,38 @@ export default function BusinessManagement() {
                     </div>
                   )}
 
-                  <div className="flex gap-4 pt-4 border-t border-gray-100">
-                    <button 
-                      type="button" 
-                      onClick={() => setEditingUser(null)}
-                      className="flex-1 py-3 bg-gray-50 text-gray-500 rounded-xl font-bold hover:bg-gray-100 transition-all"
-                    >
-                      Hủy bỏ
-                    </button>
-                    {editingUser?.accountStatus === 'pending' && editingUser?.tempPassword && (
-                      <button 
-                        type="button" 
-                        onClick={() => handleResendWelcomeEmail(editingUser.uid, editingUser.email, editingUser.fullName, editingUser.tempPassword)}
-                        disabled={loading}
-                        className="flex-1 py-3 bg-orange-50 text-orange-600 rounded-xl font-bold hover:bg-orange-100 transition-all flex items-center justify-center gap-2"
-                        title="Gửi lại thông tin tài khoản qua email"
-                      >
-                        <Mail size={16} />
-                        Gửi lại Email
-                      </button>
-                    )}
-                    <button 
-                      type="submit" 
-                      disabled={loading} 
-                      className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
-                    >
-                      {loading ? 'Đang lưu...' : 'Cập nhật tài khoản'}
-                    </button>
-                  </div>
-               </form>
+                 </form>
+               </div>
+
+               <div className="p-6 md:p-8 border-t border-gray-100 flex-shrink-0 bg-gray-50 flex gap-4 z-10">
+                 <button 
+                   type="button" 
+                   onClick={() => setEditingUser(null)}
+                   className="flex-1 py-3 bg-white text-gray-500 rounded-xl font-bold border border-gray-200 hover:bg-gray-50 transition-all shadow-sm"
+                 >
+                   Hủy bỏ
+                 </button>
+                 {editingUser?.accountStatus === 'pending' && editingUser?.tempPassword && (
+                   <button 
+                     type="button" 
+                     onClick={() => handleResendWelcomeEmail(editingUser.uid, editingUser.email, editingUser.fullName, editingUser.tempPassword!)}
+                     disabled={loading}
+                     className="flex-1 py-3 bg-orange-50 text-orange-600 rounded-xl font-bold border border-orange-100 hover:bg-orange-100 transition-all flex items-center justify-center gap-2 shadow-sm"
+                     title="Gửi lại thông tin tài khoản qua email"
+                   >
+                     <Mail size={16} />
+                     Gửi lại Email
+                   </button>
+                 )}
+                 <button 
+                   type="submit" 
+                   form="edit-user-form"
+                   disabled={loading} 
+                   className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50"
+                 >
+                   {loading ? 'Đang lưu...' : 'Cập nhật tài khoản'}
+                 </button>
+               </div>
             </motion.div>
           </div>
         )}
@@ -1843,14 +1847,18 @@ export default function BusinessManagement() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               exit={{ opacity: 0, scale: 0.95, y: 20 }} 
-              className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden p-8"
+              className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-               <h3 className="text-2xl font-black text-gray-900 mb-2 flex items-center gap-3">
-                  <UserPlus className="text-blue-600" />
-                  Khởi tạo tài khoản
-               </h3>
-               <p className="text-xs text-gray-400 mb-6 font-medium italic">Vui lòng đảm bảo phương thức Email/Password đã được bật trong Firebase Console.</p>
-               <form onSubmit={handleAddUser} className="space-y-4">
+               <div className="p-6 md:p-8 border-b border-gray-100 flex-shrink-0 bg-white z-10">
+                 <h3 className="text-2xl font-black text-gray-900 mb-2 flex items-center gap-3">
+                    <UserPlus className="text-blue-600" />
+                    Khởi tạo tài khoản
+                 </h3>
+                 <p className="text-xs text-gray-400 font-medium italic mb-0">Vui lòng đảm bảo phương thức Email/Password đã được bật trong Firebase Console.</p>
+               </div>
+               
+               <div className="p-6 md:p-8 overflow-y-auto">
+                 <form id="add-user-form" onSubmit={handleAddUser} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Địa chỉ Email</label>
@@ -2089,17 +2097,26 @@ export default function BusinessManagement() {
                       <label htmlFor="add-needs-attendance" className="text-[10px] font-black text-gray-400 uppercase tracking-widest cursor-pointer">Yêu cầu chấm công</label>
                     </div>
                   </div>
-                  
-                  <div className="pt-2">
-                    <button 
-                      type="submit" 
-                      disabled={loading}
-                      className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-blue-700 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2"
-                    >
-                      {loading ? 'Đang khởi tạo...' : 'Xác nhận tạo tài khoản'}
-                    </button>
-                  </div>
-               </form>
+                 </form>
+               </div>
+               
+               <div className="p-6 md:p-8 border-t border-gray-100 flex-shrink-0 bg-gray-50 flex gap-4 z-10">
+                 <button 
+                   type="button" 
+                   onClick={() => setShowAddUserModal(false)}
+                   className="flex-1 py-3 bg-white text-gray-500 rounded-xl font-bold border border-gray-200 hover:bg-gray-50 transition-all shadow-sm"
+                 >
+                   Hủy bỏ
+                 </button>
+                 <button 
+                   type="submit" 
+                   form="add-user-form"
+                   disabled={loading}
+                   className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-black shadow-xl shadow-blue-100 hover:bg-blue-700 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                 >
+                   {loading ? 'Đang khởi tạo...' : 'Xác nhận tạo tài khoản'}
+                 </button>
+               </div>
             </motion.div>
           </div>
         )}
@@ -2108,7 +2125,7 @@ export default function BusinessManagement() {
         {showDeptModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowDeptModal(false)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-8">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-8 max-h-[90vh] overflow-y-auto">
                <h3 className="text-xl font-bold text-gray-900 mb-6">{editingDept ? 'Cập nhật phòng ban' : 'Thêm phòng ban mới'}</h3>
                <form onSubmit={handleDeptSubmit} className="space-y-4">
                   <div>
@@ -2151,7 +2168,7 @@ export default function BusinessManagement() {
         {showPosModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowPosModal(false)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-8">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-8 max-h-[90vh] overflow-y-auto">
                <h3 className="text-xl font-bold text-gray-900 mb-6">{editingPos ? 'Cập nhật chức vụ' : 'Thêm chức vụ mới'}</h3>
                <form onSubmit={handlePosSubmit} className="space-y-4">
                   <div>

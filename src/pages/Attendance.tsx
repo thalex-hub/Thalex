@@ -925,7 +925,7 @@ export default function Attendance() {
       </div>
 
               {viewMode === 'list' ? (
-                 <div className="overflow-x-auto">
+                 <div className="overflow-x-auto scrollbar-none">
                    <div className="p-4 bg-orange-50 text-orange-800 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                      <AlertCircle size={14} /> Danh sách vi phạm trong tháng
                    </div>
@@ -953,8 +953,8 @@ export default function Attendance() {
                      </tbody>
                    </table>
 
-                   <div className="mt-8 border-t border-gray-100">
-                     <table className="w-full text-left">
+                   <div className="mt-8 border-t border-gray-100 overflow-x-auto scrollbar-none">
+                     <table className="w-full text-left min-w-[500px]">
                        <thead>
                          <tr className="bg-gray-50 text-xs text-gray-400 font-bold uppercase">
                            <th className="px-6 py-4">Ngày</th>

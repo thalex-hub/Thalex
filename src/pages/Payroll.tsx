@@ -531,8 +531,8 @@ export default function Payroll() {
                   <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider">Danh sách lỗi vi phạm</h3>
                   <span className="bg-red-100 text-red-600 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Cập nhật theo ngày</span>
                </div>
-               <div className="overflow-x-auto">
-                 <table className="w-full text-left">
+               <div className="overflow-x-auto scrollbar-none">
+                 <table className="w-full text-left min-w-[600px]">
                     <thead>
                       <tr className="bg-white text-[10px] text-gray-400 font-black uppercase border-bottom border-gray-100">
                          <th className="px-8 py-4">Ngày</th>
@@ -603,8 +603,8 @@ export default function Payroll() {
              <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider">Bảng lương tổng hợp toàn bộ nhân sự</h3>
              <span className="bg-blue-100 text-blue-600 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Dữ liệu tháng {format(currentMonth, 'MM/yyyy')}</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <div className="overflow-x-auto scrollbar-none">
+            <table className="w-full text-left min-w-[1200px]">
               <thead>
                 <tr className="bg-white text-[10px] text-gray-400 font-black uppercase border-bottom border-gray-100">
                    <th className="px-8 py-4">Nhân viên</th>

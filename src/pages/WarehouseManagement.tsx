@@ -485,8 +485,8 @@ export default function WarehouseManagement() {
             {activeTab === 'instock' ? (
               /* TAB 1: REAL STOCK VIEW */
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                <div className="overflow-x-auto scrollbar-none">
+                  <table className="w-full text-left border-collapse min-w-[750px]">
                     <thead>
                       <tr className="bg-gray-50/50">
                         <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Sản phẩm</th>
@@ -656,8 +656,8 @@ export default function WarehouseManagement() {
             ) : (
               /* TAB 2: EXPORTED ITEMS LOG */
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                <div className="overflow-x-auto scrollbar-none">
+                  <table className="w-full text-left border-collapse min-w-[750px]">
                     <thead>
                       <tr className="bg-gray-50/50">
                         <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Sản phẩm đã xuất</th>
@@ -988,8 +988,8 @@ export default function WarehouseManagement() {
 
                 <div className="space-y-3">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider pl-1 font-mono">Hàng hóa chi tiết đã xuất</p>
-                  <div className="border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-inner">
-                    <table className="w-full text-left border-collapse">
+                  <div className="border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-inner overflow-x-auto scrollbar-none">
+                    <table className="w-full text-left border-collapse min-w-[500px]">
                       <thead>
                         <tr className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100">
                           <th className="px-4 py-2.5">Sản phẩm</th>

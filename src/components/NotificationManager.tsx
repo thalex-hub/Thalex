@@ -541,47 +541,47 @@ export default function NotificationManager() {
     <>
       {/* Floating Permission Trigger */}
       {permission === 'default' && (
-        <div className="fixed bottom-6 left-6 z-50 animate-pulse">
+        <div className="fixed bottom-4 md:bottom-6 left-4 md:left-6 z-50 animate-pulse">
           <button 
             onClick={requestPermission}
-            className="bg-indigo-600 text-white px-5 py-4 rounded-3xl shadow-2xl flex items-center gap-3 font-bold hover:bg-indigo-700 transition-all scale-110 active:scale-95"
+            className="bg-indigo-600 text-white px-4 md:px-5 py-3 md:py-4 rounded-2xl md:rounded-3xl shadow-2xl flex items-center gap-2.5 md:gap-3 font-bold hover:bg-indigo-700 transition-all scale-105 md:scale-110 active:scale-95"
           >
-            <Bell size={24} className="animate-bounce" />
+            <Bell className="w-5 h-5 md:w-6 md:h-6 animate-bounce" />
             <div className="text-left">
-              <p className="text-sm">Bật thông báo</p>
-              <p className="text-[10px] font-medium opacity-80">Đừng bỏ lỡ deadline!</p>
+              <p className="text-xs md:text-sm">Bật thông báo</p>
+              <p className="text-[9px] md:text-[10px] font-medium opacity-80">Đừng bỏ lỡ deadline!</p>
             </div>
           </button>
         </div>
       )}
 
       {/* Notification Center Trigger */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
+      <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 flex flex-col items-end gap-3 md:gap-4">
         <AnimatePresence>
           {showHistory && (
             <motion.div 
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className="w-96 max-h-[500px] bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 flex flex-col mb-4 ring-1 ring-black/5"
+              className="w-[calc(100vw-2rem)] sm:w-96 max-h-[75vh] sm:max-h-[500px] bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 flex flex-col mb-2 sm:mb-4 ring-1 ring-black/5"
             >
-              <div className="p-5 border-b border-gray-50 flex items-center justify-between bg-white">
+              <div className="p-4 sm:p-5 border-b border-gray-50 flex items-center justify-between bg-white">
                  <div>
-                   <h3 className="font-bold text-gray-900 text-lg">Thông báo</h3>
-                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Cập nhật hệ thống gần nhất</p>
+                   <h3 className="font-bold text-gray-900 text-base sm:text-lg">Thông báo</h3>
+                   <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 sm:mt-1">Cập nhật hệ thống gần nhất</p>
                  </div>
-                 <div className="flex gap-3">
+                 <div className="flex items-center gap-2.5 sm:gap-3">
                    <button 
                      onClick={markAllAsRead}
-                     className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 underline underline-offset-4"
+                     className="text-[10px] sm:text-[11px] font-bold text-indigo-600 hover:text-indigo-700 underline underline-offset-4"
                    >
                      Đã đọc tất cả
                    </button>
                    <button 
                      onClick={() => setShowHistory(false)} 
-                     className="p-1.5 bg-gray-50 text-gray-400 hover:text-gray-600 rounded-xl transition-colors"
+                     className="p-1 sm:p-1.5 bg-gray-50 text-gray-400 hover:text-gray-600 rounded-xl transition-colors"
                    >
-                     <X size={18} />
+                     <X size={16} />
                    </button>
                  </div>
               </div>
@@ -710,22 +710,22 @@ export default function NotificationManager() {
         <button 
           onClick={() => setShowHistory(!showHistory)}
           className={cn(
-            "relative p-5 rounded-2xl shadow-2xl transition-all hover:scale-110 active:scale-95 group",
+            "relative p-3.5 sm:p-5 rounded-2xl shadow-2xl transition-all hover:scale-110 active:scale-95 group",
             unreadCount > 0 
               ? "bg-indigo-600 text-white shadow-indigo-200 ring-4 ring-indigo-50" 
               : "bg-white text-gray-400 border border-gray-100 hover:border-indigo-100"
           )}
         >
-          <Bell size={28} className={cn(unreadCount > 0 && "animate-[bell-ring_1s_infinite]")} />
+          <Bell className={cn("w-5 h-5 sm:w-7 sm:h-7", unreadCount > 0 && "animate-[bell-ring_1s_infinite]")} />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-7 h-7 bg-red-600 text-white text-xs font-black rounded-xl flex items-center justify-center border-4 border-white shadow-lg animate-bounce">
+            <span className="absolute -top-1 -right-1 w-5 h-5 sm:w-7 sm:h-7 bg-red-600 text-white text-[9px] sm:text-xs font-black rounded-lg sm:rounded-xl flex items-center justify-center border-2 sm:border-4 border-white shadow-lg animate-bounce">
               {unreadCount}
             </span>
           )}
           
           {/* Tooltip */}
           {unreadCount > 0 && !showHistory && (
-            <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900 text-white text-[10px] font-bold rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900 text-white text-[10px] font-bold rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
               Bạn có {unreadCount} thông báo mới
             </div>
           )}

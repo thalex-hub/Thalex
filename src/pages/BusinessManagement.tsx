@@ -891,8 +891,8 @@ export default function BusinessManagement() {
                )}
             </div>
 
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-               <table className="w-full text-left">
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto scrollbar-none">
+               <table className="w-full text-left min-w-[800px]">
                   <thead>
                     <tr className="bg-gray-50/50 text-[10px] text-gray-400 font-black uppercase tracking-wider">
                       <th className="px-6 py-4">Thành viên</th>

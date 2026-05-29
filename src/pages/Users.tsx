@@ -454,8 +454,8 @@ export default function Users() {
 
       {activeTab === 'users' ? (
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <div className="overflow-x-auto scrollbar-none">
+            <table className="w-full text-left min-w-[900px]">
               <thead>
                 <tr className="bg-gray-50 text-[10px] text-gray-400 font-black uppercase tracking-wider">
                   <th className="px-6 py-4">Nhân viên</th>

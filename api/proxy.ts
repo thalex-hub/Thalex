@@ -35,10 +35,13 @@ export default async function handler(request: Request) {
     });
   }
 
-  // Clone headers and rewrite the Host header to target Cloud Run host
-  // This is crucial to prevent Cloud Run from throwing 404 (due to custom domain host preservation)
   const headers = new Headers(request.headers);
-  headers.set("Host", new URL(backendBase).hostname);
+  headers.delete("Host");
+  headers.delete("host");
+  headers.delete("x-forwarded-host");
+  headers.delete("x-forwarded-for");
+  headers.delete("origin");
+  headers.delete("referer");
 
   const requestOptions: any = {
     method: request.method,

@@ -4,12 +4,23 @@ export const config = {
 
 export default async function handler(request: Request) {
   const originalUrl = new URL(request.url);
-  const path = originalUrl.pathname;
-  const search = originalUrl.search;
+  
+  // Extract the original path parameter passed from vercel.json rewrite
+  const pathQuery = originalUrl.searchParams.get("path") || "";
+  
+  // Clean up search parameters to remove the proxy path key so we don't pollute backend requests
+  const searchParams = new URLSearchParams(originalUrl.search);
+  searchParams.delete("path");
+  const search = searchParams.toString() ? `?${searchParams.toString()}` : "";
   
   // The secure Cloud Run backend URL
   const backendBase = "https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app";
-  const targetUrl = `${backendBase}${path}${search}`;
+  
+  // Construct the target pathname, ensuring we sanitize duplicate slashes and fallback gracefully
+  let finalPath = pathQuery ? `/${pathQuery}` : originalUrl.pathname;
+  finalPath = finalPath.replace(/\/+/g, "/");
+  
+  const targetUrl = `${backendBase}${finalPath}${search}`;
 
   // Standard preflight request response
   if (request.method === "OPTIONS") {

@@ -393,7 +393,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let unsubscribeDoc: (() => void) | null = null;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
+    const handleAuthStateChanged = async (u: User | null) => {
       setUser(u);
       
       if (unsubscribeDoc) {
@@ -405,63 +405,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const userRef = doc(db, 'users', u.uid);
           
-          // Initial check and creation if needed
-          const userDoc = await getDoc(userRef);
-          if (!userDoc.exists()) {
-             // Check if there is a pre-created account by email
-             const tempId = u.email?.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
-             let linkedData: AppUser | null = null;
-
-             if (tempId) {
-               const tempRef = doc(db, "users", tempId);
-               const tempDoc = await getDoc(tempRef);
-               if (tempDoc.exists()) {
-                 const { tempPassword, ...data } = tempDoc.data() as any;
-                 
-                 // If logging in via Google, they don't need to change password 
-                 // even if the temp account was set to need it.
-                 const isGoogle = u.providerData.some(p => p.providerId === 'google.com');
-                 
-                 linkedData = { 
-                   ...data, 
-                   uid: u.uid,
-                   needsPasswordChange: isGoogle ? false : (data.needsPasswordChange ?? false),
-                   accountStatus: isGoogle ? 'active' : (data.accountStatus ?? 'active')
-                 };
-                 await setDoc(userRef, linkedData);
-                 localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(linkedData));
-                 try {
-                   await deleteDoc(tempRef);
-                 } catch (delErr) {
-                   console.error("Error cleaning up temp account:", delErr);
-                 }
-               }
-             }
-
-             if (!linkedData) {
-               const newUser: AppUser = {
-                 uid: u.uid,
-                 fullName: u.displayName || 'Nhân viên',
-                 email: u.email || '',
-                 avatar: u.photoURL || '',
-                 roleId: u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : 'Staff',
-                 workStatus: 'official',
-                 accountStatus: 'active',
-                 createdAt: new Date().toISOString(),
-               };
-               await setDoc(userRef, newUser);
-               localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(newUser));
-             }
-          } else {
-            localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(userDoc.data()));
-          }
-
           // Use onSnapshot for real-time updates
           unsubscribeDoc = onSnapshot(userRef, (snapshot) => {
             if (snapshot.exists()) {
               const data = snapshot.data() as AppUser;
               setAppUser(data);
               localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(data));
+            } else {
+              // User document not found. They might be in the middle of migration.
+              // Do not create a default user here. Let Login.tsx handle first-time creation.
+              setAppUser(null);
             }
             setLoading(false);
           }, (error) => {
@@ -473,19 +426,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setAppUser(JSON.parse(cached));
               } catch (e) {
                 console.error("Failed to parse cached app user", e);
+                setAppUser(null);
               }
             } else {
-              const fallbackUser: AppUser = {
-                uid: u.uid,
-                fullName: u.displayName || 'Nhân viên (Offline)',
-                email: u.email || '',
-                avatar: u.photoURL || '',
-                roleId: u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : 'Staff',
-                workStatus: 'official',
-                accountStatus: 'active',
-                createdAt: new Date().toISOString(),
-              };
-              setAppUser(fallbackUser);
+              setAppUser(null);
             }
             setLoading(false);
           });
@@ -519,11 +463,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAppUser(null);
         setLoading(false);
       }
+    };
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
+      // Prevent flashing during JIT authentication by ignoring updates 
+      if (typeof window !== 'undefined' && sessionStorage.getItem('is_verifying_login') === 'true') {
+        return;
+      }
+      handleAuthStateChanged(u);
     });
+
+    const handleVerifyDone = () => {
+      handleAuthStateChanged(auth.currentUser);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('auth_verify_done', handleVerifyDone);
+    }
 
     return () => {
       unsubscribeAuth();
       if (unsubscribeDoc) unsubscribeDoc();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('auth_verify_done', handleVerifyDone);
+      }
     };
   }, []);
 

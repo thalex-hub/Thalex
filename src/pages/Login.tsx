@@ -36,7 +36,45 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
       const provider = new GoogleAuthProvider();
       // Try popup first
       try {
-        await signInWithPopup(auth, provider);
+        const userCredential = await signInWithPopup(auth, provider);
+        const u = userCredential.user;
+        const userRef = doc(db, 'users', u.uid);
+        const userDoc = await getDoc(userRef);
+        
+        if (!userDoc.exists()) {
+          const tempId = u.email?.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+          let linkedData = null;
+
+          if (tempId) {
+            const tempRef = doc(db, "users", tempId);
+            const tempDoc = await getDoc(tempRef);
+            if (tempDoc.exists()) {
+              const { tempPassword, ...data } = tempDoc.data() as any;
+              linkedData = { 
+                ...data, 
+                uid: u.uid,
+                needsPasswordChange: false,
+                accountStatus: 'active'
+              };
+              await setDoc(userRef, linkedData);
+              try { await deleteDoc(tempRef); } catch (e) {}
+            }
+          }
+
+          if (!linkedData) {
+            const newUser: AppUser = {
+              uid: u.uid,
+              fullName: u.displayName || 'Nhân viên Google',
+              email: u.email || '',
+              avatar: u.photoURL || '',
+              roleId: u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : 'Staff',
+              workStatus: 'official',
+              accountStatus: 'active',
+              createdAt: new Date().toISOString(),
+            };
+            await setDoc(userRef, newUser);
+          }
+        }
       } catch (popupErr: any) {
         // If popup is blocked, the user will see the error or we could try redirect, 
         // but for now let's just show a helpful error
@@ -77,9 +115,11 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
         if (isInvalidCredential) {
           // Because Firestore rules block unauthenticated reads, we cannot read tempPassword first.
           // Instead, we try to create the Auth user. If it succeeds, they become authenticated and can read Firestore.
+          sessionStorage.setItem('is_verifying_login', 'true');
           try {
             userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
           } catch (createErr: any) {
+            sessionStorage.removeItem('is_verifying_login');
             // If email-already-in-use, it means they DO exist in Auth, but they typed the wrong password 
             // (since signInWithEmailAndPassword failed earlier).
             if (createErr.code === 'auth/email-already-in-use') {
@@ -104,8 +144,24 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
                 if (pendingData.accountStatus === 'locked') {
                   // User is legit but locked
                   await userCredential.user.delete();
+                  sessionStorage.removeItem('is_verifying_login');
                   throw new Error('locked');
                 }
+                
+                // Passwords match! Do the migration here.
+                const { tempPassword: _, ...data } = pendingData as any;
+                const linkedData = {
+                  ...data,
+                  uid: userCredential.user.uid,
+                  needsPasswordChange: data.needsPasswordChange ?? true,
+                  accountStatus: data.accountStatus ?? 'active'
+                };
+                
+                // Save to their real UID doc
+                await setDoc(doc(db, 'users', userCredential.user.uid), linkedData);
+                // Delete the temp doc
+                await deleteDoc(userRef);
+                
                 isValid = true;
               }
             }
@@ -113,11 +169,17 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
             if (!isValid) {
               // Intruder or wrong temp password
               await userCredential.user.delete();
+              sessionStorage.removeItem('is_verifying_login');
               const err = new Error('Email hoặc mật khẩu không chính xác.');
               (err as any).code = 'auth/invalid-credential';
               throw err;
             }
+            
+            // Validation and migration succeeded! Update the context.
+            sessionStorage.removeItem('is_verifying_login');
+            window.dispatchEvent(new Event('auth_verify_done'));
           } catch (docErr: any) {
+            sessionStorage.removeItem('is_verifying_login');
             // Error checking Firestore AFTER creating the user.
             // Delete the created user just in case to prevent garbage
             if (docErr.message !== 'locked') {

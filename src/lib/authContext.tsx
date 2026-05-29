@@ -443,19 +443,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setAppUser(JSON.parse(cached));
             } catch (e) {
               console.error("Failed to parse cached app user", e);
+              setAppUser(null);
             }
           } else {
-            const fallbackUser: AppUser = {
-              uid: u.uid,
-              fullName: u.displayName || 'Nhân viên (Offline)',
-              email: u.email || '',
-              avatar: u.photoURL || '',
-              roleId: u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : 'Staff',
-              workStatus: 'official',
-              accountStatus: 'active',
-              createdAt: new Date().toISOString(),
-            };
-            setAppUser(fallbackUser);
+            setAppUser(null);
           }
           setLoading(false);
         }

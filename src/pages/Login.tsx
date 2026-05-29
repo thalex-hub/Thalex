@@ -60,11 +60,11 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
       setError('');
       
       // Save current entered password to sessionStorage for potential re-authentication
-      sessionStorage.setItem('current_login_password', password);
+      sessionStorage.setItem('current_login_password', password.trim());
       
       let userCredential;
       try {
-        userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        userCredential = await signInWithEmailAndPassword(auth, email.trim(), password.trim());
       } catch (authErr: any) {
         // Handle modern Firebase error codes for invalid credentials
         const isInvalidCredential = 
@@ -84,20 +84,30 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
             if (userSnap.exists()) {
               const pendingData = userSnap.data() as AppUser;
 
-              if (pendingData.accountStatus === 'pending' && pendingData.tempPassword === password) {
+              if (pendingData.tempPassword?.trim() === password.trim()) {
+                if (pendingData.accountStatus === 'locked') {
+                  throw new Error('locked');
+                }
                 // JIT Create Auth user
-                userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+                userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
                 
                 // The migration logic is also in authContext.tsx which will see u.uid doc missing 
                 // and move the data. But we can do it here for immediate feedback if we want.
                 // However, doing it in both places is safer.
               } else {
+                console.error("User document found, but mismatch:", { 
+                  status: pendingData.accountStatus, 
+                  hasTempPass: !!pendingData.tempPassword,
+                  passMatch: pendingData.tempPassword === password
+                });
                 throw authErr;
               }
             } else {
+              console.error("User document not found for tempId:", tempId);
               throw authErr;
             }
           } catch (docErr) {
+            console.error("Error fetching user document:", docErr);
             throw authErr;
           }
         } else {
@@ -105,7 +115,9 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
         }
       }
     } catch (err: any) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials' || err.message?.includes('INVALID_LOGIN_CREDENTIALS')) {
+      if (err.message === 'locked') {
+        setError('Tài khoản đã bị khóa. Vui lòng liên hệ Admin.');
+      } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials' || err.message?.includes('INVALID_LOGIN_CREDENTIALS')) {
         setError('Email hoặc mật khẩu không chính xác.');
       } else if (err.code === 'auth/operational-error') {
         setError('Vui lòng kích hoạt Email/Password Provider trong Firebase Console.');

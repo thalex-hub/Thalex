@@ -117,12 +117,14 @@ export function getApiUrl(path: string): string {
     }
   }
 
-  // Use relative path for custom domains as we have native proxy rule configurations:
-  // - Vercel: Configured natively via /vercel.json rewrites
-  // - Cloudflare Pages: Configured natively via /functions/api Proxy Edge handlers
-  // This avoids CORS "Failed to fetch" errors by keeping browser requests same-origin.
+  // If running on a custom domain (such as thalex.com.vn)
+  // Point directly to the secure Cloud Run cluster backend absolute URL.
+  // This is because proxy solutions (like Vercel rewrites) preserve the client's Host header
+  // when proxying, which causes the destination Cloud Run's ingress routing to return 404.
+  // Direct absolute requests avoid any Host header issues.
   if (!isLocal && !isCloudRun) {
-    return cleanPath;
+    const defaultBackend = "https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app";
+    return `${defaultBackend}${cleanPath}`;
   }
 
   // If local development or directly on the Cloud Run preview, use relative path dynamically

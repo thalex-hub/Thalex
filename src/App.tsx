@@ -48,7 +48,19 @@ function AppContent() {
   const { user, appUser, loading } = useAuth();
   const { settings } = useCompany();
 
-  if (loading) {
+  const isVerifying = typeof window !== 'undefined' && sessionStorage.getItem('is_verifying_login') === 'true';
+
+  React.useEffect(() => {
+    if (user && !loading && !isVerifying) {
+      if (!appUser) {
+        auth.signOut();
+      } else if (appUser.accountStatus === 'locked' || appUser.accountStatus === 'pending') {
+        auth.signOut();
+      }
+    }
+  }, [user, appUser, loading, isVerifying]);
+
+  if (loading || isVerifying) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-gray-50">
         <div className="mb-6">
@@ -56,7 +68,7 @@ function AppContent() {
         </div>
         <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
         <p className="mt-4 text-gray-500 font-semibold text-lg">{settings.name}</p>
-        <p className="text-gray-400 text-sm">Đang tải dữ liệu doanh nghiệp...</p>
+        <p className="text-gray-400 text-sm">Đang tải và xác thực tài khoản...</p>
       </div>
     );
   }
@@ -65,8 +77,20 @@ function AppContent() {
     return <LoginPage />;
   }
 
+  if (!appUser) {
+    return <LoginPage initialError="Tài khoản này chưa được khai báo hoặc không tồn tại trên hệ thống. Vui lòng liên hệ Admin." />;
+  }
+
+  if (appUser.accountStatus === 'locked') {
+    return <LoginPage initialError="Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin để được hỗ trợ." />;
+  }
+
+  if (appUser.accountStatus === 'pending') {
+    return <LoginPage initialError="Tài khoản đang chờ hỗ trợ kích hoạt. Vui lòng đăng nhập lại." />;
+  }
+
   // Force password change for new accounts
-  if (appUser?.needsPasswordChange) {
+  if (appUser.needsPasswordChange) {
     return <LoginPage forceChangePassword />;
   }
 

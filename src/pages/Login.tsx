@@ -8,13 +8,13 @@ import { Shield, Lock, Mail, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { AppUser } from '../types';
 import { useCompany } from '../lib/companyContext';
 
-export default function LoginPage({ forceChangePassword }: { forceChangePassword?: boolean }) {
+export default function LoginPage({ forceChangePassword, initialError }: { forceChangePassword?: boolean; initialError?: string }) {
   const { settings } = useCompany();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState('');
+  const [error, setError] = React.useState(initialError || '');
   
   // States for password change
   const [showChangeModal, setShowChangeModal] = React.useState(forceChangePassword || false);
@@ -29,10 +29,17 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
     }
   }, [forceChangePassword]);
 
+  React.useEffect(() => {
+    if (initialError) {
+      setError(initialError);
+    }
+  }, [initialError]);
+
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
       setError('');
+      sessionStorage.setItem('is_verifying_login', 'true');
       const provider = new GoogleAuthProvider();
       // Try popup first
       try {
@@ -41,9 +48,10 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
         const userRef = doc(db, 'users', u.uid);
         const userDoc = await getDoc(userRef);
         
+        let linkedData = null;
+
         if (!userDoc.exists()) {
           const tempId = u.email?.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
-          let linkedData = null;
 
           if (tempId) {
             const tempRef = doc(db, "users", tempId);
@@ -62,20 +70,46 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
           }
 
           if (!linkedData) {
-            const newUser: AppUser = {
-              uid: u.uid,
-              fullName: u.displayName || 'Nhân viên Google',
-              email: u.email || '',
-              avatar: u.photoURL || '',
-              roleId: u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : 'Staff',
-              workStatus: 'official',
-              accountStatus: 'active',
-              createdAt: new Date().toISOString(),
-            };
-            await setDoc(userRef, newUser);
+            if (u.email === 'info.vinasglobal@gmail.com') {
+              const newUser: AppUser = {
+                uid: u.uid,
+                fullName: u.displayName || 'Nhân viên Google',
+                email: u.email || '',
+                avatar: u.photoURL || '',
+                roleId: 'SuperAdmin',
+                workStatus: 'official',
+                accountStatus: 'active',
+                createdAt: new Date().toISOString(),
+              };
+              await setDoc(userRef, newUser);
+            } else {
+              try {
+                await u.delete();
+              } catch (delErr) {
+                console.error("Failed to delete unauthorized Google user:", delErr);
+              }
+              await auth.signOut();
+              sessionStorage.removeItem('is_verifying_login');
+              setError('Tài khoản này chưa được khai báo trên hệ thống. Vui lòng liên hệ Admin để tạo tài khoản và nhận mật khẩu bàn giao.');
+              setLoading(false);
+              return;
+            }
+          }
+        } else {
+          const userData = userDoc.data() as AppUser;
+          if (userData.accountStatus === 'locked') {
+            await auth.signOut();
+            sessionStorage.removeItem('is_verifying_login');
+            setError('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin.');
+            setLoading(false);
+            return;
           }
         }
+
+        sessionStorage.removeItem('is_verifying_login');
+        window.dispatchEvent(new Event('auth_verify_done'));
       } catch (popupErr: any) {
+        sessionStorage.removeItem('is_verifying_login');
         // If popup is blocked, the user will see the error or we could try redirect, 
         // but for now let's just show a helpful error
         if (popupErr.code === 'auth/popup-blocked') {
@@ -85,6 +119,7 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
         }
       }
     } catch (err: any) {
+      sessionStorage.removeItem('is_verifying_login');
       setError(err.message);
     } finally {
       setLoading(false);

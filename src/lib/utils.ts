@@ -117,12 +117,12 @@ export function getApiUrl(path: string): string {
     }
   }
 
-  // ALWAYS use absolute URL proxy on custom domains (like thalex.com.vn) if VITE_API_URL is missing.
-  // We cannot use relative paths because standard static hosting servers (Vercel, cPanel, Netlify)
-  // will throw 405 Method Not Allowed for POST requests to static files unless Cloudflare Functions are set up.
+  // Use relative path for custom domains as we have native proxy rule configurations:
+  // - Vercel: Configured natively via /vercel.json rewrites
+  // - Cloudflare Pages: Configured natively via /functions/api Proxy Edge handlers
+  // This avoids CORS "Failed to fetch" errors by keeping browser requests same-origin.
   if (!isLocal && !isCloudRun) {
-    const defaultBackend = "https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app";
-    return `${defaultBackend}${cleanPath}`;
+    return cleanPath;
   }
 
   // If local development or directly on the Cloud Run preview, use relative path dynamically
@@ -136,10 +136,6 @@ export function getApiUrl(path: string): string {
     return cleanPath;
   }
 
-  // For custom domains (like thalex.com.vn) hosted on Cloudflare Pages,
-  // we use Cloudflare Functions (/functions/api/[[path]].ts) to proxy the requests securely
-  // to the Cloud Run backend. This avoids CORS issues entirely since the browser
-  // makes a same-origin request.
   return cleanPath;
 }
 

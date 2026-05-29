@@ -75,40 +75,55 @@ export default function LoginPage({ forceChangePassword }: { forceChangePassword
           authErr.message?.includes('INVALID_LOGIN_CREDENTIALS');
 
         if (isInvalidCredential) {
-          // Check if this is a pending account in Firestore that hasn't been created in Auth yet
+          // Because Firestore rules block unauthenticated reads, we cannot read tempPassword first.
+          // Instead, we try to create the Auth user. If it succeeds, they become authenticated and can read Firestore.
+          try {
+            userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
+          } catch (createErr: any) {
+            // If email-already-in-use, it means they DO exist in Auth, but they typed the wrong password 
+            // (since signInWithEmailAndPassword failed earlier).
+            if (createErr.code === 'auth/email-already-in-use') {
+              const err = new Error('Email hoặc mật khẩu không chính xác.');
+              (err as any).code = 'auth/invalid-credential';
+              throw err;
+            }
+            throw createErr;
+          }
+
+          // Now authenticated, check if they are a valid pending user
           const tempId = email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
           try {
             const userRef = doc(db, 'users', tempId);
             const userSnap = await getDoc(userRef);
             
+            let isValid = false;
             if (userSnap.exists()) {
               const pendingData = userSnap.data() as AppUser;
-
+              // Verify tempPassword matches and they are not locked
               if (pendingData.tempPassword?.trim() === password.trim()) {
                 if (pendingData.accountStatus === 'locked') {
+                  // User is legit but locked
+                  await userCredential.user.delete();
                   throw new Error('locked');
                 }
-                // JIT Create Auth user
-                userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
-                
-                // The migration logic is also in authContext.tsx which will see u.uid doc missing 
-                // and move the data. But we can do it here for immediate feedback if we want.
-                // However, doing it in both places is safer.
-              } else {
-                console.error("User document found, but mismatch:", { 
-                  status: pendingData.accountStatus, 
-                  hasTempPass: !!pendingData.tempPassword,
-                  passMatch: pendingData.tempPassword === password
-                });
-                throw authErr;
+                isValid = true;
               }
-            } else {
-              console.error("User document not found for tempId:", tempId);
-              throw authErr;
             }
-          } catch (docErr) {
-            console.error("Error fetching user document:", docErr);
-            throw authErr;
+
+            if (!isValid) {
+              // Intruder or wrong temp password
+              await userCredential.user.delete();
+              const err = new Error('Email hoặc mật khẩu không chính xác.');
+              (err as any).code = 'auth/invalid-credential';
+              throw err;
+            }
+          } catch (docErr: any) {
+            // Error checking Firestore AFTER creating the user.
+            // Delete the created user just in case to prevent garbage
+            if (docErr.message !== 'locked') {
+              try { if (userCredential.user) await userCredential.user.delete(); } catch(e) {}
+            }
+            throw docErr;
           }
         } else {
           throw authErr;

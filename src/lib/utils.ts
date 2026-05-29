@@ -171,6 +171,12 @@ export async function safeFetchJson<T = any>(
       finalHeaders["Content-Type"] = "application/json";
     }
 
+    // Rewrite application/json to text/plain to bypass CORS preflight OPTIONS requests,
+    // which are often aggressively blocked by strict firewalls or proxies on custom domains.
+    if (finalHeaders["Content-Type"] === "application/json") {
+      finalHeaders["Content-Type"] = "text/plain";
+    }
+
     const fetchOptions: RequestInit = {
       ...options,
       headers: finalHeaders,

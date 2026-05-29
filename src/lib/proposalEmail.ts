@@ -126,7 +126,7 @@ export async function sendProposalEmailNotification(data: ProposalNotificationDa
         await fetch(getApiUrl('/api/send-proposal-email'), {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'text/plain',
           },
           body: JSON.stringify({
             email: userObj.email,

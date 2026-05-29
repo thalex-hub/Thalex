@@ -321,7 +321,7 @@ export default function Storage() {
         const response = await fetch(getApiUrl('/api/upload'), {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'text/plain',
           },
           body: JSON.stringify({
             filename: selectedFile.name,

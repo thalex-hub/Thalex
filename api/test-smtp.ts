@@ -15,7 +15,8 @@ const analyzeSmtpError = (error: any, host: string): string => {
   }
   return errMsg;
 };
-\nexport default async function handler(req: VercelRequest, res: VercelResponse) {
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS setup
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -27,6 +28,8 @@ const analyzeSmtpError = (error: any, host: string): string => {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+  
+  let host = "smtp.gmail.com";
 
   try {
     const { smtpConfig, targetEmail } = req.body;
@@ -34,7 +37,7 @@ const analyzeSmtpError = (error: any, host: string): string => {
       return res.status(400).json({ error: "Yêu cầu cung cấp email người nhận thử" });
     }
 
-    const host = smtpConfig?.host || process.env.SMTP_HOST || "smtp.gmail.com";
+    host = smtpConfig?.host || process.env.SMTP_HOST || "smtp.gmail.com";
     const port = Number(smtpConfig?.port || process.env.SMTP_PORT) || 587;
     const user = smtpConfig?.user || process.env.SMTP_USER;
     const pass = smtpConfig?.pass || process.env.SMTP_PASS;

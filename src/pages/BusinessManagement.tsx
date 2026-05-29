@@ -158,6 +158,10 @@ export default function BusinessManagement() {
     gender: 'male' as string,
     startDate: '',
     phone: '',
+    cccd: '',
+    cccdIssueDate: '',
+    cccdIssuePlace: '',
+    currentAddress: '',
     baseSalary: 0,
     probationMonths: 2,
     needsAttendance: true
@@ -390,6 +394,10 @@ export default function BusinessManagement() {
         gender: newUser.gender,
         startDate: newUser.startDate,
         phone: newUser.phone,
+        cccd: newUser.cccd,
+        cccdIssueDate: newUser.cccdIssueDate,
+        cccdIssuePlace: newUser.cccdIssuePlace,
+        currentAddress: newUser.currentAddress,
         baseSalary: newUser.baseSalary,
         probationMonths: Number(newUser.probationMonths) || 0,
         needsAttendance: newUser.needsAttendance !== false,
@@ -466,6 +474,10 @@ export default function BusinessManagement() {
         birthDate: '',
         startDate: '',
         phone: '',
+        cccd: '',
+        cccdIssueDate: '',
+        cccdIssuePlace: '',
+        currentAddress: '',
         baseSalary: 0
       });
     } catch (err: any) {
@@ -1615,6 +1627,45 @@ export default function BusinessManagement() {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Số CCCD</label>
+                      <input 
+                        type="text"
+                        className="w-full bg-gray-50 border border-transparent focus:border-blue-200 rounded-xl px-4 py-3 outline-none transition-all font-medium" 
+                        placeholder="Số căn cước công dân"
+                        value={editingUser.cccd || ''}
+                        onChange={e => setEditingUser({...editingUser, cccd: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Ngày cấp CCCD</label>
+                      <input 
+                        type="date"
+                        className="w-full bg-gray-50 border border-transparent focus:border-blue-200 rounded-xl px-4 py-3 outline-none transition-all font-medium" 
+                        value={editingUser.cccdIssueDate || ''}
+                        onChange={e => setEditingUser({...editingUser, cccdIssueDate: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Nơi cấp CCCD</label>
+                      <input 
+                        type="text"
+                        className="w-full bg-gray-50 border border-transparent focus:border-blue-200 rounded-xl px-4 py-3 outline-none transition-all font-medium" 
+                        placeholder="Nơi cấp"
+                        value={editingUser.cccdIssuePlace || ''}
+                        onChange={e => setEditingUser({...editingUser, cccdIssuePlace: e.target.value})}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Nơi ở hiện tại</label>
+                      <input 
+                        type="text"
+                        className="w-full bg-gray-50 border border-transparent focus:border-blue-200 rounded-xl px-4 py-3 outline-none transition-all font-medium" 
+                        placeholder="Địa chỉ hiện tại"
+                        value={editingUser.currentAddress || ''}
+                        onChange={e => setEditingUser({...editingUser, currentAddress: e.target.value})}
+                      />
+                    </div>
+                    <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Định mức phép năm (Ngày)</label>
                       <input 
                         type="text"
@@ -1848,7 +1899,7 @@ export default function BusinessManagement() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Ngày sinh nhật</label>
                       <input 
@@ -1870,6 +1921,54 @@ export default function BusinessManagement() {
                         <option value="other">Khác</option>
                       </select>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Số CCCD</label>
+                      <input 
+                        type="text"
+                        className="w-full bg-gray-50 border-2 border-transparent focus:border-blue-100 focus:bg-white rounded-2xl px-4 py-3.5 outline-none font-bold transition-all" 
+                        placeholder="Số căn cước công dân"
+                        value={newUser.cccd}
+                        onChange={e => setNewUser({...newUser, cccd: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Nơi ở hiện tại</label>
+                      <input 
+                        type="text"
+                        className="w-full bg-gray-50 border-2 border-transparent focus:border-blue-100 focus:bg-white rounded-2xl px-4 py-3.5 outline-none font-bold transition-all" 
+                        placeholder="Địa chỉ hiện tại"
+                        value={newUser.currentAddress}
+                        onChange={e => setNewUser({...newUser, currentAddress: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Ngày cấp CCCD</label>
+                      <input 
+                        type="date"
+                        className="w-full bg-gray-50 border-2 border-transparent focus:border-blue-100 focus:bg-white rounded-2xl px-4 py-3.5 outline-none font-bold transition-all" 
+                        value={newUser.cccdIssueDate}
+                        onChange={e => setNewUser({...newUser, cccdIssueDate: e.target.value})}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Nơi cấp CCCD</label>
+                      <input 
+                        type="text"
+                        className="w-full bg-gray-50 border-2 border-transparent focus:border-blue-100 focus:bg-white rounded-2xl px-4 py-3.5 outline-none font-bold transition-all" 
+                        placeholder="Nơi cấp"
+                        value={newUser.cccdIssuePlace}
+                        onChange={e => setNewUser({...newUser, cccdIssuePlace: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Ngày vào làm</label>
                       <input 
@@ -1878,6 +1977,18 @@ export default function BusinessManagement() {
                         value={newUser.startDate}
                         onChange={e => setNewUser({...newUser, startDate: e.target.value})}
                       />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Trạng thái công việc</label>
+                      <select 
+                        className="w-full bg-gray-50 border-2 border-transparent focus:border-blue-100 focus:bg-white rounded-2xl px-4 py-3.5 outline-none font-bold transition-all appearance-none"
+                        value={newUser.workStatus}
+                        onChange={e => setNewUser({...newUser, workStatus: e.target.value as any})}
+                      >
+                        <option value="official">Chính thức</option>
+                        <option value="probation">Thử việc</option>
+                        <option value="intern">Thực tập</option>
+                      </select>
                     </div>
                   </div>
 

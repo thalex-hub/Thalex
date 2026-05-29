@@ -36,6 +36,10 @@ export interface AppUser {
   startDate?: string;
   birthDate?: string;
   gender?: 'male' | 'female' | 'other' | string;
+  cccd?: string;
+  cccdIssueDate?: string;
+  cccdIssuePlace?: string;
+  currentAddress?: string;
   contractUrl?: string;
   annualLeaveAllowance?: number;
   baseSalary?: number;

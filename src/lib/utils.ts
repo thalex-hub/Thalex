@@ -117,16 +117,6 @@ export function getApiUrl(path: string): string {
     }
   }
 
-  // If running on a custom domain (such as thalex.com.vn)
-  // Point directly to the secure Cloud Run cluster backend absolute URL.
-  // This is because proxy solutions (like Vercel rewrites) preserve the client's Host header
-  // when proxying, which causes the destination Cloud Run's ingress routing to return 404.
-  // Direct absolute requests avoid any Host header issues.
-  if (!isLocal && !isCloudRun) {
-    const defaultBackend = "https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app";
-    return `${defaultBackend}${cleanPath}`;
-  }
-
   // If local development or directly on the Cloud Run preview, use relative path dynamically
   if (isLocal || isCloudRun) {
     const pathname = window.location.pathname;
@@ -169,12 +159,6 @@ export async function safeFetchJson<T = any>(
     // Default JSON headers if body exists
     if (options?.body && !finalHeaders["Content-Type"]) {
       finalHeaders["Content-Type"] = "application/json";
-    }
-
-    // Rewrite application/json to text/plain to bypass CORS preflight OPTIONS requests,
-    // which are often aggressively blocked by strict firewalls or proxies on custom domains.
-    if (finalHeaders["Content-Type"] === "application/json") {
-      finalHeaders["Content-Type"] = "text/plain";
     }
 
     const fetchOptions: RequestInit = {

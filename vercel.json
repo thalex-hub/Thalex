@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app/api/:path*"
+      "destination": "/api/proxy"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app/uploads/:path*"
+      "destination": "/api/proxy"
     }
   ]
 }

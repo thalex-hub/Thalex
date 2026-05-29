@@ -587,7 +587,7 @@ export default function Tasks() {
             await fetch(getApiUrl('/api/send-task-email'), {
               method: 'POST',
               headers: {
-                'Content-Type': 'text/plain',
+                'Content-Type': 'application/json',
               },
               body: JSON.stringify({
                 email: assignee.email,
@@ -684,7 +684,7 @@ export default function Tasks() {
             await fetch(getApiUrl('/api/send-task-email'), {
               method: 'POST',
               headers: {
-                'Content-Type': 'text/plain',
+                'Content-Type': 'application/json',
               },
               body: JSON.stringify({
                 email: assignee.email,

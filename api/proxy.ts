@@ -1,0 +1,75 @@
+export const config = {
+  runtime: "edge",
+};
+
+export default async function handler(request: Request) {
+  const originalUrl = new URL(request.url);
+  const path = originalUrl.pathname;
+  const search = originalUrl.search;
+  
+  // The secure Cloud Run backend URL
+  const backendBase = "https://ais-pre-xhtpfphlu2ps32uy3bofcu-255141659024.asia-southeast1.run.app";
+  const targetUrl = `${backendBase}${path}${search}`;
+
+  // Standard preflight request response
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": request.headers.get("Access-Control-Request-Headers") || "Content-Type, Authorization, X-Requested-With, Accept, Origin",
+        "Access-Control-Max-Age": "86400",
+      }
+    });
+  }
+
+  // Clone headers and rewrite the Host header to target Cloud Run host
+  // This is crucial to prevent Cloud Run from throwing 404 (due to custom domain host preservation)
+  const headers = new Headers(request.headers);
+  headers.set("Host", new URL(backendBase).hostname);
+
+  const requestOptions: any = {
+    method: request.method,
+    headers: headers,
+    redirect: "manual",
+  };
+
+  // Safely grab the request body as ArrayBuffer to bypass duplex stream fetch requirements
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    try {
+      const arrayBuffer = await request.arrayBuffer();
+      if (arrayBuffer.byteLength > 0) {
+        requestOptions.body = arrayBuffer;
+      }
+    } catch (e) {
+      // Body reading might fail if none is provided, safe to ignore
+    }
+  }
+
+  try {
+    const response = await fetch(targetUrl, requestOptions);
+
+    // Build the response to send back to client
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.set("Access-Control-Allow-Origin", "*");
+    responseHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    responseHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin");
+
+    const newResponse = new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+    });
+    
+    return newResponse;
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: "Vercel Proxy Error: " + error.message }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      }
+    });
+  }
+}

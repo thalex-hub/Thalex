@@ -289,13 +289,13 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8">
+    <div className="max-w-4xl mx-auto py-4 md:py-8">
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="flex border-b border-gray-100">
+        <div className="flex border-b border-gray-100 overflow-x-auto whitespace-nowrap scrollbar-none scroll-smooth">
           <button
             onClick={() => setActiveTab('profile')}
             className={cn(
-              "flex-1 py-4 text-sm font-bold transition-all border-b-2 flex items-center justify-center gap-2",
+              "flex-1 py-4 px-5 text-sm font-bold transition-all border-b-2 flex items-center justify-center gap-2 shrink-0 whitespace-nowrap",
               activeTab === 'profile' 
                 ? "border-blue-600 text-blue-600 bg-blue-50/50" 
                 : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
@@ -307,7 +307,7 @@ export default function Settings() {
           <button
             onClick={() => setActiveTab('security')}
             className={cn(
-              "flex-1 py-4 text-sm font-bold transition-all border-b-2 flex items-center justify-center gap-2",
+              "flex-1 py-4 px-5 text-sm font-bold transition-all border-b-2 flex items-center justify-center gap-2 shrink-0 whitespace-nowrap",
               activeTab === 'security' 
                 ? "border-blue-600 text-blue-600 bg-blue-50/50" 
                 : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
@@ -320,7 +320,7 @@ export default function Settings() {
             <button
               onClick={() => setActiveTab('company')}
               className={cn(
-                "flex-1 py-4 text-sm font-bold transition-all border-b-2 flex items-center justify-center gap-2",
+                "flex-1 py-4 px-5 text-sm font-bold transition-all border-b-2 flex items-center justify-center gap-2 shrink-0 whitespace-nowrap",
                 activeTab === 'company' 
                   ? "border-blue-600 text-blue-600 bg-blue-50/50" 
                   : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
@@ -334,7 +334,7 @@ export default function Settings() {
             <button
               onClick={() => setActiveTab('reset')}
               className={cn(
-                "flex-1 py-4 text-sm font-bold transition-all border-b-2 flex items-center justify-center gap-2",
+                "flex-1 py-4 px-5 text-sm font-bold transition-all border-b-2 flex items-center justify-center gap-2 shrink-0 whitespace-nowrap font-bold",
                 activeTab === 'reset' 
                   ? "border-red-600 text-red-600 bg-red-50/50" 
                   : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
@@ -346,7 +346,7 @@ export default function Settings() {
           )}
         </div>
 
-        <div className="p-8">
+        <div className="p-4 md:p-8">
           <AnimatePresence mode="wait">
             {activeTab === 'profile' ? (
               <motion.div

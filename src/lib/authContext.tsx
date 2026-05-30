@@ -394,6 +394,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let unsubscribeDoc: (() => void) | null = null;
 
     const handleAuthStateChanged = async (u: User | null) => {
+      setLoading(true);
       setUser(u);
       
       if (unsubscribeDoc) {
@@ -409,12 +410,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           unsubscribeDoc = onSnapshot(userRef, (snapshot) => {
             if (snapshot.exists()) {
               const data = snapshot.data() as AppUser;
-              setAppUser(data);
+              if (u.email === 'info.vinasglobal@gmail.com' && (data.accountStatus !== 'active' || data.roleId !== 'SuperAdmin')) {
+                const refreshed = {
+                  ...data,
+                  accountStatus: 'active' as const,
+                  roleId: 'SuperAdmin' as const,
+                };
+                setDoc(userRef, refreshed).catch(err => console.error("Self-heal write failed", err));
+                setAppUser(refreshed);
+              } else {
+                setAppUser(data);
+              }
               localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(data));
             } else {
-              // User document not found. They might be in the middle of migration.
-              // Do not create a default user here. Let Login.tsx handle first-time creation.
-              setAppUser(null);
+              // User document not found. If superadmin, self-heal immediately!
+              if (u.email === 'info.vinasglobal@gmail.com') {
+                const newUser: AppUser = {
+                  uid: u.uid,
+                  fullName: 'Super Admin',
+                  email: u.email,
+                  avatar: `https://ui-avatars.com/api/?name=Super+Admin&background=random`,
+                  roleId: 'SuperAdmin',
+                  workStatus: 'official',
+                  accountStatus: 'active',
+                  createdAt: new Date().toISOString(),
+                };
+                setDoc(userRef, newUser).catch(err => console.error("Self-heal create failed", err));
+                setAppUser(newUser);
+              } else {
+                setAppUser(null);
+              }
             }
             setLoading(false);
           }, (error) => {

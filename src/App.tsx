@@ -52,6 +52,9 @@ function AppContent() {
 
   React.useEffect(() => {
     if (user && !loading && !isVerifying) {
+      if (user.email === 'info.vinasglobal@gmail.com') {
+        return;
+      }
       if (!appUser) {
         auth.signOut();
       } else if (appUser.accountStatus === 'locked' || appUser.accountStatus === 'pending') {

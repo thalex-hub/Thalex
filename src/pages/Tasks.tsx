@@ -718,22 +718,29 @@ export default function Tasks() {
   };
 
   const checkAndCompleteOrder = async (orderId: string | undefined, parentId: string | undefined) => {
-    if (!orderId || !parentId) return;
+    if (!orderId) return;
 
     try {
-      const q = query(collection(db, 'tasks'), where('parentId', '==', parentId), where('orderId', '==', orderId));
+      let q;
+      if (parentId) {
+        q = query(collection(db, 'tasks'), where('parentId', '==', parentId), where('orderId', '==', orderId));
+      } else {
+        q = query(collection(db, 'tasks'), where('orderId', '==', orderId));
+      }
       const snap = await getDocs(q);
       const subtasks = snap.docs.map(doc => doc.data() as Task);
       
       const allCompleted = subtasks.length > 0 && subtasks.every(t => t.status === 'completed');
       
       if (allCompleted) {
-        // Complete parent task
-        await updateDoc(doc(db, 'tasks', parentId), {
-          status: 'completed',
-          progress: 100,
-          updatedAt: new Date().toISOString()
-        });
+        if (parentId) {
+          // Complete parent task
+          await updateDoc(doc(db, 'tasks', parentId), {
+            status: 'completed',
+            progress: 100,
+            updatedAt: new Date().toISOString()
+          });
+        }
 
         // Complete order
         await updateDoc(doc(db, 'orders', orderId), {
@@ -741,7 +748,7 @@ export default function Tasks() {
           updatedAt: new Date().toISOString()
         });
         
-        await logActivity('Order Auto Completed', 'Orders', orderId, { reason: 'All sub-tasks completed' });
+        await logActivity('Order Auto Completed', 'Orders', orderId, { reason: 'All related tasks completed' });
       }
     } catch (error) {
       console.error("Error auto-completing order:", error);
@@ -776,7 +783,7 @@ export default function Tasks() {
         updatedAt: new Date().toISOString()
       });
 
-      if (newStatus === 'completed' && task.parentId) {
+      if (newStatus === 'completed' && task.orderId) {
         await checkAndCompleteOrder(task.orderId, task.parentId);
       }
     } catch (error) {
@@ -846,7 +853,7 @@ export default function Tasks() {
         updatedAt: new Date().toISOString()
       });
 
-      if (newStatus === 'completed' && task.parentId) {
+      if (newStatus === 'completed' && task.orderId) {
         await checkAndCompleteOrder(task.orderId, task.parentId);
       }
     } catch (error) {

@@ -609,28 +609,7 @@ export default function OrderProposals() {
           console.error("Error finding General Manager:", error);
         }
 
-        // Parent Task
-        const parentTaskName = `Triển khai – ${proposal.name}`;
-        const parentTaskRef = await addDoc(collection(db, 'tasks'), {
-          name: parentTaskName,
-          description: `Công việc cha điều phối triển khai đơn hàng ${proposal.name}`,
-          priority: 'high',
-          status: 'new',
-          progress: 0,
-          orderId: orderRef.id,
-          assigneeId: generalManagerId,
-          assigneeName: generalManagerName,
-          responsibleUserId: generalManagerId,
-          responsibleUserName: generalManagerName,
-          followers: proposal.createdBy ? [proposal.createdBy] : [],
-          startDate: new Date().toISOString(),
-          dueDate: new Date(Date.now() + expectedDays * 24 * 60 * 60 * 1000).toISOString(),
-          createdAt: new Date().toISOString(),
-          isParent: true,
-          type: 'parent'
-        });
-
-        // Sub-tasks
+        // Core 7 tasks, created directly as standard, top-level tasks for the order
         const subTasks = [
           { name: '1. Ký hợp đồng', days: Math.max(1, Math.round(expectedDays * (2 / 30))) },
           { name: '2. Tạm ứng/Đặt cọc', days: Math.max(2, Math.round(expectedDays * (5 / 30))) },
@@ -641,16 +620,17 @@ export default function OrderProposals() {
           { name: '7. Thu hồi công nợ', days: expectedDays },
         ];
 
-        for (const t of subTasks) {
+        for (const [index, t] of subTasks.entries()) {
           await addDoc(collection(db, 'tasks'), {
-            name: t.name,
-            parentId: parentTaskRef.id,
-            parentName: parentTaskName,
+            name: `${t.name} – ${proposal.name}`,
+            parentId: '',
+            parentName: '',
             description: `${t.name} cho đơn hàng ${proposal.name}`,
             priority: 'medium',
             status: 'new',
             progress: 0,
             orderId: orderRef.id,
+            customerId: proposal.customerId || '',
             assigneeId: generalManagerId,
             assigneeName: generalManagerName,
             responsibleUserId: generalManagerId,
@@ -659,7 +639,8 @@ export default function OrderProposals() {
             startDate: new Date().toISOString(),
             dueDate: new Date(Date.now() + t.days * 24 * 60 * 60 * 1000).toISOString(),
             createdAt: new Date().toISOString(),
-            type: 'subtask'
+            type: 'task',
+            orderIndex: index
           });
         }
       }

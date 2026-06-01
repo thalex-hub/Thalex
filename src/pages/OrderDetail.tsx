@@ -321,35 +321,9 @@ export default function OrderDetail() {
         batch.delete(d.ref);
       });
 
-      // 2. Parent Task
-      const parentTaskName = `Triển khai – ${order.name}`;
-      const parentTaskRef = doc(collection(db, 'tasks'));
       const now = new Date().toISOString();
-      const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      
-      batch.set(parentTaskRef, {
-        name: parentTaskName,
-        description: `Công việc cha điều phối triển khai đơn hàng ${order.name}`,
-        priority: 'high',
-        status: 'pending',
-        progress: 0,
-        orderId: id,
-        customerId: order.customerId || '',
-        assigneeId: generalManagerId,
-        assigneeName: generalManagerName,
-        responsibleUserId: generalManagerId,
-        responsibleUserName: generalManagerName,
-        followers: [order.responsibleUserId || user.uid].filter(Boolean),
-        startDate: now,
-        endDate: order.endDate || thirtyDaysLater,
-        createdAt: now,
-        updatedAt: now,
-        isParent: true,
-        type: 'parent',
-        orderIndex: -1 // Parent task first
-      });
 
-      // 3. Sub-tasks
+      // 3. Standalone workflow tasks
       const subTasks = [
         { name: '1. Ký hợp đồng', days: 2 },
         { name: '2. Tạm ứng/Đặt cọc', days: 5 },
@@ -363,11 +337,11 @@ export default function OrderDetail() {
       subTasks.forEach((t, index) => {
         const newTaskRef = doc(collection(db, 'tasks'));
         batch.set(newTaskRef, {
-          parentId: parentTaskRef.id,
-          parentName: parentTaskName,
+          parentId: '',
+          parentName: '',
           orderId: id,
           customerId: order.customerId || '',
-          name: t.name,
+          name: `${t.name} – ${order.name}`,
           description: `${t.name} cho đơn hàng ${order.name}`,
           priority: 'medium',
           status: 'pending',
@@ -382,12 +356,12 @@ export default function OrderDetail() {
           endDate: new Date(Date.now() + t.days * 24 * 60 * 60 * 1000).toISOString(),
           createdAt: now,
           updatedAt: now,
-          type: 'subtask',
+          type: 'task',
           orderIndex: index
         });
       });
 
-      console.log(`Committing batch: deleting ${deleteCount} items, adding 1 parent and 7 subtasks.`);
+      console.log(`Committing batch: deleting ${deleteCount} items, adding 7 standalone tasks.`);
       await batch.commit();
       
       alert(`Đã làm mới kế hoạch: Dọn dẹp ${deleteCount} mục cũ và thiết lập lại quy trình chuẩn thành công.`);
@@ -2057,7 +2031,10 @@ export default function OrderDetail() {
                            </div>
                            <div>
                               <h4 className="font-black text-gray-900 text-sm leading-tight">
-                                {parentTask.name.startsWith('Triển khai – ') ? parentTask.name.replace('Triển khai – ', '') : parentTask.name}
+                                {parentTask.name
+                                  .replace(` – ${order.name}`, '')
+                                  .replace(` - ${order.name}`, '')
+                                  .replace('Triển khai – ', '')}
                               </h4>
                               <div className="flex items-center gap-3 mt-0.5">
                                 <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">

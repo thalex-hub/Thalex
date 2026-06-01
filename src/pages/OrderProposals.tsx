@@ -172,32 +172,74 @@ export default function OrderProposals() {
 
     const unsubCustomers = onSnapshot(collection(db, 'customers'), (snap) => {
       setCustomers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error("Error loading customers in OrderProposals:", err);
+      setCustomers([]);
     });
 
     let unsubUsers = () => {};
     if (canSeeAll) {
       unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
         setUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }, (err) => {
+        console.error("Error loading users in OrderProposals:", err);
+        setUsers([]);
       });
     } else if (user) {
       // At least put self in the users list
       setUsers([{ id: user.uid, fullName: user.displayName, email: user.email }]);
     }
     
-    const q = canSeeAll 
-      ? query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'))
-      : query(
-          collection(db, 'order_proposals'), 
-          or(
-            where('createdBy', '==', user.uid),
-            where('followers', 'array-contains', user.uid)
-          ),
-          orderBy('createdAt', 'desc')
-        );
-      
-    const unsubProposals = onSnapshot(q, (snap) => {
-      setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    let unsubProposals = () => {};
+    if (canSeeAll) {
+      const q = query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'));
+      unsubProposals = onSnapshot(q, (snap) => {
+        setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }, (err) => {
+        console.error("Error loading order proposals in OrderProposals:", err);
+        setProposals([]);
+      });
+    } else {
+      // For non-admin/non-manager roles, split the compound OR + ORDER BY query to avoid composite index requirement.
+      // This solves the blank page loading issue by executing independent simple queries and sorting in memory.
+      let listCreated: any[] = [];
+      let listFollowed: any[] = [];
+
+      const combineAndSortProposals = () => {
+        const mergedMap = new Map();
+        listCreated.forEach(item => mergedMap.set(item.id, item));
+        listFollowed.forEach(item => mergedMap.set(item.id, item));
+        const mergedList = Array.from(mergedMap.values());
+        mergedList.sort((a, b) => {
+          const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return tB - tA;
+        });
+        setProposals(mergedList);
+      };
+
+      const q1 = query(collection(db, 'order_proposals'), where('createdBy', '==', user.uid));
+      const q2 = query(collection(db, 'order_proposals'), where('followers', 'array-contains', user.uid));
+
+      const unsub1 = onSnapshot(q1, (snap) => {
+        listCreated = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        combineAndSortProposals();
+      }, (err) => {
+        console.error("Error loading created proposals in OrderProposals:", err);
+      });
+
+      const unsub2 = onSnapshot(q2, (snap) => {
+        listFollowed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        combineAndSortProposals();
+      }, (err) => {
+        console.error("Error loading followed proposals in OrderProposals:", err);
+      });
+
+      unsubProposals = () => {
+        unsub1();
+        unsub2();
+      };
+    }
 
     return () => {
       unsubCustomers();

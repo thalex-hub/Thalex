@@ -270,6 +270,8 @@ export default function NotificationManager() {
 
     const unsubscribeTasks = onSnapshot(q, (snapshot) => {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+    }, (err) => {
+      console.error("Error in unsubscribeTasks notification watch:", err);
     });
 
     // Listen to MY leave requests that are returned
@@ -300,6 +302,8 @@ export default function NotificationManager() {
           setNotifications(prev => prev.filter(n => !shouldRemoveNotification(n, id, 'leave_requests', leaveReq)));
         }
       });
+    }, (err) => {
+      console.error("Error in unsubscribeLeave notification watch:", err);
     });
 
     // APPROVAL NOTIFICATIONS (Role-based and scoped queries)

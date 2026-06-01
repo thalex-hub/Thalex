@@ -35,7 +35,8 @@ export default function OrderProposals() {
     customerAcquisitionCost: '0',
     otherCosts: '0',
     followers: [] as string[],
-    note: ''
+    note: '',
+    expectedDays: '30'
   });
 
   const [viewingProposal, setViewingProposal] = React.useState<any>(null);
@@ -368,6 +369,7 @@ export default function OrderProposals() {
           businessPlan: businessPlanFile ? mockUpload(businessPlanFile) : editingProposal?.businessPlan,
           followers: newProposal.followers,
           note: newProposal.note,
+          expectedDays: Number(newProposal.expectedDays) || 30,
           updatedAt: new Date().toISOString()
         };
 
@@ -413,7 +415,8 @@ export default function OrderProposals() {
         customerAcquisitionCost: '0', 
         otherCosts: '0', 
         followers: [],
-        note: '' 
+        note: '',
+        expectedDays: '30'
       });
       setContractFile(null);
       setBusinessPlanFile(null);
@@ -452,7 +455,8 @@ export default function OrderProposals() {
       customerAcquisitionCost: (prop.customerAcquisitionCost || '0').toString(),
       otherCosts: (prop.otherCosts || '0').toString(),
       followers: prop.followers || [],
-      note: prop.note || ''
+      note: prop.note || '',
+      expectedDays: (prop.expectedDays || '30').toString()
     });
     setShowAddModal(true);
   };
@@ -510,6 +514,8 @@ export default function OrderProposals() {
       }
 
       if (status === 'approved') {
+        const expectedDays = proposal.expectedDays ? Number(proposal.expectedDays) : 30;
+
         // Generate Order Code: TL + yyyyMMdd + - + index
         const today = new Date();
         const dateStr = format(today, 'yyyyMMdd');
@@ -560,7 +566,7 @@ export default function OrderProposals() {
           expectedProfitAfterCIT: proposal.expectedProfitAfterCIT,
           budgetedTotalCosts: proposal.totalCosts,
           startDate: new Date().toISOString(),
-          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          endDate: new Date(Date.now() + expectedDays * 24 * 60 * 60 * 1000).toISOString(),
           status: 'contract_signed',
           responsibleUserId: proposal.createdBy,
           followers: proposal.followers || [],
@@ -618,7 +624,7 @@ export default function OrderProposals() {
           responsibleUserName: generalManagerName,
           followers: proposal.createdBy ? [proposal.createdBy] : [],
           startDate: new Date().toISOString(),
-          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          dueDate: new Date(Date.now() + expectedDays * 24 * 60 * 60 * 1000).toISOString(),
           createdAt: new Date().toISOString(),
           isParent: true,
           type: 'parent'
@@ -626,13 +632,13 @@ export default function OrderProposals() {
 
         // Sub-tasks
         const subTasks = [
-          { name: '1. Ký hợp đồng', days: 2 },
-          { name: '2. Tạm ứng/Đặt cọc', days: 5 },
-          { name: '3. Đặt hàng nhà cung cấp', days: 10 },
-          { name: '4. Kiểm tra và nhập kho hàng hoá', days: 15 },
-          { name: '5. Xuất kho và triển khai', days: 20 },
-          { name: '6. Bàn giao nghiệm thu, xuất hoá đơn', days: 25 },
-          { name: '7. Thu hồi công nợ', days: 30 },
+          { name: '1. Ký hợp đồng', days: Math.max(1, Math.round(expectedDays * (2 / 30))) },
+          { name: '2. Tạm ứng/Đặt cọc', days: Math.max(2, Math.round(expectedDays * (5 / 30))) },
+          { name: '3. Đặt hàng nhà cung cấp', days: Math.max(3, Math.round(expectedDays * (10 / 30))) },
+          { name: '4. Kiểm tra và nhập kho hàng hoá', days: Math.max(4, Math.round(expectedDays * (15 / 30))) },
+          { name: '5. Xuất kho và triển khai', days: Math.max(5, Math.round(expectedDays * (20 / 30))) },
+          { name: '6. Bàn giao nghiệm thu, xuất hoá đơn', days: Math.max(6, Math.round(expectedDays * (25 / 30))) },
+          { name: '7. Thu hồi công nợ', days: expectedDays },
         ];
 
         for (const t of subTasks) {
@@ -1068,6 +1074,21 @@ export default function OrderProposals() {
                               <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Ngày đề xuất</p>
                               <p className="font-bold text-gray-900">{safeFormatDate(viewingProposal.createdAt, 'dd/MM/yyyy HH:mm')}</p>
                            </div>
+                           <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Số ngày dự kiến triển khai</p>
+                              <p className="font-bold text-gray-900">{viewingProposal.expectedDays || 30} ngày</p>
+                           </div>
+                           <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Ngày hoàn thành dự kiến</p>
+                              <p className="font-bold text-purple-700 font-extrabold text-sm">
+                                {(() => {
+                                  const days = Number(viewingProposal.expectedDays) || 30;
+                                  const baseDate = viewingProposal.createdAt ? new Date(viewingProposal.createdAt) : new Date();
+                                  const compDate = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000);
+                                  return isNaN(compDate.getTime()) ? '--/--/----' : format(compDate, 'dd/MM/yyyy');
+                                })()}
+                              </p>
+                           </div>
                            {viewingProposal.followers && viewingProposal.followers.length > 0 && (
                              <div>
                                <p className="text-[10px] font-black text-gray-400 uppercase mb-2 flex items-center gap-2">
@@ -1274,6 +1295,30 @@ export default function OrderProposals() {
                               onChange={e => setNewProposal({...newProposal, name: e.target.value})} 
                             />
                           </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Số ngày dự kiến triển khai</label>
+                            <input 
+                              type="number" 
+                              min="1"
+                              required 
+                              className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 outline-none text-sm font-medium" 
+                              value={newProposal.expectedDays || ''} 
+                              placeholder="VD: 30"
+                              onChange={e => setNewProposal({...newProposal, expectedDays: e.target.value})} 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Ngày hoàn thành dự kiến</label>
+                            <div className="w-full bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 font-bold text-purple-700 text-sm h-[48px] flex items-center">
+                              {(() => {
+                                const days = Number(newProposal.expectedDays) || 0;
+                                const baseDate = editingProposal?.createdAt ? new Date(editingProposal.createdAt) : new Date();
+                                const compDate = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000);
+                                return isNaN(compDate.getTime()) || days <= 0 ? '--/--/----' : format(compDate, 'dd/MM/yyyy');
+                              })()}
+                            </div>
+                          </div>
+
                           <div className="col-span-2">
                             <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Khách hàng</label>
                             <div className="relative">

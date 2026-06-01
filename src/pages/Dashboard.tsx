@@ -253,8 +253,7 @@ export default function Dashboard() {
           const dateA = toDate(a.createdAt);
           const dateB = toDate(b.createdAt);
           return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
-        })
-        .slice(0, 5);
+        });
       setRecentTasks(unfinished);
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, 'tasks', false);
@@ -1225,7 +1224,12 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="text-right text-xs font-semibold text-gray-500">
-                  <span className="font-extrabold text-green-600">{stats.completedTasksCount}</span> / {stats.totalTasksCount} việc
+                  <div>
+                    <span className="font-extrabold text-green-600">{stats.completedTasksCount}</span> / {stats.totalTasksCount} việc
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-1 font-medium">
+                    ({stats.totalTasksCount - stats.completedTasksCount} việc đang chạy • {stats.completedTasksCount} đã xong)
+                  </div>
                 </div>
               </div>
 

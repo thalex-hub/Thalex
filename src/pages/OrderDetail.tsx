@@ -932,7 +932,15 @@ export default function OrderDetail() {
       );
       unsubSubtasks = onSnapshot(qSubtasks, (snap) => {
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-        docs.sort((a: any, b: any) => (a.orderIndex || 0) - (b.orderIndex || 0));
+        docs.sort((a: any, b: any) => {
+          const getOrder = (task: any) => {
+            if (typeof task.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
+            const match = task.name?.match(/^(\d+)\./);
+            if (match) return parseInt(match[1]);
+            return 999;
+          };
+          return getOrder(a) - getOrder(b);
+        });
         setTaskSubtasks(docs);
       }, (err) => {
         handleFirestoreError(err, OperationType.LIST, 'tasks', false);
@@ -2009,8 +2017,24 @@ export default function OrderDetail() {
              
              <div className="p-4 space-y-3">
                 {/* Parent Task Rendering - All top-level tasks sorted by orderIndex */}
-                {tasks.filter(t => !t.parentId).sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0)).map((parentTask, i) => {
-                  const subtasks = tasks.filter(st => st.parentId === parentTask.id).sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+                {tasks.filter(t => !t.parentId).sort((a, b) => {
+                  const getTaskOrder = (task: any) => {
+                    if (typeof task.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
+                    const match = task.name?.match(/^(\d+)\./);
+                    if (match) return parseInt(match[1]);
+                    return 999;
+                  };
+                  return getTaskOrder(a) - getTaskOrder(b);
+                }).map((parentTask, i) => {
+                  const subtasks = tasks.filter(st => st.parentId === parentTask.id).sort((a, b) => {
+                    const getTaskOrder = (task: any) => {
+                      if (typeof task.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
+                      const match = task.name?.match(/^(\d+)\./);
+                      if (match) return parseInt(match[1]);
+                      return 999;
+                    };
+                    return getTaskOrder(a) - getTaskOrder(b);
+                  });
                   const completedSubtasks = subtasks.filter(st => st.status === 'completed').length;
                   const phaseProgress = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : 
                                        (parentTask.status === 'completed' ? 100 : (parentTask.progress || 0));

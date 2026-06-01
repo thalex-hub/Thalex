@@ -36,7 +36,11 @@ const CATEGORY_MAP: Record<string, string> = {
 export default function Disbursements() {
   const { isDirector, isAdmin, isSuperAdmin, isManager, isAccountant, isFinanceStaff, user, appUser, hasPermission } = useAuth();
   const canAccess = isDirector || isAdmin || isManager || isAccountant || isFinanceStaff || hasPermission('menu_disbursements');
-  const isDisburser = isSuperAdmin || isDirector || isAccountant || hasPermission('approve_disbursements') || hasPermission('menu_disbursements_edit') || appUser?.roleId === 'ChiefAccountant' || appUser?.roleId === 'Accountant' || appUser?.roleId === 'AccountantStaff';
+  const isDisburser = isSuperAdmin || (
+    (isAccountant || hasPermission('approve_disbursements') || hasPermission('menu_disbursements_edit') || appUser?.roleId === 'ChiefAccountant' || appUser?.roleId === 'Accountant' || appUser?.roleId === 'AccountantStaff') &&
+    appUser?.roleId !== 'Director' &&
+    appUser?.roleId !== 'ViceDirector'
+  );
 
   const [loading, setLoading] = React.useState(true);
   const [advances, setAdvances] = React.useState<any[]>([]);

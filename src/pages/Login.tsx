@@ -196,7 +196,7 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
                   ...data,
                   uid: userCredential.user.uid,
                   needsPasswordChange: data.needsPasswordChange ?? true,
-                  accountStatus: data.accountStatus ?? 'active'
+                  accountStatus: 'active' as const
                 };
                 
                 // Save to their real UID doc

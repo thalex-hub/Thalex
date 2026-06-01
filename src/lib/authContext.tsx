@@ -418,10 +418,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 };
                 setDoc(userRef, refreshed).catch(err => console.error("Self-heal write failed", err));
                 setAppUser(refreshed);
+                localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(refreshed));
+              } else if (data.accountStatus === 'pending') {
+                const refreshed = {
+                  ...data,
+                  accountStatus: 'active' as const,
+                };
+                setDoc(userRef, refreshed).catch(err => console.error("Self-heal write failed", err));
+                setAppUser(refreshed);
+                localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(refreshed));
               } else {
                 setAppUser(data);
+                localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(data));
               }
-              localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(data));
             } else {
               // User document not found. If superadmin, self-heal immediately!
               if (u.email === 'info.vinasglobal@gmail.com') {

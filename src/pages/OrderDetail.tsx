@@ -934,9 +934,9 @@ export default function OrderDetail() {
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
         docs.sort((a: any, b: any) => {
           const getOrder = (task: any) => {
-            if (typeof task.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
             const match = task.name?.match(/^(\d+)\./);
             if (match) return parseInt(match[1]);
+            if (typeof task.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
             return 999;
           };
           return getOrder(a) - getOrder(b);
@@ -2019,18 +2019,18 @@ export default function OrderDetail() {
                 {/* Parent Task Rendering - All top-level tasks sorted by orderIndex */}
                 {tasks.filter(t => !t.parentId).sort((a, b) => {
                   const getTaskOrder = (task: any) => {
-                    if (typeof task.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
                     const match = task.name?.match(/^(\d+)\./);
                     if (match) return parseInt(match[1]);
+                    if (typeof task.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
                     return 999;
                   };
                   return getTaskOrder(a) - getTaskOrder(b);
                 }).map((parentTask, i) => {
                   const subtasks = tasks.filter(st => st.parentId === parentTask.id).sort((a, b) => {
                     const getTaskOrder = (task: any) => {
-                      if (typeof task.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
                       const match = task.name?.match(/^(\d+)\./);
                       if (match) return parseInt(match[1]);
+                      if (typeof task.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
                       return 999;
                     };
                     return getTaskOrder(a) - getTaskOrder(b);

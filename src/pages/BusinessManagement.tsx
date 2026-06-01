@@ -490,9 +490,22 @@ export default function BusinessManagement() {
   };
 
   const handleResendWelcomeEmail = async (userId: string, userEmail: string, userFullName: string, userTempPassword?: string) => {
-    if (!userTempPassword) {
-      alert("Tài khoản này không lưu mật khẩu tạm thời hoặc đã đổi mật khẩu (đã được kích hoạt).");
-      return;
+    let finalTempPassword = userTempPassword;
+    if (!finalTempPassword) {
+      const confirmCreate = window.confirm("Tài khoản này chưa có mật khẩu tạm thời (có thể đã được dọn dẹp hoặc khởi tạo trơn). Hệ thống sẽ tự tạo mật khẩu ngẫu nhiên để gửi. Bạn có muốn tiếp tục?");
+      if (!confirmCreate) return;
+      
+      finalTempPassword = Math.random().toString(36).slice(-8);
+      try {
+        await updateDoc(doc(db, 'users', userId), {
+          tempPassword: finalTempPassword,
+          needsPasswordChange: true
+        });
+      } catch (err) {
+        console.error("Lỗi tạo mật khẩu", err);
+        alert("Lưu mật khẩu tạm thời thất bại!");
+        return;
+      }
     }
     setSendingEmailId(userId);
     try {
@@ -513,7 +526,7 @@ export default function BusinessManagement() {
         body: JSON.stringify({
           email: userEmail,
           fullName: userFullName,
-          password: userTempPassword,
+          password: finalTempPassword,
           customAppUrl: window.location.origin,
           smtpConfig: {
             host: companyProfile.smtpHost,
@@ -530,9 +543,9 @@ export default function BusinessManagement() {
       if (!success) {
         alert(`Lỗi kết nối hoặc gửi email: ${fetchErr}`);
       } else if (mailData?.simulated) {
-        alert("SMTP chưa cấu hình, thông tin tài khoản tạm thời đã được ghi lại trên nhật ký máy chủ để kiểm thử.");
+        alert(`SMTP chưa cấu hình, thông tin tài khoản tạm thời đã được ghi lại trên nhật ký máy chủ để kiểm thử.\nMật khẩu tạm thời: ${finalTempPassword}`);
       } else if (mailData?.success) {
-        alert(`Đã gửi lại thành công email thông tin kích hoạt tài khoản tới: ${userEmail}`);
+        alert(`Đã gửi lại thành công email thông tin kích hoạt tài khoản tới: ${userEmail}\n(Mật khẩu tạm thời: ${finalTempPassword})`);
       } else {
         alert(`Lỗi từ máy chủ SMTP: ${mailData?.error || 'Vui lòng kiểm tra lại cấu hình SMTP.'}`);
       }
@@ -953,7 +966,7 @@ export default function BusinessManagement() {
                         </td>
                         <td className="px-6 py-4 text-right">
                            <div className="flex justify-end gap-2">
-                             {u.accountStatus === 'pending' && u.tempPassword && (
+                             {u.accountStatus === 'pending' && (
                                <button 
                                  onClick={() => handleResendWelcomeEmail(u.uid, u.email, u.fullName, u.tempPassword)}
                                  disabled={sendingEmailId !== null || loading}
@@ -1808,10 +1821,10 @@ export default function BusinessManagement() {
                  >
                    Hủy bỏ
                  </button>
-                 {editingUser?.accountStatus === 'pending' && editingUser?.tempPassword && (
+                 {editingUser?.accountStatus === 'pending' && (
                    <button 
                      type="button" 
-                     onClick={() => handleResendWelcomeEmail(editingUser.uid, editingUser.email, editingUser.fullName, editingUser.tempPassword!)}
+                     onClick={() => handleResendWelcomeEmail(editingUser.uid, editingUser.email, editingUser.fullName, editingUser.tempPassword)}
                      disabled={loading}
                      className="flex-1 py-3 bg-orange-50 text-orange-600 rounded-xl font-bold border border-orange-100 hover:bg-orange-100 transition-all flex items-center justify-center gap-2 shadow-sm"
                      title="Gửi lại thông tin tài khoản qua email"

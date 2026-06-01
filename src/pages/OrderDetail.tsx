@@ -931,7 +931,9 @@ export default function OrderDetail() {
         orderBy('createdAt', 'asc')
       );
       unsubSubtasks = onSnapshot(qSubtasks, (snap) => {
-        setTaskSubtasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        docs.sort((a: any, b: any) => (a.orderIndex || 0) - (b.orderIndex || 0));
+        setTaskSubtasks(docs);
       }, (err) => {
         handleFirestoreError(err, OperationType.LIST, 'tasks', false);
       });
@@ -2008,7 +2010,7 @@ export default function OrderDetail() {
              <div className="p-4 space-y-3">
                 {/* Parent Task Rendering - All top-level tasks sorted by orderIndex */}
                 {tasks.filter(t => !t.parentId).sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0)).map((parentTask, i) => {
-                  const subtasks = tasks.filter(st => st.parentId === parentTask.id);
+                  const subtasks = tasks.filter(st => st.parentId === parentTask.id).sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
                   const completedSubtasks = subtasks.filter(st => st.status === 'completed').length;
                   const phaseProgress = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : 
                                        (parentTask.status === 'completed' ? 100 : (parentTask.progress || 0));

@@ -262,7 +262,7 @@ export default function Tasks() {
     }
     
     const unsubTasks = onSnapshot(tasksQ, (snap) => {
-      setTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+      setTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)).filter(t => !t.orderId));
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, 'tasks', false);
     });

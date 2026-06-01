@@ -245,7 +245,10 @@ export default function BusinessExpenses() {
     };
   }, { salary: 0, office_rent: 0, electricity: 0, water: 0, office_supplies: 0, delivery: 0, other: 0, total: 0 }) as MonthlyExpense;
 
-  const monthsPassed = Object.keys(monthlyBreakdown).length;
+  // Chỉ tính trung bình dựa trên số tháng thực tế có phát sinh chi phí (có tổng chi phí > 0)
+  // Tránh việc tính các tháng cũ chưa cấu hình dữ liệu hoặc chưa hoạt động gây kéo thấp giá trị trung bình thực tế.
+  const activeMonths = (Object.values(monthlyBreakdown) as MonthlyExpense[]).filter(v => v.total > 0).length;
+  const monthsPassed = activeMonths > 0 ? activeMonths : 1;
 
   const handleExport = () => {
     const data = Object.entries(monthlyBreakdown).map(([key, value]: [string, MonthlyExpense]) => ({

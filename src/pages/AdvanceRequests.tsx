@@ -83,8 +83,8 @@ export default function AdvanceRequests() {
     fetchOrders();
     
   const q = isDirector || isFinanceStaff || hasPermission('view_advances') || hasPermission('menu_proposals_view')
-    ? query(collection(db, 'advance_requests'), where('requestType', '==', 'advance'), orderBy('requestDate', 'desc'))
-    : query(collection(db, 'advance_requests'), where('userId', '==', user.uid), where('requestType', '==', 'advance'), orderBy('requestDate', 'desc'));
+    ? query(collection(db, 'advance_requests'))
+    : query(collection(db, 'advance_requests'), where('userId', '==', user.uid));
       
     const rQ = isDirector || isFinanceStaff || hasPermission('view_reimbursements') || hasPermission('menu_proposals_view')
       ? query(collection(db, 'reimbursement_requests'))
@@ -97,11 +97,15 @@ export default function AdvanceRequests() {
         );
 
     const unsubReimbursements = onSnapshot(rQ, (snap) => {
-      setReimbursements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a: any, b: any) => new Date(b.requestDate || b.createdAt).getTime() - new Date(a.requestDate || a.createdAt).getTime());
+      setReimbursements(data);
     });
 
     const unsubRequests = onSnapshot(q, (snap) => {
-      setRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((r: any) => r.requestType === 'advance');
+      data.sort((a: any, b: any) => new Date(b.requestDate || b.createdAt).getTime() - new Date(a.requestDate || a.createdAt).getTime());
+      setRequests(data);
     }, (error) => {
       console.error("Firestore read error:", error);
     });

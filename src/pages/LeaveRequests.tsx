@@ -60,23 +60,24 @@ export default function LeaveRequests() {
     // For managers, see department requests or all if admin.
     let q;
     if (isAdmin || isDirector) {
-      q = query(collection(db, 'leave_requests'), orderBy('startDate', 'desc'));
+      q = query(collection(db, 'leave_requests'));
     } else if (isManager) {
       // Sees their own + department requests
       q = query(
         collection(db, 'leave_requests'), 
         or(
-          where('userId', '==', auth.currentUser.uid),
-          where('departmentId', '==', appUser.departmentId || 'none')
-        ),
-        orderBy('startDate', 'desc')
+          where('userId', '==', auth.currentUser?.uid),
+          where('departmentId', '==', appUser?.departmentId || 'none')
+        )
       );
     } else {
-      q = query(collection(db, 'leave_requests'), where('userId', '==', auth.currentUser.uid), orderBy('startDate', 'desc'));
+      q = query(collection(db, 'leave_requests'), where('userId', '==', auth.currentUser?.uid));
     }
       
     return onSnapshot(q, (snap) => {
-      setRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a: any, b: any) => new Date(b.startDate || b.createdAt).getTime() - new Date(a.startDate || a.createdAt).getTime());
+      setRequests(data);
     });
   }, [isAdmin, appUser]);
 

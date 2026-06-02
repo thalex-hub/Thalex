@@ -156,11 +156,13 @@ export default function PaymentRequests() {
     fetchOrders();
     
     const q = isDirector || isFinanceStaff || hasPermission('view_payment_requests') || hasPermission('menu_proposals_view')
-      ? query(collection(db, 'payment_requests'), orderBy('requestDate', 'desc'))
-      : query(collection(db, 'payment_requests'), where('userId', '==', user.uid), orderBy('requestDate', 'desc'));
+      ? query(collection(db, 'payment_requests'))
+      : query(collection(db, 'payment_requests'), where('userId', '==', user.uid));
       
     return onSnapshot(q, (snap) => {
-      setRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a: any, b: any) => new Date(b.requestDate || b.createdAt).getTime() - new Date(a.requestDate || a.createdAt).getTime());
+      setRequests(data);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'payment_requests');
     });

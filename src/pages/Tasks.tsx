@@ -197,7 +197,7 @@ export default function Tasks() {
     const canSeeAll = isAdmin || isDirector;
     
     if (canSeeAll) {
-       tasksQ = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
+       tasksQ = query(collection(db, 'tasks'));
     } else {
        const email = currentUser.email || appUser?.email;
        const tempId = email ? email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : null;
@@ -219,13 +219,14 @@ export default function Tasks() {
 
        tasksQ = query(
          collection(db, 'tasks'),
-         or(...orConditions),
-         orderBy('createdAt', 'desc')
+         or(...orConditions)
        );
     }
     
     const unsubTasks = onSnapshot(tasksQ, (snap) => {
-      setTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)).filter(t => !t.orderId));
+      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)).filter(t => !t.orderId);
+      data.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+      setTasks(data);
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, 'tasks', false);
     });

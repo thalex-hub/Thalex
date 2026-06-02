@@ -148,11 +148,11 @@ export default function Attendance() {
         collection(db, 'attendance'),
         where('userId', '==', user.uid),
         where('workDate', '>=', startForQuery),
-        where('workDate', '<=', end),
-        orderBy('workDate', 'desc')
+        where('workDate', '<=', end)
       );
       const snap = await getDocs(q);
       const allAttSnapshot = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      allAttSnapshot.sort((a: any, b: any) => new Date(b.workDate).getTime() - new Date(a.workDate).getTime());
       setAllAttendance(allAttSnapshot);
       setMonthData(allAttSnapshot.filter((r: any) => r.workDate >= start && r.workDate <= end));
 
@@ -214,12 +214,12 @@ export default function Attendance() {
     try {
       const q = query(
         collection(db, 'attendance'),
-        where('userId', '==', user.uid),
-        orderBy('workDate', 'desc'),
-        limit(10)
+        where('userId', '==', user.uid)
       );
       const snap = await getDocs(q);
-      setHistory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a: any, b: any) => new Date(b.workDate).getTime() - new Date(a.workDate).getTime());
+      setHistory(data.slice(0, 10));
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, 'attendance');
     }

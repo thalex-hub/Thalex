@@ -105,15 +105,13 @@ export default function Storage() {
         collection(db, 'stored_files'),
         where('ownerId', '==', user.uid),
         where('type', '==', 'personal'),
-        where('folderId', '==', currentFolderId || null),
-        orderBy('createdAt', 'desc')
+        where('folderId', '==', currentFolderId || null)
       );
       folderQuery = query(
         collection(db, 'folders'),
         where('ownerId', '==', user.uid),
         where('type', '==', 'personal'),
-        where('parentFolderId', '==', currentFolderId || null),
-        orderBy('createdAt', 'desc')
+        where('parentFolderId', '==', currentFolderId || null)
       );
     } else if (activeTab === 'shared') {
       fileQuery = query(
@@ -124,8 +122,7 @@ export default function Storage() {
             where('sharedWith', 'array-contains', 'all')
           ),
           where('folderId', '==', currentFolderId || null)
-        ),
-        orderBy('createdAt', 'desc')
+        )
       );
       folderQuery = query(
         collection(db, 'folders'),
@@ -135,28 +132,27 @@ export default function Storage() {
             where('sharedWith', 'array-contains', 'all')
           ),
           where('parentFolderId', '==', currentFolderId || null)
-        ),
-        orderBy('createdAt', 'desc')
+        )
       );
     } else {
       fileQuery = query(
         collection(db, 'stored_files'),
         where('type', '==', 'company'),
         where('category', '==', selectedCategory || 'other'),
-        where('folderId', '==', currentFolderId || null),
-        orderBy('createdAt', 'desc')
+        where('folderId', '==', currentFolderId || null)
       );
       folderQuery = query(
         collection(db, 'folders'),
         where('type', '==', 'company'),
         where('category', '==', selectedCategory || 'other'),
-        where('parentFolderId', '==', currentFolderId || null),
-        orderBy('createdAt', 'desc')
+        where('parentFolderId', '==', currentFolderId || null)
       );
     }
 
     const unsubFiles = onSnapshot(fileQuery, (snapshot) => {
-      setFiles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setFiles(data);
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'stored_files');
@@ -164,7 +160,9 @@ export default function Storage() {
     });
 
     const unsubFolders = onSnapshot(folderQuery, (snapshot) => {
-      setFolders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setFolders(data);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'folders');
     });

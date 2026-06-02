@@ -104,18 +104,19 @@ export default function ReimbursementRequests() {
 
     // Viewing logic: Staff sees their own + settlements for their advances, Accountant/Director sees all
     const q = (isDirector || isFinanceStaff || hasPermission('view_reimbursements') || hasPermission('menu_proposals_view'))
-      ? query(collection(db, 'reimbursement_requests'), orderBy('requestDate', 'desc'))
+      ? query(collection(db, 'reimbursement_requests'))
       : query(
           collection(db, 'reimbursement_requests'), 
           or(
             where('userId', '==', user.uid),
             where('advanceOwnerId', '==', user.uid)
-          ),
-          orderBy('requestDate', 'desc')
+          )
         );
       
     const unsubRequests = onSnapshot(q, (snap) => {
-      setRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a: any, b: any) => new Date(b.requestDate || b.createdAt).getTime() - new Date(a.requestDate || a.createdAt).getTime());
+      setRequests(data);
     }, (error) => {
       console.error("Firestore read error:", error);
     });

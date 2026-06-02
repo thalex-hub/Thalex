@@ -560,26 +560,16 @@ app.get("/api/download", async (req, res) => {
     
     const contentType = response.headers.get("content-type") || "application/octet-stream";
     
-    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+    // Use proper encoding for the filename in Content-Disposition header
+    const encodedFilename = encodeURIComponent(filename).replace(/['()]/g, escape).replace(/\*/g, '%2A');
+    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodedFilename}; filename="${encodedFilename}"`);
     res.setHeader("Content-Type", contentType);
     
-    // Convert ReadableStream to Node.js stream and pipe to response
-    if (response.body) {
-        // @ts-ignore
-        const reader = response.body.getReader();
-        const pump = async () => {
-            const { done, value } = await reader.read();
-            if (done) {
-                res.end();
-                return;
-            }
-            res.write(value);
-            await pump();
-        };
-        await pump();
-    } else {
-        res.end();
-    }
+    // Fetch directly to array buffer and send
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    res.send(buffer);
   } catch (error: any) {
     console.error("Proxy download error:", error);
     res.status(500).json({ error: "Failed to download file" });

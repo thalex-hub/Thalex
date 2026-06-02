@@ -59,10 +59,10 @@ export default function BusinessExpenses() {
       ? query(collection(db, 'orders'))
       : query(collection(db, 'orders'), where('responsibleUserId', '==', appUser?.uid || 'none'));
 
-    // Sub to users (excluding SuperAdmin to align with Dashboard and other pages)
+    // Sub to users
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
       const fetchedUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-      setUsers(fetchedUsers.filter((u: any) => u.roleId !== 'SuperAdmin'));
+      setUsers(fetchedUsers.filter((u: any) => u.isActive !== false));
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, 'users', false);
     });
@@ -151,7 +151,7 @@ export default function BusinessExpenses() {
       month,
       paymentRequests
     );
-    return stats.remainingNetSalary;
+    return stats.finalSalary || 0;
   }, [allOrders, allDepartments, paymentRequests, advanceRequests, reimbursementRequests]);
 
   const monthlyBreakdown = React.useMemo(() => {
@@ -177,16 +177,18 @@ export default function BusinessExpenses() {
       const monthAttendance = attendance.filter(a => a.workDate.startsWith(monthKey));
       
       // Calculate Total Salary
-      const totalSalary = monthAttendance.length === 0 ? 0 : users.reduce((sum, user) => {
-        const userAtt = monthAttendance.filter(a => a.userId === user.uid);
-        return sum + calculateSalaryForUserAndMonth(user, month, userAtt);
+      const totalSalary = users.reduce((sum, user) => {
+        // Pass the full attendance array to calculateSalaryForUserAndMonth, NOT just this month's!
+        return sum + calculateSalaryForUserAndMonth(user, month, attendance);
       }, 0);
 
       // Filter Payment Requests for this month
       const monthPayments = paymentRequests.filter(req => req.requestDate && req.requestDate.startsWith(monthKey) && req.status === 'paid');
+      
+      const manualSalary = monthPayments.filter(p => p.category === 'salary').reduce((sum, p) => sum + (p.amount || 0), 0);
 
       breakdown[monthKey] = {
-        salary: Math.round(totalSalary),
+        salary: Math.max(Math.round(totalSalary), manualSalary),
         office_rent: monthPayments.filter(p => p.category === 'office_rent').reduce((sum, p) => sum + (p.amount || 0), 0),
         electricity: monthPayments.filter(p => p.category === 'electricity').reduce((sum, p) => sum + (p.amount || 0), 0),
         water: monthPayments.filter(p => p.category === 'water').reduce((sum, p) => sum + (p.amount || 0), 0),

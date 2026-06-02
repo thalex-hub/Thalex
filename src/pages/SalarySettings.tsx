@@ -178,12 +178,17 @@ export default function SalarySettings() {
 
   const handleUpdateSalary = async (userId: string) => {
     setSaving(userId);
+    console.log("handleUpdateSalary payload:", editBuffer);
     try {
       const userRef = doc(db, 'users', userId);
       const user = users.find(u => u.uid === userId);
+      
+      const newBaseSalary = isNaN(editBuffer.baseSalary) ? 0 : editBuffer.baseSalary;
+      const newInsuranceSalary = isNaN(editBuffer.insuranceSalary) ? 0 : editBuffer.insuranceSalary;
+      
       const updatedYearlyBaseSalaries = { 
         ...(user?.yearlyBaseSalaries || {}), 
-        [selectedYear.toString()]: isNaN(editBuffer.baseSalary) ? 0 : editBuffer.baseSalary
+        [selectedYear.toString()]: newBaseSalary
       };
 
       // Clean up objects to avoid undefined values which Firestore rejects
@@ -192,7 +197,8 @@ export default function SalarySettings() {
       const updateData = {
         workStatus: editBuffer.workStatus || 'official',
         yearlyBaseSalaries: updatedYearlyBaseSalaries,
-        insuranceSalary: isNaN(editBuffer.insuranceSalary) ? 0 : editBuffer.insuranceSalary,
+        baseSalary: newBaseSalary,
+        insuranceSalary: newInsuranceSalary,
         monthlyBonuses: cleanObj(editBuffer.bonuses),
         bonusPercentage: cleanObj(editBuffer.bonusPercentage),
         kpiRevenue: cleanObj(editBuffer.kpiRevenue),
@@ -200,6 +206,8 @@ export default function SalarySettings() {
         monthlyBaseSalaries: cleanObj(editBuffer.monthlyBaseSalaries),
         updatedAt: new Date().toISOString()
       };
+      
+      console.log("Updating Firestore payload:", updateData);
 
       await updateDoc(userRef, updateData);
       

@@ -213,8 +213,8 @@ export default function Users() {
     setUploading(true);
     try {
       const storageRef = ref(storage, `avatars/${userId}_${Date.now()}`);
-      await withTimeout(uploadBytes(storageRef, file), 25000);
-      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
+      await withTimeout(uploadBytes(storageRef, file), 8000);
+      const downloadURL = await withTimeout(getDownloadURL(storageRef), 5000);
 
       if (editingUser && editingUser.uid === userId) {
         setEditingUser({
@@ -230,6 +230,7 @@ export default function Users() {
 
       await logActivity('Upload Avatar', 'Users', userId, { fileName: file.name });
     } catch (error) {
+      alert('Không thể tải tệp lên. Vui lòng kiểm tra cấu hình Firebase Storage.');
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}/avatar`);
     } finally {
       setUploading(false);
@@ -248,8 +249,8 @@ export default function Users() {
     setUploading(true);
     try {
       const storageRef = ref(storage, `contracts/${userId}/${file.name}`);
-      await withTimeout(uploadBytes(storageRef, file), 25000);
-      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
+      await withTimeout(uploadBytes(storageRef, file), 8000);
+      const downloadURL = await withTimeout(getDownloadURL(storageRef), 5000);
 
       await updateDoc(doc(db, 'users', userId), {
         contractUrl: downloadURL,
@@ -268,6 +269,7 @@ export default function Users() {
 
       await logActivity('Upload Contract', 'Users', userId, { fileName: file.name });
     } catch (error) {
+      alert('Không thể tải tệp lên. Vui lòng kiểm tra cấu hình Firebase Storage.');
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}/contract`);
     } finally {
       setUploading(false);

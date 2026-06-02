@@ -438,8 +438,8 @@ export default function OrderDetail() {
     for (const file of files) {
       try {
         const storageRef = ref(storage, `requests/${type}/${Date.now()}_${file.name}`);
-        const snapshot = await withTimeout(uploadBytes(storageRef, file), 25000);
-        const url = await withTimeout(getDownloadURL(snapshot.ref), 10000);
+        const snapshot = await withTimeout(uploadBytes(storageRef, file), 8000);
+        const url = await withTimeout(getDownloadURL(snapshot.ref), 5000);
         
         newAttachments.push({
           name: file.name,
@@ -450,6 +450,14 @@ export default function OrderDetail() {
         });
       } catch (err) {
         console.error(`Error uploading file ${file.name}:`, err);
+        alert(`Không thể tải lên tệp: ${file.name}. Storage chưa được kích hoạt.`);
+        newAttachments.push({
+          name: file.name,
+          url: '',
+          size: file.size,
+          type: file.type,
+          uploadDate: new Date().toISOString()
+        });
       }
     }
 

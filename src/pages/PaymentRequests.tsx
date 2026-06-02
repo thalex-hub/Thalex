@@ -221,8 +221,8 @@ export default function PaymentRequests() {
           if (att.file) {
             try {
               const fileRef = ref(storage, `payment_requests/${Date.now()}_${att.file.name}`);
-              await withTimeout(uploadBytes(fileRef, att.file), 25000);
-              const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
+              await withTimeout(uploadBytes(fileRef, att.file), 8000); // Fail fast
+              const downloadUrl = await withTimeout(getDownloadURL(fileRef), 5000);
               return {
                 name: att.name,
                 type: att.type,
@@ -232,7 +232,14 @@ export default function PaymentRequests() {
               };
             } catch (uploadErr) {
               console.error("Lỗi tải tệp lên Storage:", uploadErr);
-              throw new Error(`Không thể tải lên tệp: ${att.name}. Vui lòng thử lại.`);
+              alert(`Không thể tải lên tệp đính kèm: ${att.name}. Yêu cầu của bạn vẫn sẽ được gửi nhưng không có tệp này. Lỗi: Storage chưa được kích hoạt hoặc quá tải.`);
+              return {
+                 name: att.name,
+                 type: att.type,
+                 size: att.size,
+                 lastModified: att.lastModified,
+                 url: ''
+              };
             }
           }
           // Fallback if no file object (should not happen for newly added)

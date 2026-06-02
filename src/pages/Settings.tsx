@@ -186,8 +186,8 @@ export default function Settings() {
     
     try {
       const storageRef = ref(storage, `avatars/${user.uid}_${Date.now()}`);
-      await withTimeout(uploadBytes(storageRef, file), 25000);
-      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
+      await withTimeout(uploadBytes(storageRef, file), 8000);
+      const downloadURL = await withTimeout(getDownloadURL(storageRef), 5000);
       
       // Update local state
       setAvatarUrl(downloadURL);
@@ -206,7 +206,8 @@ export default function Settings() {
       setTimeout(() => setProfileSuccess(false), 3000);
     } catch (err: any) {
       console.error('Error uploading avatar:', err);
-      setProfileError('Lỗi khi tải ảnh lên. Vui lòng thử lại.');
+      alert('Không thể tải ảnh. Vui lòng kiểm tra Firebase Storage.');
+      setProfileError('Không thể tải ảnh. Vui lòng kiểm tra Firebase Storage.');
     } finally {
       setIsUploading(false);
     }

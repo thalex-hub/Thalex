@@ -571,8 +571,8 @@ export default function BusinessManagement() {
     setUploading(true);
     try {
       const storageRef = ref(storage, `contracts/${userId}/${file.name}`);
-      await withTimeout(uploadBytes(storageRef, file), 25000);
-      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
+      await withTimeout(uploadBytes(storageRef, file), 8000);
+      const downloadURL = await withTimeout(getDownloadURL(storageRef), 5000);
 
       await updateDoc(doc(db, 'users', userId), {
         contractUrl: downloadURL,
@@ -591,6 +591,7 @@ export default function BusinessManagement() {
 
       await logActivity('Upload Contract', 'Business', userId, { fileName: file.name });
     } catch (error) {
+      alert('Không thể tải tệp lên. Vui lòng kiểm tra lại cấu hình Firebase Storage.');
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}/contract`);
     } finally {
       setUploading(false);

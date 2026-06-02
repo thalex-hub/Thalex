@@ -163,8 +163,8 @@ export default function ReimbursementRequests() {
         selectedFiles.map(async (f) => {
           try {
             const fileRef = ref(storage, `reimbursements/${Date.now()}_${f.name}`);
-            await withTimeout(uploadBytes(fileRef, f), 25000);
-            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
+            await withTimeout(uploadBytes(fileRef, f), 8000); // Fail fast
+            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 5000);
             return {
               name: f.name,
               type: f.type,
@@ -173,7 +173,13 @@ export default function ReimbursementRequests() {
             };
           } catch (uploadErr) {
             console.error("Lỗi tải tệp lên Storage:", uploadErr);
-            throw new Error(`Không thể tải lên tệp: ${f.name}. Vui lòng thử lại.`);
+            alert(`Không thể tải lên tệp đính kèm: ${f.name}. Yêu cầu của bạn vẫn sẽ được gửi nhưng không có tệp này.`);
+            return {
+              name: f.name,
+              type: f.type,
+              size: f.size,
+              url: ''
+            };
           }
         })
       );

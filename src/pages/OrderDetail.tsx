@@ -47,7 +47,7 @@ import {
   Eye
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput, downloadFile } from '../lib/utils';
+import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput, downloadFile, uploadFileWithTimeout } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { useAuth } from '../lib/authContext';
@@ -438,7 +438,7 @@ export default function OrderDetail() {
     for (const file of files) {
       try {
         const storageRef = ref(storage, `requests/${type}/${Date.now()}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
+        const snapshot = await uploadFileWithTimeout(uploadBytes(storageRef, file));
         const url = await getDownloadURL(snapshot.ref);
         
         newAttachments.push({

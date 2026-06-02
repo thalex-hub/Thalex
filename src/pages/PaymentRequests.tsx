@@ -6,7 +6,7 @@ import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, Fi
 
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile } from '../lib/utils';
+import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile, uploadFileWithTimeout } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/authContext';
@@ -220,7 +220,7 @@ export default function PaymentRequests() {
         newRequest.attachments.map(async (att) => {
           if (att.file) {
             const fileRef = ref(storage, `payment_requests/${Date.now()}_${att.file.name}`);
-            await uploadBytes(fileRef, att.file);
+            await uploadFileWithTimeout(uploadBytes(fileRef, att.file));
             const downloadUrl = await getDownloadURL(fileRef);
             return {
               name: att.name,

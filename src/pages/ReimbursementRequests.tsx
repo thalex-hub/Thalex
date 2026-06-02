@@ -5,7 +5,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, ShieldCheck, Wallet, FileText, Upload, RefreshCcw, ArrowRight, FileSpreadsheet, Banknote, ReceiptText, ClipboardCheck, Trash2, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile } from '../lib/utils';
+import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile, uploadFileWithTimeout } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/authContext';
 import { exportToExcel } from '../lib/excel';
@@ -162,7 +162,7 @@ export default function ReimbursementRequests() {
       const uploadedAttachments = await Promise.all(
         selectedFiles.map(async (f) => {
           const fileRef = ref(storage, `reimbursements/${Date.now()}_${f.name}`);
-          await uploadBytes(fileRef, f);
+          await uploadFileWithTimeout(uploadBytes(fileRef, f));
           const downloadUrl = await getDownloadURL(fileRef);
           return {
             name: f.name,

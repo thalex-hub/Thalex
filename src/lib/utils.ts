@@ -5,6 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export async function uploadFileWithTimeout(uploadPromise: Promise<any>, timeoutMs = 8000) {
+  return Promise.race([
+    uploadPromise,
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Lỗi timeout khi tải tệp. Vui lòng kiểm tra lại dịch vụ lưu trữ (Firebase Storage).')), timeoutMs)
+    )
+  ]);
+}
+
 export function formatCurrency(value: number | string | undefined | null) {
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (num === undefined || num === null || isNaN(num)) return '0 đ';

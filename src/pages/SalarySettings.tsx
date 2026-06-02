@@ -165,7 +165,7 @@ export default function SalarySettings() {
     setEditingId(user.uid!);
     setEditBuffer({
       startDate: user.startDate,
-      baseSalary: user.yearlyBaseSalaries?.[selectedYear.toString()] || user.baseSalary || 0,
+      baseSalary: user.yearlyBaseSalaries?.[selectedYear.toString()] ?? user.baseSalary ?? 0,
       insuranceSalary: user.insuranceSalary || 0,
       bonuses: user.monthlyBonuses || {},
       bonusPercentage: user.bonusPercentage || {},
@@ -183,7 +183,7 @@ export default function SalarySettings() {
       const user = users.find(u => u.uid === userId);
       const updatedYearlyBaseSalaries = { 
         ...(user?.yearlyBaseSalaries || {}), 
-        [selectedYear.toString()]: isNaN(editBuffer.baseSalary) ? 0 : (editBuffer.baseSalary || 0)
+        [selectedYear.toString()]: isNaN(editBuffer.baseSalary) ? 0 : editBuffer.baseSalary
       };
 
       // Clean up objects to avoid undefined values which Firestore rejects
@@ -192,7 +192,7 @@ export default function SalarySettings() {
       const updateData = {
         workStatus: editBuffer.workStatus || 'official',
         yearlyBaseSalaries: updatedYearlyBaseSalaries,
-        insuranceSalary: isNaN(editBuffer.insuranceSalary) ? 0 : (editBuffer.insuranceSalary || 0),
+        insuranceSalary: isNaN(editBuffer.insuranceSalary) ? 0 : editBuffer.insuranceSalary,
         monthlyBonuses: cleanObj(editBuffer.bonuses),
         bonusPercentage: cleanObj(editBuffer.bonusPercentage),
         kpiRevenue: cleanObj(editBuffer.kpiRevenue),
@@ -408,7 +408,7 @@ export default function SalarySettings() {
                     return commission + manualBonus;
                   };
                   
-                  const currentBase = isEditing ? editBuffer.baseSalary : (user.yearlyBaseSalaries?.[selectedYear.toString()] || user.baseSalary || 0);
+                  const currentBase = isEditing ? editBuffer.baseSalary : (user.yearlyBaseSalaries?.[selectedYear.toString()] ?? user.baseSalary ?? 0);
                   const currentProbationRate = Math.round(currentBase * 0.85);
 
                   let probationMonthsCount = 0;
@@ -528,7 +528,7 @@ export default function SalarySettings() {
                               onChange={(e) => setEditBuffer({ ...editBuffer, insuranceSalary: Number(parseCurrencyInput(e.target.value)) })}
                             />
                           ) : (
-                            <p className="font-black text-blue-600 text-sm">{formatCurrency(user.insuranceSalary || 0)}</p>
+                            <p className="font-black text-blue-600 text-sm">{formatCurrency(user.insuranceSalary ?? 0)}</p>
                           )}
                         </td>
                         {isKpiBased && (
@@ -901,7 +901,7 @@ export default function SalarySettings() {
                     <p className="font-black text-gray-900 text-sm">
                       {formatCurrency(filteredUsers.reduce((acc, u) => {
                         const isIdxEditing = editingId === u.uid;
-                        const base = isIdxEditing ? editBuffer.baseSalary : (u.yearlyBaseSalaries?.[selectedYear.toString()] || u.baseSalary || 0);
+                        const base = isIdxEditing ? editBuffer.baseSalary : (u.yearlyBaseSalaries?.[selectedYear.toString()] ?? u.baseSalary ?? 0);
                         let userOfficialSum = 0;
                         const now = new Date();
                         const currentYear = now.getFullYear();
@@ -929,7 +929,7 @@ export default function SalarySettings() {
                     <p className="font-black text-orange-700 text-sm">
                       {formatCurrency(filteredUsers.reduce((acc, u) => {
                         const isIdxEditing = editingId === u.uid;
-                        const base = isIdxEditing ? editBuffer.baseSalary : (u.yearlyBaseSalaries?.[selectedYear.toString()] || u.baseSalary || 0);
+                        const base = isIdxEditing ? editBuffer.baseSalary : (u.yearlyBaseSalaries?.[selectedYear.toString()] ?? u.baseSalary ?? 0);
                         let userProbationSum = 0;
                         const now = new Date();
                         const currentYear = now.getFullYear();
@@ -955,7 +955,7 @@ export default function SalarySettings() {
                   </td>
                   <td className="px-6 py-6 text-center bg-blue-50/10">
                     <p className="font-black text-blue-600 text-sm">
-                      {formatCurrency(filteredUsers.reduce((acc, u) => acc + ( (editingId === u.uid ? editBuffer.insuranceSalary : (u.insuranceSalary || 0)) ), 0) * 12)}
+                      {formatCurrency(filteredUsers.reduce((acc, u) => acc + ( (editingId === u.uid ? editBuffer.insuranceSalary : (u.insuranceSalary ?? 0)) ), 0) * 12)}
                       <span className="block text-[8px] text-gray-400 font-bold uppercase mt-0.5">Đóng BH / năm</span>
                     </p>
                   </td>
@@ -1006,7 +1006,7 @@ export default function SalarySettings() {
                       <p className="font-black text-sm">
                         {formatCurrency(filteredUsers.reduce((acc, u) => {
                           const isIdxEditing = editingId === u.uid;
-                          const base = isIdxEditing ? editBuffer.baseSalary : (u.yearlyBaseSalaries?.[selectedYear.toString()] || u.baseSalary || 0);
+                          const base = isIdxEditing ? editBuffer.baseSalary : (u.yearlyBaseSalaries?.[selectedYear.toString()] ?? u.baseSalary ?? 0);
                           const isKpiIndiv = selectedCategory === 'sales' || selectedCategory === 'directors';
                           const userKpi = isIdxEditing ? (editBuffer.kpiRevenue?.['default'] || 0) : (u.kpiRevenue?.['default'] || 0);
                           const userPercent = isIdxEditing ? (editBuffer.bonusPercentage?.['default'] || 0) : (u.bonusPercentage?.['default'] || 0);

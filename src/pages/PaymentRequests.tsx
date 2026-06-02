@@ -6,7 +6,7 @@ import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, Fi
 
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile, uploadFileWithTimeout } from '../lib/utils';
+import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile, withTimeout } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/authContext';
@@ -220,8 +220,8 @@ export default function PaymentRequests() {
         newRequest.attachments.map(async (att) => {
           if (att.file) {
             const fileRef = ref(storage, `payment_requests/${Date.now()}_${att.file.name}`);
-            await uploadFileWithTimeout(uploadBytes(fileRef, att.file));
-            const downloadUrl = await getDownloadURL(fileRef);
+            await withTimeout(uploadBytes(fileRef, att.file));
+            const downloadUrl = await withTimeout(getDownloadURL(fileRef));
             return {
               name: att.name,
               type: att.type,
@@ -241,7 +241,7 @@ export default function PaymentRequests() {
         })
       );
 
-      await addDoc(collection(db, 'payment_requests'), {
+      await withTimeout(addDoc(collection(db, 'payment_requests'), {
         userId: user.uid,
         userName: appUser?.fullName || user.displayName || 'Nhân viên',
         userEmail: user.email,
@@ -266,7 +266,7 @@ export default function PaymentRequests() {
           userName: appUser?.fullName || user.displayName || 'Nhân viên',
           timestamp: new Date().toISOString()
         }]
-      });
+      }));
 
       // Trigger proposal email notification on creation
       const formattedAmount = Number(newRequest.amount).toLocaleString('vi-VN');

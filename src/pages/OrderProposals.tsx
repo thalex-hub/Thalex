@@ -4,7 +4,7 @@ import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, 
 import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput } from '../lib/utils';
+import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput, withTimeout } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/authContext';
 import { exportToExcel } from '../lib/excel';
@@ -48,8 +48,9 @@ export default function OrderProposals() {
   const [contractFile, setContractFile] = React.useState<File | null>(null);
   const [businessPlanFile, setBusinessPlanFile] = React.useState<File | null>(null);
 
+  const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
   const [customers, setCustomers] = React.useState<any[]>([]);
-  const { isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user } = useAuth();
+  const { isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user, isSuperAdmin } = useAuth();
   const location = useLocation();
   const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR;
 
@@ -908,6 +909,18 @@ export default function OrderProposals() {
             </div>
 
             <div className="flex items-center gap-4">
+               {isSuperAdmin && (
+                 <button 
+                   onClick={(e) => {
+                     e.stopPropagation();
+                     setDeleteConfirmId(prop.id);
+                   }}
+                   className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                   title="Xóa đề xuất (Superadmin)"
+                 >
+                   <Trash2 size={20} />
+                 </button>
+               )}
                {prop.status === 'pending' && prop.createdBy === user?.uid && (
                  <button 
                    onClick={(e) => {
@@ -1719,6 +1732,60 @@ export default function OrderProposals() {
                      </button>
                   </div>
                </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {deleteConfirmId && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => setDeleteConfirmId(null)} 
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 overflow-hidden"
+            >
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+                  <AlertCircle size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Xác nhận xóa</h3>
+                <p className="text-gray-500 text-sm">
+                  Bạn có chắc chắn muốn xóa đề xuất này? Hành động này không thể hoàn tác.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setDeleteConfirmId(null)} 
+                  className="flex-1 py-3 border border-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors uppercase tracking-wider text-xs"
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="button" 
+                  onClick={async () => {
+                    const id = deleteConfirmId;
+                    setDeleteConfirmId(null);
+                    try {
+                      await deleteDoc(doc(db, 'order_proposals', id));
+                    } catch (err: any) {
+                      alert('Lỗi: ' + err.message);
+                    }
+                  }} 
+                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-colors uppercase tracking-wider text-xs"
+                >
+                  Xác nhận Xóa
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

@@ -5,7 +5,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, ShieldCheck, Wallet, FileText, Upload, RefreshCcw, ArrowRight, FileSpreadsheet, Banknote, ReceiptText, ClipboardCheck, Trash2, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile, uploadFileWithTimeout } from '../lib/utils';
+import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile, withTimeout } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/authContext';
 import { exportToExcel } from '../lib/excel';
@@ -162,8 +162,8 @@ export default function ReimbursementRequests() {
       const uploadedAttachments = await Promise.all(
         selectedFiles.map(async (f) => {
           const fileRef = ref(storage, `reimbursements/${Date.now()}_${f.name}`);
-          await uploadFileWithTimeout(uploadBytes(fileRef, f));
-          const downloadUrl = await getDownloadURL(fileRef);
+          await withTimeout(uploadBytes(fileRef, f));
+          const downloadUrl = await withTimeout(getDownloadURL(fileRef));
           return {
             name: f.name,
             type: f.type,
@@ -175,7 +175,7 @@ export default function ReimbursementRequests() {
       
       const linkedAdvance = newRequest.advanceRequestId ? advances.find(a => a.id === newRequest.advanceRequestId) : null;
 
-      await addDoc(collection(db, 'reimbursement_requests'), {
+      await withTimeout(addDoc(collection(db, 'reimbursement_requests'), {
         userId: user.uid,
         userName: appUser?.fullName || user.displayName || 'Nhân viên',
         userEmail: user.email,
@@ -198,7 +198,7 @@ export default function ReimbursementRequests() {
           userName: appUser?.fullName || 'Nhân viên',
           date: new Date().toISOString()
         }]
-      });
+      }));
 
       // Trigger proposal email notification on creation
       const formattedAmount = Number(newRequest.amount).toLocaleString('vi-VN');
@@ -293,7 +293,7 @@ export default function ReimbursementRequests() {
       }
 
       if (Math.abs(balance) > 0) {
-        await addDoc(collection(db, 'payments'), {
+        await withTimeout(addDoc(collection(db, 'payments'), {
           amount: Math.abs(balance),
           type: balance > 0 ? 'expense' : 'income',
           paymentDate: new Date().toISOString(),
@@ -307,7 +307,7 @@ export default function ReimbursementRequests() {
           orderId: req.relatedOrderId || null,
           createdBy: user?.uid,
           userName: appUser?.fullName || user?.displayName
-        });
+        }));
       }
 
       alert("Giải ngân quyết toán thành công!");

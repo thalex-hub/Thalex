@@ -5,11 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export async function uploadFileWithTimeout(uploadPromise: Promise<any>, timeoutMs = 8000) {
+export async function withTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
   return Promise.race([
-    uploadPromise,
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Lỗi timeout khi tải tệp. Vui lòng kiểm tra lại dịch vụ lưu trữ (Firebase Storage).')), timeoutMs)
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error('Lỗi truy cập dữ liệu quá lâu (Timeout). Vui lòng thử lại.')), timeoutMs)
     )
   ]);
 }

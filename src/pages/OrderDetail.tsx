@@ -481,7 +481,7 @@ export default function OrderDetail() {
         status: 'pending_finance',
         history: [{
           action: 'create',
-          userName: appUser?.fullName || user.displayName,
+          userName: appUser?.fullName || user.displayName || 'Nhân viên',
           timestamp: new Date().toISOString()
         }]
       });
@@ -518,7 +518,7 @@ export default function OrderDetail() {
         status: 'pending_finance',
         history: [{
           action: 'create',
-          userName: appUser?.fullName || user.displayName,
+          userName: appUser?.fullName || user.displayName || 'Nhân viên',
           timestamp: new Date().toISOString()
         }]
       });

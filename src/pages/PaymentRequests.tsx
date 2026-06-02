@@ -262,7 +262,7 @@ export default function PaymentRequests() {
         paymentStatus: 'not_disbursed',
         history: [{
           action: 'create',
-          userName: appUser?.fullName || user.displayName,
+          userName: appUser?.fullName || user.displayName || 'Nhân viên',
           timestamp: new Date().toISOString()
         }]
       });

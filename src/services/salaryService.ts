@@ -296,13 +296,7 @@ export function calculateSingleMonthSalary(
   // Calculate Insurance
   const insuranceSalary = isProbation
     ? 0
-    : Number(
-        targetUser?.insuranceSalary !== undefined &&
-        targetUser?.insuranceSalary !== null &&
-        Number(targetUser.insuranceSalary) > 0
-          ? targetUser.insuranceSalary
-          : (initialBaseSalary || 0)
-      );
+    : Number(targetUser?.insuranceSalary || 0);
   const bhxh = isProbation ? 0 : insuranceSalary * 0.08;
   const bhyt = isProbation ? 0 : insuranceSalary * 0.015;
   const bhtn = isProbation ? 0 : insuranceSalary * 0.01;

@@ -131,7 +131,11 @@ export function getApiUrl(path: string): string {
   return cleanPath;
 }
 
-export async function downloadFile(url: string, fileName: string) {
+export async function downloadFile(url: string | undefined, fileName: string) {
+  if (!url) {
+    alert('Không tìm thấy liên kết tải về cho tệp này. Tệp có thể chưa được tải lên máy chủ.');
+    return;
+  }
   try {
     // Handle inline data URLs
     if (url.startsWith('data:')) {

@@ -86,7 +86,7 @@ export interface Task {
   assigneeAvatar?: string;
   assignerName?: string;
   checklist?: ChecklistItem[];
-  attachments?: { name: string; type: string; size: number; lastModified: number }[];
+  attachments?: { url?: string; name: string; type: string; size: number; lastModified: number }[];
   parentId?: string;
   followers?: string[];
   createdAt?: string;

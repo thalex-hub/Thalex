@@ -1,10 +1,11 @@
 import React from 'react';
-import { db, auth } from '../lib/firebase';
+import { db, auth, storage } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or, deleteDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, ShieldCheck, Wallet, FileText, Upload, RefreshCcw, ArrowRight, FileSpreadsheet, Banknote, ReceiptText, ClipboardCheck, Trash2, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../lib/utils';
+import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/authContext';
 import { exportToExcel } from '../lib/excel';
@@ -157,8 +158,20 @@ export default function ReimbursementRequests() {
         }
       }
 
-      // In a real app, we would upload files to Firebase Storage first
-      const fileNames = selectedFiles.map(f => f.name);
+      const uploadedAttachments = await Promise.all(
+        selectedFiles.map(async (f) => {
+          const fileRef = ref(storage, `reimbursements/${Date.now()}_${f.name}`);
+          await uploadBytes(fileRef, f);
+          const downloadUrl = await getDownloadURL(fileRef);
+          return {
+            name: f.name,
+            type: f.type,
+            size: f.size,
+            url: downloadUrl
+          };
+        })
+      );
+      
       const linkedAdvance = newRequest.advanceRequestId ? advances.find(a => a.id === newRequest.advanceRequestId) : null;
 
       await addDoc(collection(db, 'reimbursement_requests'), {
@@ -173,7 +186,7 @@ export default function ReimbursementRequests() {
         purpose: newRequest.purpose,
         advanceRequestId: newRequest.advanceRequestId || null,
         relatedOrderId: newRequest.relatedOrderId || null,
-        attachments: fileNames,
+        attachments: uploadedAttachments,
         requestDate: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         status: 'pending', // Step 1: Accountant Review
@@ -901,16 +914,28 @@ export default function ReimbursementRequests() {
                     <div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Hồ sơ chứng từ đính kèm ({viewingRequest.attachments.length})</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                           {viewingRequest.attachments.map((file: string, idx: number) => (
-                             <div key={idx} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-blue-200 transition-colors group cursor-pointer">
+                           {viewingRequest.attachments.map((file: any, idx: number) => {
+                               const fileName = typeof file === 'string' ? file : file.name;
+                               const fileUrl = typeof file === 'string' ? undefined : file.url;
+                               return (
+                             <div 
+                               key={idx} 
+                               onClick={() => fileUrl ? downloadFile(fileUrl, fileName) : alert('Không tìm thấy liên kết tải về cho tệp này. Tệp có thể chưa được tải lên máy chủ.')}
+                               className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-blue-200 transition-colors group cursor-pointer"
+                             >
                                 <div className="flex items-center gap-3 overflow-hidden">
                                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
                                       <FileText size={16} />
                                    </div>
-                                   <span className="text-xs font-bold text-gray-700 truncate">{file}</span>
+                                   <div className="overflow-hidden">
+                                       <span className="text-xs font-bold text-gray-700 truncate block">{fileName}</span>
+                                       {typeof file !== 'string' && file.size && (
+                                           <span className="text-[10px] text-gray-400 font-medium">{Math.round(file.size / 1024)} KB</span>
+                                       )}
+                                   </div>
                                 </div>
                              </div>
-                           ))}
+                           )})}
                         </div>
                     </div>
                   )}

@@ -15,6 +15,7 @@ import {
   doc,
   updateDoc,
   onSnapshot,
+  deleteDoc,
 } from "firebase/firestore";
 import {
   ShoppingCart,
@@ -67,7 +68,7 @@ export default function Orders() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const PAGE_SIZE = 12;
 
-  const { user, isAdmin, isManager, isDirector, isFinanceStaff, hasPermission } = useAuth();
+  const { user, isAdmin, isManager, isDirector, isFinanceStaff, hasPermission, isSuperAdmin } = useAuth();
   const canSeeAll = isAdmin || isManager || isDirector || isFinanceStaff || hasPermission('view_orders') || hasPermission('menu_orders_view') || hasPermission('menu_orders');
 
   const [showFilterDropdown, setShowFilterDropdown] = React.useState(false);
@@ -910,7 +911,29 @@ export default function Orders() {
                         </Link>
                       )}
                     </div>
-                    <StatusBadge status={order.status} />
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={order.status} />
+                      {isSuperAdmin && (
+                        <button
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (window.confirm('Cảnh báo: Hành động này sẽ xóa hoàn toàn đơn hàng khỏi hệ thống!')) {
+                              try {
+                                await deleteDoc(doc(db, 'orders', order.id));
+                                alert('Xóa đơn hàng thành công!');
+                              } catch (err: any) {
+                                alert('Lỗi: ' + err.message);
+                              }
+                            }
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Xóa đơn hàng (Superadmin)"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <h3 className="text-base font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-1 mb-2">
                     {order.name}
@@ -1091,8 +1114,28 @@ export default function Orders() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex justify-center font-medium">
+                      <div className="flex justify-center items-center gap-2 font-medium">
                         <StatusBadge status={order.status} />
+                        {isSuperAdmin && (
+                          <button
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (window.confirm('Cảnh báo: Hành động này sẽ xóa hoàn toàn đơn hàng khỏi hệ thống!')) {
+                                try {
+                                  await deleteDoc(doc(db, 'orders', order.id));
+                                  alert('Xóa đơn hàng thành công!');
+                                } catch (err: any) {
+                                  alert('Lỗi: ' + err.message);
+                                }
+                              }
+                            }}
+                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Xóa đơn hàng (Superadmin)"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">

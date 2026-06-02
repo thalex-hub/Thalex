@@ -1,7 +1,7 @@
 import React from 'react';
 import { db, auth } from '../lib/firebase';
-import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or } from 'firebase/firestore';
-import { Wallet, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, ShieldCheck, RefreshCcw, Zap, Droplets, Truck, PenTool, Building2, Users, Megaphone, ReceiptText, Tags, FileSpreadsheet, Banknote, Search } from 'lucide-react';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or, deleteDoc } from 'firebase/firestore';
+import { Wallet, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, ShieldCheck, RefreshCcw, Zap, Droplets, Truck, PenTool, Building2, Users, Megaphone, ReceiptText, Tags, FileSpreadsheet, Banknote, Search, Trash2 } from 'lucide-react';
 
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -514,7 +514,29 @@ export default function AdvanceRequests() {
             </div>
 
             <div className="flex items-center gap-4">
-               <StatusBadge status={req.status} />
+               <div className="flex items-center gap-2">
+                  <StatusBadge status={req.status} />
+                  
+                  {isSuperAdmin && (
+                    <button 
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (window.confirm('Cảnh báo: Hành động này sẽ xóa hoàn toàn yêu cầu khỏi hệ thống do bạn là Superadmin!')) {
+                          try {
+                            await deleteDoc(doc(db, 'advance_requests', req.id));
+                            alert('Xóa thành công!');
+                          } catch (err: any) {
+                            alert('Lỗi: ' + err.message);
+                          }
+                        }
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Xóa yêu cầu (Superadmin)"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+               </div>
                
                {isFinanceStaff && req.status === 'pending_finance' && (
                   <button 

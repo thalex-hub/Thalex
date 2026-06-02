@@ -1,7 +1,7 @@
 import React from 'react';
 import { db, auth } from '../lib/firebase';
-import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, or, getDocs, limit } from 'firebase/firestore';
-import { Calendar, Plus, CheckCircle, XCircle, Clock, FileText, AlertCircle, ShieldCheck, UserCheck, RefreshCcw, FileSpreadsheet, Search } from 'lucide-react';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, or, getDocs, limit, deleteDoc } from 'firebase/firestore';
+import { Calendar, Plus, CheckCircle, XCircle, Clock, FileText, AlertCircle, ShieldCheck, UserCheck, RefreshCcw, FileSpreadsheet, Search, Trash2 } from 'lucide-react';
 import { format, differenceInDays, eachDayOfInterval } from 'date-fns';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -11,7 +11,7 @@ import { exportToExcel } from '../lib/excel';
 import { sendProposalEmailNotification } from '../lib/proposalEmail';
 
 export default function LeaveRequests() {
-  const { appUser, isAdmin, isManager, isDirector } = useAuth();
+  const { appUser, isAdmin, isManager, isDirector, isSuperAdmin } = useAuth();
   const [requests, setRequests] = React.useState<any[]>([]);
   const [allUsers, setAllUsers] = React.useState<any[]>([]);
   const [selectedUserForStats, setSelectedUserForStats] = React.useState<string>(auth.currentUser?.uid || '');
@@ -381,7 +381,28 @@ export default function LeaveRequests() {
             </div>
 
                <div className="flex items-center gap-3">
-               <StatusBadge status={req.status} />
+               <div className="flex items-center gap-2">
+                  <StatusBadge status={req.status} />
+                  {isSuperAdmin && (
+                    <button 
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (window.confirm('Cảnh báo: Hành động này sẽ xóa hoàn toàn đơn xin nghỉ phép này khỏi hệ thống!')) {
+                          try {
+                            await deleteDoc(doc(db, 'leave_requests', req.id));
+                            alert('Xóa thành công!');
+                          } catch (err: any) {
+                            alert('Lỗi: ' + err.message);
+                          }
+                        }
+                      }}
+                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Xóa đơn (Superadmin)"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+               </div>
                
                {req.status === 'pending' && (
                  <div className="flex gap-2">

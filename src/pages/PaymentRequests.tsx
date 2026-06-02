@@ -1,8 +1,8 @@
 import React from 'react';
 import { db, auth, storage } from '../lib/firebase';
-import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, Building2, User, ReceiptText, Zap, Droplets, Truck, PenTool, Users, Megaphone, Tags, ShieldCheck, Paperclip, FileText, Undo2, ChevronRight, FileSpreadsheet, Wallet, Search } from 'lucide-react';
+import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, Building2, User, ReceiptText, Zap, Droplets, Truck, PenTool, Users, Megaphone, Tags, ShieldCheck, Paperclip, FileText, Undo2, ChevronRight, FileSpreadsheet, Wallet, Search, Trash2 } from 'lucide-react';
 
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { format } from 'date-fns';
@@ -577,7 +577,29 @@ export default function PaymentRequests() {
             </div>
 
             <div className="flex flex-col items-end gap-3">
-               <StatusBadge status={req.status} />
+               <div className="flex items-center gap-4">
+                  <StatusBadge status={req.status} />
+                  
+                  {isSuperAdmin && (
+                    <button 
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (window.confirm('Cảnh báo: Hành động này sẽ xóa hoàn toàn yêu cầu khỏi hệ thống do bạn là Superadmin!')) {
+                          try {
+                            await deleteDoc(doc(db, 'payment_requests', req.id));
+                            alert('Xóa thành công!');
+                          } catch (err: any) {
+                            alert('Lỗi: ' + err.message);
+                          }
+                        }
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Xóa yêu cầu (Superadmin)"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+               </div>
                
                {canDisburse && req.status === 'approved' && (
                   <div className="flex gap-2">

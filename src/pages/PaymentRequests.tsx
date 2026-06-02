@@ -5,7 +5,7 @@ import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, Fi
 
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../lib/utils';
+import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/authContext';
@@ -1035,7 +1035,12 @@ export default function PaymentRequests() {
                                     <p className="text-[10px] text-gray-400 uppercase font-medium">{(file.size / 1024).toFixed(1)} KB</p>
                                  </div>
                               </div>
-                              <button className="text-[10px] font-black text-blue-600 uppercase hover:underline">Tải về</button>
+                              <button 
+                                onClick={() => downloadFile(file.url, file.name)}
+                                className="text-[10px] font-black text-blue-600 uppercase hover:underline"
+                              >
+                                Tải về
+                              </button>
                            </div>
                         ))}
                      </div>

@@ -47,7 +47,7 @@ import {
   Eye
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput } from '../lib/utils';
+import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput, downloadFile } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { useAuth } from '../lib/authContext';
@@ -3691,7 +3691,10 @@ export default function OrderDetail() {
                                   {file.url ? (
                                     <a 
                                       href={file.url} 
-                                      download={file.name}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        downloadFile(file.url, file.name);
+                                      }}
                                       className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center"
                                       title="Tải về"
                                     >
@@ -3762,10 +3765,11 @@ export default function OrderDetail() {
                                           {file.url ? (
                                             <a 
                                               href={file.url}
-                                              download={file.name}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              onClick={(e) => e.stopPropagation()}
+                                              onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                downloadFile(file.url, file.name);
+                                              }}
                                               className={cn(
                                                 "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border transition-all hover:scale-[1.02] shadow-sm",
                                                 comment.userId === user?.uid 

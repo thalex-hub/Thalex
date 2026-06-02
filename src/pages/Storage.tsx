@@ -38,7 +38,7 @@ import { useAuth } from '../lib/authContext';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
-import { getApiUrl } from '../lib/utils';
+import { getApiUrl, downloadFile } from '../lib/utils';
 
 const COMPANY_FOLDERS = [
   { id: 'templates', name: 'Biển mẫu công ty', icon: File },
@@ -261,38 +261,8 @@ export default function Storage() {
       if (url.startsWith('/')) {
         fullUrl = window.location.origin + url;
       }
-
-      if (fullUrl.startsWith('data:')) {
-        const link = document.createElement('a');
-        link.href = fullUrl;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        return;
-      }
-
-      const response = await fetch(fullUrl);
-      if (!response.ok) throw new Error('Network response was not ok');
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      await downloadFile(fullUrl, fileName);
     } catch (error) {
-      console.error('Download failed:', error);
-      const win = window.open(url, '_blank');
-      if (!win) {
-        const link = document.createElement('a');
-        link.href = url;
-        link.target = '_blank';
-        link.download = fileName;
-        link.click();
-      }
     }
   };
 

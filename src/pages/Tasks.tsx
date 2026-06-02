@@ -7,7 +7,7 @@ import { logActivity } from '../services/activityLogger';
 const DroppableComponent = DroppableBase as any;
 const DraggableComponent = DraggableBase as any;
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, subDays } from 'date-fns';
-import { cn, formatPercent, getApiUrl } from '../lib/utils';
+import { cn, formatPercent, getApiUrl, downloadFile } from '../lib/utils';
 import { Task, AppUser } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -170,44 +170,7 @@ export default function Tasks() {
       alert('Không tìm thấy liên kết tải về cho tệp này.');
       return;
     }
-    
-    try {
-      // Handle DataURLs directly
-      if (url.startsWith('data:')) {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        return;
-      }
-
-      // Handle external URLs (like Firebase Storage Download URLs)
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Network response was not ok');
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-    } catch (error) {
-      console.error('Download failed:', error);
-      // Fallback: try opening in new tab
-      const win = window.open(url, '_blank');
-      if (!win) {
-        // If popup blocked, create a temporary link
-        const link = document.createElement('a');
-        link.href = url;
-        link.target = '_blank';
-        link.download = fileName;
-        link.click();
-      }
-    }
+    await downloadFile(url, fileName);
   };
 
   React.useEffect(() => {

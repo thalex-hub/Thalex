@@ -584,7 +584,9 @@ export default function PaymentRequests() {
                   
                   {isSuperAdmin && (
                     <button 
+                      type="button"
                       onClick={async (e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         if (window.confirm('Cảnh báo: Hành động này sẽ xóa hoàn toàn yêu cầu khỏi hệ thống do bạn là Superadmin!')) {
                           try {
@@ -595,7 +597,7 @@ export default function PaymentRequests() {
                           }
                         }
                       }}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50"
                       title="Xóa yêu cầu (Superadmin)"
                     >
                       <Trash2 size={16} />

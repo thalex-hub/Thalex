@@ -386,7 +386,9 @@ export default function LeaveRequests() {
                   <StatusBadge status={req.status} />
                   {isSuperAdmin && (
                     <button 
+                      type="button"
                       onClick={async (e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         if (window.confirm('Cảnh báo: Hành động này sẽ xóa hoàn toàn đơn xin nghỉ phép này khỏi hệ thống!')) {
                           try {
@@ -397,7 +399,7 @@ export default function LeaveRequests() {
                           }
                         }
                       }}
-                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50"
                       title="Xóa đơn (Superadmin)"
                     >
                       <Trash2 size={16} />

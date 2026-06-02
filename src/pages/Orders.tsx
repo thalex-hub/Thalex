@@ -914,7 +914,8 @@ export default function Orders() {
                     <div className="flex items-center gap-2">
                       <StatusBadge status={order.status} />
                       {isSuperAdmin && (
-                        <button
+                        <button 
+                          type="button"
                           onClick={async (e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -927,7 +928,7 @@ export default function Orders() {
                               }
                             }
                           }}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50"
                           title="Xóa đơn hàng (Superadmin)"
                         >
                           <Trash2 size={16} />
@@ -1117,7 +1118,8 @@ export default function Orders() {
                       <div className="flex justify-center items-center gap-2 font-medium">
                         <StatusBadge status={order.status} />
                         {isSuperAdmin && (
-                          <button
+                          <button 
+                            type="button"
                             onClick={async (e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -1130,7 +1132,7 @@ export default function Orders() {
                                 }
                               }
                             }}
-                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50"
                             title="Xóa đơn hàng (Superadmin)"
                           >
                             <Trash2 size={16} />

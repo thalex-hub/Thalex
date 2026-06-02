@@ -795,8 +795,13 @@ export default function ReimbursementRequests() {
                   
                   {(isDirector || isFinanceStaff) && (
                     <button 
-                      onClick={() => setDeleteConfirmId(req.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDeleteConfirmId(req.id);
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50"
                       title="Xóa yêu cầu"
                     >
                       <Trash2 size={16} />

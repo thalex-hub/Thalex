@@ -37,7 +37,9 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       errorMessage.includes('chunk') ||
       errorMessage.includes('loading chunk') ||
       errorMessage.includes('dynamically imported module') ||
-      errorMessage.includes('dynamic import');
+      errorMessage.includes('dynamic import') ||
+      errorMessage.includes('text/html') ||
+      errorMessage.includes('mime type');
 
     if (isChunkFailure) {
       console.warn('Network or Chunk loading failure detected. Attempting self-recovery via page reload...');

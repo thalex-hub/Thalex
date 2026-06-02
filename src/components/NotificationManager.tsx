@@ -282,6 +282,14 @@ export default function NotificationManager() {
     );
 
     const unsubscribeLeave = onSnapshot(qLeave, (snapshot) => {
+      const activeIds = new Set(snapshot.docs.map(doc => doc.id));
+      setNotifications(prev => prev.filter(n => {
+        if (n.type === 'returned' && n.colName === 'leave_requests' && n.docId) {
+          if (!activeIds.has(n.docId)) return false;
+        }
+        return true;
+      }));
+
       snapshot.docChanges().forEach((change) => {
         const id = change.doc.id;
         if (change.type === 'added' || change.type === 'modified') {
@@ -343,6 +351,19 @@ export default function NotificationManager() {
         }
 
         const unsub = onSnapshot(qApproval, (snapshot) => {
+          const activeIds = new Set(snapshot.docs.map(doc => doc.id));
+          
+          setNotifications(prev => {
+            // Remove notifications for this collection that are no longer in the snapshot
+            const filtered = prev.filter(n => {
+              if (n.type === 'approval' && n.colName === colName && n.docId) {
+                if (!activeIds.has(n.docId)) return false;
+              }
+              return true;
+            });
+            return filtered;
+          });
+
           snapshot.docChanges().forEach((change) => {
             const id = change.doc.id;
             if (change.type === 'added' || change.type === 'modified') {
@@ -401,6 +422,15 @@ export default function NotificationManager() {
       const in24Hours = addHours(now, 24);
       const newNotified = new Set(notifiedTasksRef.current);
       let changed = false;
+
+      // Sync notifications first: remove soon/overdue notifications for tasks that are deleted or completed
+      setNotifications(prev => prev.filter(n => {
+        if ((n.type === 'soon' || n.type === 'overdue') && n.taskId) {
+           const t = tasks.find(tsk => tsk.id === n.taskId);
+           if (!t || t.status === 'completed') return false;
+        }
+        return true;
+      }));
 
       for (const task of tasks) {
         if (!task.dueDate) continue;

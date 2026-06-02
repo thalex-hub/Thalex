@@ -146,22 +146,30 @@ export async function downloadFile(url: string | undefined, fileName: string) {
     return;
   }
   
-  // To avoid popup blockers and CORS issues from async fetch(),
-  // trigger the download/new tab navigation synchronously.
   try {
-    const link = document.createElement('a');
-    link.href = url;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.download = fileName || 'download';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Attempt to open in a new tab directly. 
+    // This is most reliable for triggering downloads of files (like .xlsx, .pdf) 
+    // across different browsers and avoiding popup blockers.
+    const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    
+    // If popup blocker blocked it (returns null), fallback to standard link click
+    if (!newWindow) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.download = fileName || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   } catch (error) {
-    console.warn('Download fallback failed:', error);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    console.error('Download failed:', error);
+    // Absolute fallback
+    window.location.href = url;
   }
 }
+
 
 /**
  * Perform a fetch to JSON API safely, handles non-JSON HTML (404/502 etc.) gracefully, and catches DOMExceptions.

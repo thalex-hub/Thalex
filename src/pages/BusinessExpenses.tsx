@@ -59,10 +59,10 @@ export default function BusinessExpenses() {
       ? query(collection(db, 'orders'))
       : query(collection(db, 'orders'), where('responsibleUserId', '==', appUser?.uid || 'none'));
 
-    // Sub to users
+    // Sub to users (excluding SuperAdmin and inactive users)
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
       const fetchedUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-      setUsers(fetchedUsers.filter((u: any) => u.isActive !== false));
+      setUsers(fetchedUsers.filter((u: any) => u.isActive !== false && u.roleId !== 'SuperAdmin'));
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, 'users', false);
     });

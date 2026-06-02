@@ -186,8 +186,8 @@ export default function Settings() {
     
     try {
       const storageRef = ref(storage, `avatars/${user.uid}_${Date.now()}`);
-      await withTimeout(uploadBytes(storageRef, file), 8000);
-      const downloadURL = await withTimeout(getDownloadURL(storageRef), 5000);
+      await withTimeout(uploadBytes(storageRef, file), 25000);
+      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
       
       // Update local state
       setAvatarUrl(downloadURL);

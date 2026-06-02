@@ -571,8 +571,8 @@ export default function BusinessManagement() {
     setUploading(true);
     try {
       const storageRef = ref(storage, `contracts/${userId}/${file.name}`);
-      await withTimeout(uploadBytes(storageRef, file), 8000);
-      const downloadURL = await withTimeout(getDownloadURL(storageRef), 5000);
+      await withTimeout(uploadBytes(storageRef, file), 25000);
+      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
 
       await updateDoc(doc(db, 'users', userId), {
         contractUrl: downloadURL,

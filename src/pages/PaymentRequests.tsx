@@ -221,8 +221,8 @@ export default function PaymentRequests() {
           if (att.file) {
             try {
               const fileRef = ref(storage, `payment_requests/${Date.now()}_${att.file.name}`);
-              await withTimeout(uploadBytes(fileRef, att.file), 8000); // Fail fast
-              const downloadUrl = await withTimeout(getDownloadURL(fileRef), 5000);
+              await withTimeout(uploadBytes(fileRef, att.file), 25000);
+              const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
               return {
                 name: att.name,
                 type: att.type,

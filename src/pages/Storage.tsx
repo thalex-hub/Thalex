@@ -284,8 +284,8 @@ export default function Storage() {
         }
 
         const fileRef = ref(storage, `storage/${Date.now()}_${selectedFile.name}`);
-        await withTimeout(uploadBytes(fileRef, selectedFile), 8000);
-        fileUrl = await withTimeout(getDownloadURL(fileRef), 5000);
+        await withTimeout(uploadBytes(fileRef, selectedFile), 25000);
+        fileUrl = await withTimeout(getDownloadURL(fileRef), 10000);
         fileSize = selectedFile.size;
         mimeType = selectedFile.type || 'application/octet-stream';
         documentName = newFileData.name.trim() || selectedFile.name;

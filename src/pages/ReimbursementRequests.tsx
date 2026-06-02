@@ -163,8 +163,8 @@ export default function ReimbursementRequests() {
         selectedFiles.map(async (f) => {
           try {
             const fileRef = ref(storage, `reimbursements/${Date.now()}_${f.name}`);
-            await uploadBytes(fileRef, f);
-            const downloadUrl = await getDownloadURL(fileRef);
+            await withTimeout(uploadBytes(fileRef, f), 25000);
+            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
             return {
               name: f.name,
               type: f.type,

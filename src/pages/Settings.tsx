@@ -21,7 +21,7 @@ import { updatePassword, updateProfile, EmailAuthProvider, reauthenticateWithCre
 import { doc, updateDoc, writeBatch, collection, getDocs, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import { cn, withTimeout } from '../lib/utils';
 import CompanyProfile from './CompanyProfile';
 
 export default function Settings() {
@@ -186,8 +186,8 @@ export default function Settings() {
     
     try {
       const storageRef = ref(storage, `avatars/${user.uid}_${Date.now()}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      await withTimeout(uploadBytes(storageRef, file), 25000);
+      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
       
       // Update local state
       setAvatarUrl(downloadURL);

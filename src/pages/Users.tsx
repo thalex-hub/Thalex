@@ -3,7 +3,7 @@ import { db, storage } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Shield, Mail, Phone, MapPin, Briefcase, BadgeCheck, Users as UsersIcon, Plus, Edit2, Trash2, X, Settings2, Calendar, FileText, Download, Clock, FileSpreadsheet, Upload, FileUp, Camera } from 'lucide-react';
-import { cn, formatCurrencyInput, parseCurrencyInput } from '../lib/utils';
+import { cn, formatCurrencyInput, parseCurrencyInput, withTimeout } from '../lib/utils';
 import { AppUser } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { logActivity } from '../services/activityLogger';
@@ -213,8 +213,8 @@ export default function Users() {
     setUploading(true);
     try {
       const storageRef = ref(storage, `avatars/${userId}_${Date.now()}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      await withTimeout(uploadBytes(storageRef, file), 25000);
+      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
 
       if (editingUser && editingUser.uid === userId) {
         setEditingUser({
@@ -248,8 +248,8 @@ export default function Users() {
     setUploading(true);
     try {
       const storageRef = ref(storage, `contracts/${userId}/${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      await withTimeout(uploadBytes(storageRef, file), 25000);
+      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
 
       await updateDoc(doc(db, 'users', userId), {
         contractUrl: downloadURL,

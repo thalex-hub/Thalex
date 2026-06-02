@@ -7,7 +7,7 @@ import {
   Trash2, X, Settings2, Calendar, FileText, Download, Clock, FileSpreadsheet,
   LayoutGrid, Building2, UserPlus, Key, Upload, FileUp, Search, Check, Save, Info
 } from 'lucide-react';
-import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, getApiUrl, safeFetchJson } from '../lib/utils';
+import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, getApiUrl, safeFetchJson, withTimeout } from '../lib/utils';
 import { AppUser, UserRole } from '../types';
 
 const ROLE_NAMES: Record<UserRole, string> = {
@@ -571,8 +571,8 @@ export default function BusinessManagement() {
     setUploading(true);
     try {
       const storageRef = ref(storage, `contracts/${userId}/${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      await withTimeout(uploadBytes(storageRef, file), 25000);
+      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
 
       await updateDoc(doc(db, 'users', userId), {
         contractUrl: downloadURL,

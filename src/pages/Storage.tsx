@@ -39,7 +39,7 @@ import { useAuth } from '../lib/authContext';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
-import { getApiUrl, downloadFile } from '../lib/utils';
+import { getApiUrl, downloadFile, withTimeout } from '../lib/utils';
 
 const COMPANY_FOLDERS = [
   { id: 'templates', name: 'Biển mẫu công ty', icon: File },
@@ -284,8 +284,8 @@ export default function Storage() {
         }
 
         const fileRef = ref(storage, `storage/${Date.now()}_${selectedFile.name}`);
-        await uploadBytes(fileRef, selectedFile);
-        fileUrl = await getDownloadURL(fileRef);
+        await withTimeout(uploadBytes(fileRef, selectedFile), 25000);
+        fileUrl = await withTimeout(getDownloadURL(fileRef), 10000);
         fileSize = selectedFile.size;
         mimeType = selectedFile.type || 'application/octet-stream';
         documentName = newFileData.name.trim() || selectedFile.name;

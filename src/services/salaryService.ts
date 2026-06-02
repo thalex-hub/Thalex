@@ -294,9 +294,21 @@ export function calculateSingleMonthSalary(
   }
 
   // Calculate Insurance
-  const insuranceSalary = isProbation
+  let insuranceSalary = isProbation
     ? 0
     : Number(targetUser?.insuranceSalary || 0);
+
+  // If base salary is 0, they do not pay insurance.
+  if (baseSalary === 0) {
+    insuranceSalary = 0;
+  }
+
+  // General rule in Vietnam: If an employee works less than 14 days in a month, they do not pay social insurance for that month.
+  // Unless they don't need attendance (e.g. directors who are not required to clock in).
+  if (targetUser?.needsAttendance !== false && actualDays < 14) {
+    insuranceSalary = 0;
+  }
+
   const bhxh = isProbation ? 0 : insuranceSalary * 0.08;
   const bhyt = isProbation ? 0 : insuranceSalary * 0.015;
   const bhtn = isProbation ? 0 : insuranceSalary * 0.01;

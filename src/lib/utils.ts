@@ -140,31 +140,27 @@ export function getApiUrl(path: string): string {
   return cleanPath;
 }
 
-export async function downloadFile(url: string | undefined, fileName: string) {
+export function downloadFile(url: string | undefined, fileName: string) {
   if (!url) {
     alert('Không tìm thấy liên kết tải về cho tệp này. Tệp có thể chưa được tải lên máy chủ.');
     return;
   }
   
   try {
-    // Try to fetch as blob to force download instead of opening in a new tab
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Network response was not ok');
-    
-    const blob = await response.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
+    // Attempt download using backend proxy
+    const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName || 'download')}`;
     
     const link = document.createElement('a');
-    link.href = blobUrl;
+    link.href = proxyUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
     link.download = fileName || 'download';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
-    // Clean up
-    window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
   } catch (error) {
-    console.error('Download as blob failed, falling back to direct link:', error);
+    console.error('Download failed, falling back to direct link:', error);
     try {
       const link = document.createElement('a');
       link.href = url;

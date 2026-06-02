@@ -544,6 +544,48 @@ app.post("/api/send-account-email", async (req, res) => {
   }
 });
 
+app.get("/api/download", async (req, res) => {
+  try {
+    const fileUrl = req.query.url as string;
+    const filename = req.query.filename as string || "download";
+    
+    if (!fileUrl) {
+      return res.status(400).json({ error: "Missing url parameter" });
+    }
+
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch file: ${response.statusText}`);
+    }
+    
+    const contentType = response.headers.get("content-type") || "application/octet-stream";
+    
+    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader("Content-Type", contentType);
+    
+    // Convert ReadableStream to Node.js stream and pipe to response
+    if (response.body) {
+        // @ts-ignore
+        const reader = response.body.getReader();
+        const pump = async () => {
+            const { done, value } = await reader.read();
+            if (done) {
+                res.end();
+                return;
+            }
+            res.write(value);
+            await pump();
+        };
+        await pump();
+    } else {
+        res.end();
+    }
+  } catch (error: any) {
+    console.error("Proxy download error:", error);
+    res.status(500).json({ error: "Failed to download file" });
+  }
+});
+
 app.post("/api/send-task-email", async (req, res) => {
   let host = "smtp.gmail.com";
   try {

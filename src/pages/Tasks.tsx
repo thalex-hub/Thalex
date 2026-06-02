@@ -2432,13 +2432,16 @@ export default function Tasks() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {file.url && (
-                                    <button 
-                                      onClick={() => forceDownload(file.url, file.name)}
-                                      className="p-2 text-blue-500 hover:text-blue-700 bg-blue-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    <a 
+                                      href={file.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      download={file.name}
+                                      className="p-2 text-blue-500 hover:text-blue-700 bg-blue-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer"
                                       title="Tải về"
                                     >
                                       <Download size={16} />
-                                    </button>
+                                    </a>
                                   )}
                                   <button 
                                     onClick={() => removeFile(i, true)}
@@ -2502,16 +2505,22 @@ export default function Tasks() {
                                                     alt={file.name} 
                                                     referrerPolicy="no-referrer"
                                                   />
-                                                  <button
-                                                    onClick={() => forceDownload(file.url, file.name)}
+                                                  <a
+                                                    href={file.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    download={file.name}
                                                     className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-all text-white font-bold text-[10px]"
                                                   >
                                                     TẢI VỀ
-                                                  </button>
+                                                  </a>
                                                 </div>
                                               )}
-                                              <button 
-                                                onClick={() => forceDownload(file.url, file.name)}
+                                              <a 
+                                                href={file.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                download={file.name}
                                                 className={cn(
                                                   "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border transition-all hover:scale-[1.02] shadow-sm",
                                                   comment.userId === currentUser?.uid 
@@ -2525,7 +2534,7 @@ export default function Tasks() {
                                                   <span className="text-[8px] opacity-60 font-medium">Click để tải về ({(file.size / 1024).toFixed(1)} KB)</span>
                                                 </div>
                                                 <Download size={14} className="ml-1 opacity-60" />
-                                              </button>
+                                              </a>
                                             </div>
                                           ) : (
                                             <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border bg-gray-50 border-gray-200 text-gray-400 opacity-60">

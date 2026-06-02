@@ -934,10 +934,32 @@ export default function ReimbursementRequests() {
                            {viewingRequest.attachments.map((file: any, idx: number) => {
                                const fileName = typeof file === 'string' ? file : file.name;
                                const fileUrl = typeof file === 'string' ? undefined : file.url;
-                               return (
+                               return fileUrl ? (
+                             <a 
+                               key={idx} 
+                               href={fileUrl}
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               download={fileName}
+                               className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-blue-200 transition-colors group cursor-pointer"
+                             >
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                   <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                      <FileText size={16} />
+                                   </div>
+                                   <div className="overflow-hidden">
+                                       <span className="text-xs font-bold text-gray-700 truncate block">{fileName}</span>
+                                       {typeof file !== 'string' && file.size && (
+                                           <span className="text-[10px] text-gray-400 font-medium">{Math.round(file.size / 1024)} KB</span>
+                                       )}
+                                   </div>
+                                </div>
+                                <span className="text-[10px] font-black text-blue-600 uppercase group-hover:underline">Tải về</span>
+                             </a>
+                               ) : (
                              <div 
                                key={idx} 
-                               onClick={() => fileUrl ? downloadFile(fileUrl, fileName) : alert('Không tìm thấy liên kết tải về cho tệp này. Tệp có thể chưa được tải lên máy chủ.')}
+                               onClick={() => alert('Không tìm thấy liên kết tải về cho tệp này. Tệp có thể chưa được tải lên máy chủ.')}
                                className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-blue-200 transition-colors group cursor-pointer"
                              >
                                 <div className="flex items-center gap-3 overflow-hidden">
@@ -952,7 +974,8 @@ export default function ReimbursementRequests() {
                                    </div>
                                 </div>
                              </div>
-                           )})}
+                               );
+                           })}
                         </div>
                     </div>
                   )}

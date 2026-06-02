@@ -3691,10 +3691,9 @@ export default function OrderDetail() {
                                   {file.url ? (
                                     <a 
                                       href={file.url} 
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        downloadFile(file.url, file.name);
-                                      }}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      download={file.name}
                                       className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center"
                                       title="Tải về"
                                     >
@@ -3765,11 +3764,9 @@ export default function OrderDetail() {
                                           {file.url ? (
                                             <a 
                                               href={file.url}
-                                              onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                downloadFile(file.url, file.name);
-                                              }}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              download={file.name}
                                               className={cn(
                                                 "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border transition-all hover:scale-[1.02] shadow-sm",
                                                 comment.userId === user?.uid 

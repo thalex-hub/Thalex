@@ -242,12 +242,14 @@ export function calculateSingleMonthSalary(
       const currentMonthActiveRecords = userAttendance.filter(r => r.workDate.startsWith(monthKey));
       const hasAnyRecordsInMonth = currentMonthActiveRecords.length > 0;
 
-      if (targetUser?.needsAttendance !== false && hasAnyRecordsInMonth) {
-        totalPenalties += daySalary;
-        violations.push({ date: dateStr, type: 'Nghỉ không phép / Không chấm công', penalty: daySalary });
-      } else {
-        // If no record and doesn't need attendance (or system wasn't live/not recorded yet), count as work day
+      if (targetUser?.needsAttendance === false) {
         actualDays += 1;
+      } else {
+        totalPenalties += daySalary;
+        // Only push violation strings if we actually have some records that month (to avoid spamming history for inactive months)
+        if (hasAnyRecordsInMonth) {
+           violations.push({ date: dateStr, type: 'Nghỉ không phép / Không chấm công', penalty: daySalary });
+        }
       }
     }
   });

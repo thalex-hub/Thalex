@@ -743,13 +743,16 @@ export default function Storage() {
                     </div>
 
                     <div className="flex items-center gap-2 pt-4 border-t border-gray-50">
-                      <button 
-                        onClick={() => forceDownload(file.url, file.name)}
+                      <a 
+                        href={file.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={file.name}
                         className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-blue-600 text-blue-600 rounded-full text-xs font-extrabold hover:bg-blue-50 transition-all"
                       >
                         <Download size={14} className="stroke-[3]" />
                         Tải xuống
-                      </button>
+                      </a>
                       {file.type === 'personal' && file.ownerId === user?.uid && (
                         <button 
                           onClick={() => setShowShareModal(file)}

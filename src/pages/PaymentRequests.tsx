@@ -1096,12 +1096,14 @@ export default function PaymentRequests() {
                                     <p className="text-[10px] text-gray-400 uppercase font-medium">{(file.size / 1024).toFixed(1)} KB</p>
                                  </div>
                               </div>
-                              <button 
-                                onClick={() => downloadFile(file.url, file.name)}
+                              <a 
+                                href={file.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="text-[10px] font-black text-blue-600 uppercase hover:underline"
                               >
                                 Tải về
-                              </button>
+                              </a>
                            </div>
                         ))}
                      </div>

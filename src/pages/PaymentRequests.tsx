@@ -219,16 +219,29 @@ export default function PaymentRequests() {
       const uploadedAttachments = await Promise.all(
         newRequest.attachments.map(async (att) => {
           if (att.file) {
-            const fileRef = ref(storage, `payment_requests/${Date.now()}_${att.file.name}`);
-            await withTimeout(uploadBytes(fileRef, att.file));
-            const downloadUrl = await withTimeout(getDownloadURL(fileRef));
-            return {
-              name: att.name,
-              type: att.type,
-              size: att.size,
-              lastModified: att.lastModified,
-              url: downloadUrl
-            };
+            try {
+              const fileRef = ref(storage, `payment_requests/${Date.now()}_${att.file.name}`);
+              await withTimeout(uploadBytes(fileRef, att.file), 8000);
+              const downloadUrl = await withTimeout(getDownloadURL(fileRef), 8000);
+              return {
+                name: att.name,
+                type: att.type,
+                size: att.size,
+                lastModified: att.lastModified,
+                url: downloadUrl
+              };
+            } catch (uploadErr) {
+              console.error("Lỗi tải tệp lên Storage:", uploadErr);
+              // Fallback: continue without stopping the form submission
+              return {
+                name: att.name,
+                type: att.type,
+                size: att.size,
+                lastModified: att.lastModified,
+                url: '',
+                error: 'Không thể tải lên (Firebase Storage Error)'
+              };
+            }
           }
           // Fallback if no file object (should not happen for newly added)
           return {

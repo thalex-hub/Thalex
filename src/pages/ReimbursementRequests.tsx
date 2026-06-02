@@ -161,15 +161,26 @@ export default function ReimbursementRequests() {
 
       const uploadedAttachments = await Promise.all(
         selectedFiles.map(async (f) => {
-          const fileRef = ref(storage, `reimbursements/${Date.now()}_${f.name}`);
-          await withTimeout(uploadBytes(fileRef, f));
-          const downloadUrl = await withTimeout(getDownloadURL(fileRef));
-          return {
-            name: f.name,
-            type: f.type,
-            size: f.size,
-            url: downloadUrl
-          };
+          try {
+            const fileRef = ref(storage, `reimbursements/${Date.now()}_${f.name}`);
+            await withTimeout(uploadBytes(fileRef, f), 8000);
+            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 8000);
+            return {
+              name: f.name,
+              type: f.type,
+              size: f.size,
+              url: downloadUrl
+            };
+          } catch (uploadErr) {
+            console.error("Lỗi tải tệp lên Storage:", uploadErr);
+            return {
+              name: f.name,
+              type: f.type,
+              size: f.size,
+              url: '',
+              error: 'Không thể tải lên (Firebase Storage Error)'
+            };
+          }
         })
       );
       

@@ -183,34 +183,33 @@ export default function SalarySettings() {
       const user = users.find(u => u.uid === userId);
       const updatedYearlyBaseSalaries = { 
         ...(user?.yearlyBaseSalaries || {}), 
-        [selectedYear.toString()]: editBuffer.baseSalary 
+        [selectedYear.toString()]: isNaN(editBuffer.baseSalary) ? 0 : (editBuffer.baseSalary || 0)
       };
 
-      await updateDoc(userRef, {
+      // Clean up objects to avoid undefined values which Firestore rejects
+      const cleanObj = (obj: any) => Object.fromEntries(Object.entries(obj || {}).map(([k, v]) => [k, (typeof v === 'number' && isNaN(v)) ? 0 : v]).filter(([_, v]) => v !== undefined));
+
+      const updateData = {
         workStatus: editBuffer.workStatus || 'official',
         yearlyBaseSalaries: updatedYearlyBaseSalaries,
-        insuranceSalary: editBuffer.insuranceSalary,
-        monthlyBonuses: editBuffer.bonuses,
-        bonusPercentage: editBuffer.bonusPercentage || {},
-        kpiRevenue: editBuffer.kpiRevenue || {},
-        monthlyWorkStatuses: editBuffer.monthlyWorkStatuses || {},
-        monthlyBaseSalaries: editBuffer.monthlyBaseSalaries || {},
+        insuranceSalary: isNaN(editBuffer.insuranceSalary) ? 0 : (editBuffer.insuranceSalary || 0),
+        monthlyBonuses: cleanObj(editBuffer.bonuses),
+        bonusPercentage: cleanObj(editBuffer.bonusPercentage),
+        kpiRevenue: cleanObj(editBuffer.kpiRevenue),
+        monthlyWorkStatuses: cleanObj(editBuffer.monthlyWorkStatuses),
+        monthlyBaseSalaries: cleanObj(editBuffer.monthlyBaseSalaries),
         updatedAt: new Date().toISOString()
-      });
+      };
+
+      await updateDoc(userRef, updateData);
       
       setUsers(prev => prev.map(u => u.uid === userId ? { 
         ...u, 
-        workStatus: editBuffer.workStatus || 'official',
-        yearlyBaseSalaries: updatedYearlyBaseSalaries, 
-        insuranceSalary: editBuffer.insuranceSalary,
-        monthlyBonuses: editBuffer.bonuses,
-        bonusPercentage: editBuffer.bonusPercentage || {},
-        kpiRevenue: editBuffer.kpiRevenue || {},
-        monthlyWorkStatuses: editBuffer.monthlyWorkStatuses || {},
-        monthlyBaseSalaries: editBuffer.monthlyBaseSalaries || {}
+        ...updateData
       } : u));
       setEditingId(null);
     } catch (error) {
+      console.error("LỖI CẬP NHẬT LƯƠNG:", error);
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
     } finally {
       setSaving(null);

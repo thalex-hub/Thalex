@@ -868,25 +868,45 @@ export default function AdvanceRequests() {
                   <div>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 px-1">Tài liệu đính kèm ({showDetailModal.attachments.length})</p>
                     <div className="grid grid-cols-1 gap-2">
-                      {showDetailModal.attachments.map((file: any, idx: number) => (
-                        <a 
-                          key={idx}
-                          href={file.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors group/file"
-                        >
-                          <div className="flex items-center gap-2">
-                            <FileStack size={16} className="text-blue-500" />
-                            <div>
-                               <p className="text-xs font-bold text-gray-700 truncate max-w-[200px]">{file.name}</p>
-                               <p className="text-[10px] text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
+                      {showDetailModal.attachments.map((file: any, idx: number) => {
+                        const hasUrl = !!file.url;
+                        return hasUrl ? (
+                          <a 
+                            key={idx}
+                            href={file.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors group/file cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <FileStack size={16} className="text-blue-500" />
+                              <div>
+                                 <p className="text-xs font-bold text-gray-700 truncate max-w-[200px]">{file.name}</p>
+                                 <p className="text-[10px] text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
+                              </div>
+                            </div>
+                            <Zap size={14} className="text-blue-400 opacity-0 group-hover/file:opacity-100 transition-opacity" />
+                          </a>
+                        ) : (
+                          <div 
+                            key={idx}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              alert('Không tìm thấy liên kết tải về cho tệp này.');
+                            }}
+                            className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-xl text-gray-400"
+                          >
+                            <div className="flex items-center gap-2">
+                              <FileStack size={16} className="text-gray-300" />
+                              <div>
+                                 <p className="text-xs font-medium truncate max-w-[200px] text-gray-400">{file.name}</p>
+                                 <p className="text-[10px]">{(file.size / 1024).toFixed(1)} KB</p>
+                              </div>
                             </div>
                           </div>
-                          <Zap size={14} className="text-blue-400 opacity-0 group-hover/file:opacity-100 transition-opacity" />
-                        </a>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}

@@ -1096,14 +1096,21 @@ export default function PaymentRequests() {
                                     <p className="text-[10px] text-gray-400 uppercase font-medium">{(file.size / 1024).toFixed(1)} KB</p>
                                  </div>
                               </div>
-                              <a 
-                                href={file.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[10px] font-black text-blue-600 uppercase hover:underline"
+                              <button 
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (!file.url) {
+                                    alert('Không tìm thấy liên kết tải về cho tệp này. Tệp có thể chưa được tải lên máy chủ.');
+                                    return;
+                                  }
+                                  downloadFile(file.url, file.name);
+                                }}
+                                className="text-[10px] font-black text-blue-600 uppercase hover:underline cursor-pointer"
                               >
                                 Tải về
-                              </a>
+                              </button>
                            </div>
                         ))}
                      </div>

@@ -157,6 +157,7 @@ export function calculateSingleMonthSalary(
       finalSalary: 0,
       daySalary: 0,
       monthlyBonus: 0,
+      monthlyRevenue: 0,
       commission: 0,
       insuranceSalary: 0,
       totalInsurance: 0,
@@ -165,6 +166,7 @@ export function calculateSingleMonthSalary(
       bhtn: 0,
       paidSalary: 0,
       remainingNetSalary: 0,
+      advanceDebt: 0,
       previousMonthDebt: 0
     };
   }

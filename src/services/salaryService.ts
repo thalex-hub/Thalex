@@ -285,11 +285,9 @@ export function calculateSingleMonthSalary(
   const isSalesCategory = deptName.includes('kinh doanh') || deptName.includes('sales') || deptName.includes('bán hàng');
   const isKpiBased = isDirectorCategory || isSalesCategory;
 
-  let finalMonthlyBonus = 0;
+  const finalMonthlyBonus = Number(targetUser?.monthlyBonuses?.[monthKey] || targetUser?.monthlyBonus || 0);
   let commission = 0;
-  if (!isKpiBased) {
-    finalMonthlyBonus = Number(targetUser?.monthlyBonuses?.[monthKey] || targetUser?.monthlyBonus || 0);
-  } else {
+  if (isKpiBased) {
     if (monthlyRevenue >= Number(userKpi) && Number(userPercent) > 0) {
       commission = monthlyRevenue * (Number(userPercent) / 100);
     }

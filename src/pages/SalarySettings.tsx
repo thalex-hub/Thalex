@@ -397,12 +397,16 @@ export default function SalarySettings() {
                   };
 
                   const calculateBonus = (month: number) => {
-                    if (!isKpiBased) return isEditing ? (editBuffer.bonuses[`${selectedYear}-${String(month).padStart(2, '0')}`] || 0) : (user.monthlyBonuses?.[`${selectedYear}-${String(month).padStart(2, '0')}`] || 0);
+                    const mKey = `${selectedYear}-${String(month).padStart(2, '0')}`;
+                    const manualBonus = isEditing ? (editBuffer.bonuses[mKey] || 0) : (user.monthlyBonuses?.[mKey] || 0);
+                    if (!isKpiBased) return manualBonus;
+                    
                     const revenue = getMonthlyRevenue(month);
+                    let commission = 0;
                     if (revenue >= userKpi && userPercent > 0) {
-                      return (userPercent / 100) * revenue;
+                      commission = (userPercent / 100) * revenue;
                     }
-                    return 0;
+                    return commission + manualBonus;
                   };
                   
                   const currentBase = isEditing ? editBuffer.baseSalary : (user.yearlyBaseSalaries?.[selectedYear.toString()] || user.baseSalary || 0);
@@ -573,6 +577,7 @@ export default function SalarySettings() {
                           const bonusValue = calculateBonus(month);
                           const mStatus = getMonthStatus(isEditing ? editBuffer : user, monthKey);
                           const isInactive = mStatus === 'not_started' || mStatus === 'resigned';
+                          const manualBonus = isEditing ? (editBuffer.bonuses[monthKey] || 0) : (user.monthlyBonuses?.[monthKey] || 0);
                           
                           return (
                             <td key={i} className="px-4 py-4 text-center group/cell relative">
@@ -580,17 +585,26 @@ export default function SalarySettings() {
                                 <div className="flex flex-col items-center justify-center min-h-[40px]">
                                   <span className="text-gray-300 text-xs font-semibold font-mono">-</span>
                                 </div>
-                              ) : isEditing && !isKpiBased ? (
-                                <input 
-                                  type="text"
-                                  inputMode="decimal"
-                                  className="w-24 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 text-sm font-black outline-none shadow-sm text-center text-emerald-600"
-                                  value={formatCurrencyInput(bonusValue)}
-                                  onChange={(e) => {
-                                    const newBonuses = { ...editBuffer.bonuses, [monthKey]: Number(parseCurrencyInput(e.target.value)) };
-                                    setEditBuffer({ ...editBuffer, bonuses: newBonuses });
-                                  }}
-                                />
+                              ) : isEditing ? (
+                                <div className="space-y-1.5 flex flex-col items-center justify-center">
+                                  {isKpiBased && (
+                                    <span className="text-[8px] font-black text-gray-400 block whitespace-nowrap leading-none" title={`Thưởng doanh số: ${formatCurrency(bonusValue - manualBonus)}`}>
+                                      DS: {formatCurrency(bonusValue - manualBonus)}
+                                    </span>
+                                  )}
+                                  <input 
+                                    type="text"
+                                    inputMode="decimal"
+                                    className="w-24 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 text-xs font-black outline-none shadow-sm text-center text-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
+                                    value={formatCurrencyInput(manualBonus)}
+                                    placeholder="Thưởng tay..."
+                                    onChange={(e) => {
+                                      const val = Number(parseCurrencyInput(e.target.value));
+                                      const newBonuses = { ...editBuffer.bonuses, [monthKey]: val };
+                                      setEditBuffer({ ...editBuffer, bonuses: newBonuses });
+                                    }}
+                                  />
+                                </div>
                               ) : (
                                 <div className="flex flex-col items-center justify-center min-h-[40px]">
                                   {isKpiBased && revenue > 0 && (
@@ -598,9 +612,14 @@ export default function SalarySettings() {
                                       DT trước VAT: {formatCurrency(revenue)}
                                     </p>
                                   )}
-                                  <p className={cn("font-black text-[10px]", bonusValue > 0 ? "text-emerald-600" : "text-gray-300")}>
+                                  <p className={cn("font-black text-[10px]", bonusValue > 0 ? "text-emerald-600" : "text-gray-300")} title={isKpiBased && manualBonus > 0 ? `Thành phần: Thưởng doanh số ${formatCurrency(bonusValue - manualBonus)} + Thưởng thêm ${formatCurrency(manualBonus)}` : undefined}>
                                     {bonusValue > 0 ? formatCurrency(bonusValue) : '-'}
                                   </p>
+                                  {isKpiBased && manualBonus > 0 && (
+                                    <span className="text-[7px] font-bold text-emerald-500 bg-emerald-55 px-1 py-0.5 rounded whitespace-nowrap mt-0.5 block" title={`Thưởng tay điền tay: ${formatCurrency(manualBonus)}`}>
+                                      + {formatCurrency(manualBonus)}
+                                    </span>
+                                  )}
                                   {mStatus === 'probation' ? (
                                     <span className="text-[8px] font-bold text-orange-600 bg-orange-50 px-1 py-0.5 rounded mt-1 whitespace-nowrap">Thử việc</span>
                                   ) : mStatus === 'official' ? (
@@ -934,7 +953,8 @@ export default function SalarySettings() {
 
                       const calcIndivBonus = (m: number, userId: string) => {
                         const mKey = `${selectedYear}-${String(m).padStart(2, '0')}`;
-                        if (!isKpiIndiv) return isIdxEditing ? (editBuffer.bonuses[mKey] || 0) : (u.monthlyBonuses?.[mKey] || 0);
+                        const manBonus = isIdxEditing ? (editBuffer.bonuses[mKey] || 0) : (u.monthlyBonuses?.[mKey] || 0);
+                        if (!isKpiIndiv) return manBonus;
                         
                         // Use correct revenue base: Company Total for Directors in specialized view
                         let rev = 0;
@@ -944,10 +964,11 @@ export default function SalarySettings() {
                           rev = revenueMap[userId]?.[mKey] || 0;
                         }
 
+                        let comm = 0;
                         if (rev >= uKpi && uPercent > 0) {
-                          return (uPercent / 100) * rev;
+                          comm = (uPercent / 100) * rev;
                         }
-                        return 0;
+                        return comm + manBonus;
                       };
 
                       return acc + calcIndivBonus(month, u.uid!);
@@ -974,9 +995,9 @@ export default function SalarySettings() {
                           let bonusSum = 0;
                           for (let i = 1; i <= 12; i++) {
                             const monthKey = `${selectedYear}-${String(i).padStart(2, '0')}`;
+                            const manBonus = isIdxEditing ? (editBuffer.bonuses[monthKey] || 0) : (u.monthlyBonuses?.[monthKey] || 0);
                             if (!isKpiIndiv) {
-                              const b = isIdxEditing ? editBuffer.bonuses[monthKey] : (u.monthlyBonuses?.[monthKey]);
-                              bonusSum += b || 0;
+                              bonusSum += manBonus;
                             } else {
                               const uIsDirector = u.roleId === 'Director' || u.roleId === 'SuperAdmin';
                               let rev = 0;
@@ -986,9 +1007,11 @@ export default function SalarySettings() {
                                 rev = revenueMap[u.uid!]?.[monthKey] || 0;
                               }
                               
+                              let comm = 0;
                               if (rev >= userKpi && userPercent > 0) {
-                                bonusSum += (userPercent / 100) * rev;
+                                comm = (userPercent / 100) * rev;
                               }
+                              bonusSum += comm + manBonus;
                             }
                           }
                           let actualBaseSum = 0;

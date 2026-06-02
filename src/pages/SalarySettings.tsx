@@ -809,6 +809,26 @@ export default function SalarySettings() {
                                                 }}
                                               />
                                             </div>
+                                            <div>
+                                              <p className="text-[8px] font-bold text-emerald-600 uppercase mb-0.5">Thưởng tay_</p>
+                                              <input 
+                                                type="text"
+                                                inputMode="decimal"
+                                                placeholder="0"
+                                                className="w-full text-[10px] font-bold py-1 px-1.5 bg-white border border-emerald-200 rounded-md outline-none text-emerald-600 focus:ring-1 focus:ring-emerald-500/20"
+                                                value={editBuffer.bonuses?.[mKey] ? formatCurrencyInput(editBuffer.bonuses[mKey]) : ''}
+                                                onChange={(e) => {
+                                                  const val = Number(parseCurrencyInput(e.target.value));
+                                                  const newBonuses = { ...(editBuffer.bonuses || {}) };
+                                                  if (val > 0) {
+                                                    newBonuses[mKey] = val;
+                                                  } else {
+                                                    delete newBonuses[mKey];
+                                                  }
+                                                  setEditBuffer({ ...editBuffer, bonuses: newBonuses });
+                                                }}
+                                              />
+                                            </div>
                                           </div>
                                         )}
                                       </div>

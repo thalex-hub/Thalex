@@ -243,7 +243,9 @@ export default function Dashboard() {
         );
 
     const unsubTasks = onSnapshot(tasksQ, (snap) => {
-      const allTasks = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const allTasks = snap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((t: any) => !t.isParent && t.type !== 'parent' && !t.name?.startsWith('Triển khai –') && !t.name?.startsWith('Triển khai -'));
       setTasks(allTasks);
 
       // Recent unfinished tasks

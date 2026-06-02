@@ -145,40 +145,21 @@ export async function downloadFile(url: string | undefined, fileName: string) {
     alert('Không tìm thấy liên kết tải về cho tệp này. Tệp có thể chưa được tải lên máy chủ.');
     return;
   }
+  
+  // To avoid popup blockers and CORS issues from async fetch(),
+  // trigger the download/new tab navigation synchronously.
   try {
-    // Handle inline data URLs
-    if (url.startsWith('data:')) {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      return;
-    }
-
-    // Handle normal URLs (including Firebase Storage)
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Network response was not ok');
-    const blob = await response.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(blobUrl);
-  } catch (error) {
-    console.warn('Silent download failed, falling back to new tab:', error);
-    // Fallback if CORS prevents blob reading
     const link = document.createElement('a');
     link.href = url;
     link.target = '_blank';
-    link.download = fileName;
+    link.rel = 'noopener noreferrer';
+    link.download = fileName || 'download';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  } catch (error) {
+    console.warn('Download fallback failed:', error);
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 

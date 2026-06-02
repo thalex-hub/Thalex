@@ -546,16 +546,18 @@ app.post("/api/send-account-email", async (req, res) => {
 
 app.get("/api/download", async (req, res) => {
   try {
-    const fileUrl = req.query.url as string;
+    const rawUrl = req.query.url as string;
     const filename = req.query.filename as string || "download";
     
-    if (!fileUrl) {
+    if (!rawUrl) {
       return res.status(400).json({ error: "Missing url parameter" });
     }
 
+    const fileUrl = Buffer.from(rawUrl, 'base64').toString('utf-8');
+
     const response = await fetch(fileUrl);
     if (!response.ok) {
-        throw new Error(`Failed to fetch file: ${response.statusText}`);
+        throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
     }
     
     const contentType = response.headers.get("content-type") || "application/octet-stream";
@@ -569,7 +571,7 @@ app.get("/api/download", async (req, res) => {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
-    res.send(buffer);
+    res.end(buffer);
   } catch (error: any) {
     console.error("Proxy download error:", error);
     res.status(500).json({ error: "Failed to download file" });

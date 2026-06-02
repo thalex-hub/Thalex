@@ -147,17 +147,21 @@ export function downloadFile(url: string | undefined, fileName: string) {
   }
   
   try {
-    // Attempt download using backend proxy
-    const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName || 'download')}`;
+    // Attempt download using backend proxy with base64 encoded URL to prevent decoding issues
+    const proxyUrl = getAppletUrl(`/api/download?url=${encodeURIComponent(btoa(url))}&filename=${encodeURIComponent(fileName || 'download')}`);
     
-    const link = document.createElement('a');
-    link.href = proxyUrl;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.download = fileName || 'download';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Create an invisible iframe to download to prevent opening a new blank tab
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = proxyUrl;
+    document.body.appendChild(iframe);
+    
+    // Clean up iframe after download starts
+    setTimeout(() => {
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
+    }, 5000);
     
   } catch (error) {
     console.error('Download failed, falling back to direct link:', error);

@@ -33,7 +33,8 @@ import {
   or,
   and
 } from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
+import { db, auth, storage } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '../lib/authContext';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -284,29 +285,10 @@ export default function Storage() {
           throw new Error('Vui lòng chọn một tệp tin từ máy tính.');
         }
 
-        // Convert file to Base64
-        const base64Data = await readFileAsBase64(selectedFile);
-
-        // Upload to server
-        const response = await fetch(getApiUrl('/api/upload'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            filename: selectedFile.name,
-            base64Data,
-          }),
-        });
-
-        if (!response.ok) {
-          const errRes = await response.json().catch(() => ({}));
-          throw new Error(errRes.error || 'Tải tệp lên máy chủ không thành công.');
-        }
-
-        const data = await response.json();
-        fileUrl = data.url;
-        fileSize = data.size;
+        const fileRef = ref(storage, `storage/${Date.now()}_${selectedFile.name}`);
+        await uploadBytes(fileRef, selectedFile);
+        fileUrl = await getDownloadURL(fileRef);
+        fileSize = selectedFile.size;
         mimeType = selectedFile.type || 'application/octet-stream';
         documentName = newFileData.name.trim() || selectedFile.name;
       } else {

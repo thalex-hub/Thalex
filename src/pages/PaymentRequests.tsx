@@ -1,6 +1,7 @@
 import React from 'react';
-import { db, auth } from '../lib/firebase';
+import { db, auth, storage } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, Building2, User, ReceiptText, Zap, Droplets, Truck, PenTool, Users, Megaphone, Tags, ShieldCheck, Paperclip, FileText, Undo2, ChevronRight, FileSpreadsheet, Wallet, Search } from 'lucide-react';
 
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
@@ -106,7 +107,7 @@ export default function PaymentRequests() {
     accountName: '',
     accountNumber: '',
     bankName: '',
-    attachments: [] as { name: string, type: string, size: number, lastModified: number }[]
+    attachments: [] as { file?: File, url?: string, name: string, type: string, size: number, lastModified: number }[]
   });
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -178,6 +179,7 @@ export default function PaymentRequests() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files).map((f: any) => ({
+        file: f,
         name: f.name,
         type: f.type,
         size: f.size,
@@ -210,6 +212,32 @@ export default function PaymentRequests() {
     setLoading(true);
 
     try {
+      // Upload any actual File objects to Firebase storage
+      const uploadedAttachments = await Promise.all(
+        newRequest.attachments.map(async (att) => {
+          if (att.file) {
+            const fileRef = ref(storage, `payment_requests/${Date.now()}_${att.file.name}`);
+            await uploadBytes(fileRef, att.file);
+            const downloadUrl = await getDownloadURL(fileRef);
+            return {
+              name: att.name,
+              type: att.type,
+              size: att.size,
+              lastModified: att.lastModified,
+              url: downloadUrl
+            };
+          }
+          // Fallback if no file object (should not happen for newly added)
+          return {
+            name: att.name,
+            type: att.type,
+            size: att.size,
+            lastModified: att.lastModified,
+            url: att.url || ''
+          };
+        })
+      );
+
       await addDoc(collection(db, 'payment_requests'), {
         userId: user.uid,
         userName: appUser?.fullName || user.displayName || 'Nhân viên',
@@ -224,7 +252,7 @@ export default function PaymentRequests() {
         accountName: newRequest.paymentMethod === 'transfer' ? newRequest.accountName : null,
         accountNumber: newRequest.paymentMethod === 'transfer' ? newRequest.accountNumber : null,
         bankName: newRequest.paymentMethod === 'transfer' ? newRequest.bankName : null,
-        attachments: newRequest.attachments,
+        attachments: uploadedAttachments,
         approvalLevel: 'Finance -> Director',
         requestDate: new Date().toISOString(),
         createdAt: new Date().toISOString(),

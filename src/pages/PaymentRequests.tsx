@@ -53,6 +53,7 @@ export default function PaymentRequests() {
   const [orders, setOrders] = React.useState<any[]>([]);
   const [showAddModal, setShowAddModal] = React.useState(false);
   const [showDetailModal, setShowDetailModal] = React.useState<any>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -585,22 +586,15 @@ export default function PaymentRequests() {
                   {isSuperAdmin && (
                     <button 
                       type="button"
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (window.confirm('Cảnh báo: Hành động này sẽ xóa hoàn toàn yêu cầu khỏi hệ thống do bạn là Superadmin!')) {
-                          try {
-                            await deleteDoc(doc(db, 'payment_requests', req.id));
-                            alert('Xóa thành công!');
-                          } catch (err: any) {
-                            alert('Lỗi: ' + err.message);
-                          }
-                        }
+                        setDeleteConfirmId(req.id);
                       }}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50"
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50 text-base"
                       title="Xóa yêu cầu (Superadmin)"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={20} />
                     </button>
                   )}
                </div>
@@ -1189,6 +1183,61 @@ export default function PaymentRequests() {
                  }} className="flex-1 bg-gray-100 text-gray-650 text-gray-600 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-200 transition-colors">
                    Đóng
                  </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteConfirmId && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => setDeleteConfirmId(null)} 
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 overflow-hidden"
+            >
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+                  <AlertCircle size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Xác nhận xóa</h3>
+                <p className="text-gray-500 text-sm">
+                  Bạn có chắc chắn muốn xóa yêu cầu này? Hành động này không thể hoàn tác.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setDeleteConfirmId(null)} 
+                  className="flex-1 py-3 border border-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors uppercase tracking-wider text-xs"
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="button" 
+                  onClick={async () => {
+                    const id = deleteConfirmId;
+                    setDeleteConfirmId(null);
+                    try {
+                      await deleteDoc(doc(db, 'payment_requests', id));
+                    } catch (err: any) {
+                      alert('Lỗi: ' + err.message);
+                    }
+                  }} 
+                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-colors uppercase tracking-wider text-xs"
+                >
+                  Xác nhận Xóa
+                </button>
               </div>
             </motion.div>
           </div>

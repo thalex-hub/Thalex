@@ -48,6 +48,7 @@ export default function BusinessExpenses() {
   const [allOrders, setAllOrders] = React.useState<any[]>([]);
   const [advanceRequests, setAdvanceRequests] = React.useState<any[]>([]);
   const [reimbursementRequests, setReimbursementRequests] = React.useState<any[]>([]);
+  const [superAdminIds, setSuperAdminIds] = React.useState<string[]>([]);
 
   React.useEffect(() => {
     if (!appUser) return;
@@ -63,6 +64,7 @@ export default function BusinessExpenses() {
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
       const fetchedUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
       setUsers(fetchedUsers.filter((u: any) => u.isActive !== false && u.roleId !== 'SuperAdmin'));
+      setSuperAdminIds(fetchedUsers.filter((u: any) => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, 'users', false);
     });
@@ -183,7 +185,7 @@ export default function BusinessExpenses() {
       }, 0);
 
       // Filter Payment Requests for this month
-      const monthPayments = paymentRequests.filter(req => req.requestDate && req.requestDate.startsWith(monthKey) && req.status === 'paid');
+      const monthPayments = paymentRequests.filter(req => req.requestDate && req.requestDate.startsWith(monthKey) && req.status === 'paid' && !superAdminIds.includes(req.userId));
       
       const manualSalary = monthPayments.filter(p => p.category === 'salary').reduce((sum, p) => sum + (p.amount || 0), 0);
 

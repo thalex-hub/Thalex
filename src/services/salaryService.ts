@@ -104,7 +104,16 @@ export function calculateSingleMonthSalary(
   }
   
   // Custom monthly base salary check
-  const initialBaseSalary = targetUser?.monthlyBaseSalaries?.[monthKey] || targetUser?.yearlyBaseSalaries?.[currentYearStr] || targetUser?.baseSalary || 0;
+  let initialBaseSalary = 0;
+  if (targetUser?.monthlyBaseSalaries && targetUser.monthlyBaseSalaries[monthKey] !== undefined) {
+    initialBaseSalary = Number(targetUser.monthlyBaseSalaries[monthKey]);
+  } else if (targetUser?.yearlyBaseSalaries && targetUser.yearlyBaseSalaries[currentYearStr] !== undefined) {
+    initialBaseSalary = Number(targetUser.yearlyBaseSalaries[currentYearStr]);
+  } else if (targetUser?.baseSalary !== undefined) {
+    initialBaseSalary = Number(targetUser.baseSalary);
+  }
+  if (isNaN(initialBaseSalary)) initialBaseSalary = 0;
+
   let baseSalary = isProbation ? initialBaseSalary * 0.85 : initialBaseSalary;
   const daySalary = requiredDaysValue > 0 ? (isProbation ? initialBaseSalary * 0.85 : initialBaseSalary) / requiredDaysValue : 0;
 
@@ -135,6 +144,30 @@ export function calculateSingleMonthSalary(
 
   // Filter attendance for this user only
   const userAttendance = attendance.filter(r => r.userId === targetUser.uid);
+  const currentMonthActiveRecords = userAttendance.filter(r => r.workDate.startsWith(monthKey));
+  const hasAnyRecordsInMonth = currentMonthActiveRecords.length > 0;
+
+  if (targetUser?.isActive === false && !hasAnyRecordsInMonth) {
+    return {
+      requiredDays: requiredDaysValue,
+      actualDays: 0,
+      totalPenalties: 0,
+      violations: [],
+      baseSalary: 0,
+      finalSalary: 0,
+      daySalary: 0,
+      monthlyBonus: 0,
+      commission: 0,
+      insuranceSalary: 0,
+      totalInsurance: 0,
+      bhxh: 0,
+      bhyt: 0,
+      bhtn: 0,
+      paidSalary: 0,
+      remainingNetSalary: 0,
+      previousMonthDebt: 0
+    };
+  }
 
   // Filter relevant payment requests for current month (salary context)
   const monthlySalaryPayments = paymentRequests.filter(req => {
@@ -239,9 +272,6 @@ export function calculateSingleMonthSalary(
         }
       }
     } else if (day < today) {
-      const currentMonthActiveRecords = userAttendance.filter(r => r.workDate.startsWith(monthKey));
-      const hasAnyRecordsInMonth = currentMonthActiveRecords.length > 0;
-
       if (targetUser?.needsAttendance === false) {
         actualDays += 1;
       } else {

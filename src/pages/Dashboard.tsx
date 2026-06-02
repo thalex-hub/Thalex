@@ -119,6 +119,7 @@ export default function Dashboard() {
   const [advanceRequests, setAdvanceRequests] = React.useState<any[]>([]);
   const [reimbursementRequests, setReimbursementRequests] = React.useState<any[]>([]);
   const [recentTasks, setRecentTasks] = React.useState<any[]>([]);
+  const [superAdminIds, setSuperAdminIds] = React.useState<string[]>([]);
 
   const toDate = (dateVal: any) => {
     if (!dateVal) return null;
@@ -306,6 +307,7 @@ export default function Dashboard() {
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
       const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
       setUsers(dbUsers.filter(u => u.roleId !== 'SuperAdmin'));
+      setSuperAdminIds(dbUsers.filter(u => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, 'users', false);
     });
@@ -596,7 +598,8 @@ export default function Dashboard() {
       const monthPayments = paymentRequests.filter(req => 
         req.requestDate && 
         req.requestDate.startsWith(monthKey) && 
-        req.status === 'paid'
+        req.status === 'paid' &&
+        !superAdminIds.includes(req.userId)
       );
 
       item.office_rent = monthPayments.filter(p => p.category === 'office_rent').reduce((sum, p) => sum + (p.amount || 0), 0);

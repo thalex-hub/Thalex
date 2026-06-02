@@ -221,8 +221,8 @@ export default function PaymentRequests() {
           if (att.file) {
             try {
               const fileRef = ref(storage, `payment_requests/${Date.now()}_${att.file.name}`);
-              await withTimeout(uploadBytes(fileRef, att.file), 8000);
-              const downloadUrl = await withTimeout(getDownloadURL(fileRef), 8000);
+              await uploadBytes(fileRef, att.file);
+              const downloadUrl = await getDownloadURL(fileRef);
               return {
                 name: att.name,
                 type: att.type,
@@ -232,15 +232,7 @@ export default function PaymentRequests() {
               };
             } catch (uploadErr) {
               console.error("Lỗi tải tệp lên Storage:", uploadErr);
-              // Fallback: continue without stopping the form submission
-              return {
-                name: att.name,
-                type: att.type,
-                size: att.size,
-                lastModified: att.lastModified,
-                url: '',
-                error: 'Không thể tải lên (Firebase Storage Error)'
-              };
+              throw new Error(`Không thể tải lên tệp: ${att.name}. Vui lòng thử lại.`);
             }
           }
           // Fallback if no file object (should not happen for newly added)

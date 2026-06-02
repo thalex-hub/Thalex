@@ -871,13 +871,15 @@ export default function AdvanceRequests() {
                       {showDetailModal.attachments.map((file: any, idx: number) => {
                         const hasUrl = !!file.url;
                         return hasUrl ? (
-                          <a 
+                          <button 
                             key={idx}
-                            href={file.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors group/file cursor-pointer"
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              downloadFile(file.url, file.name || 'document');
+                            }}
+                            className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors group/file cursor-pointer text-left w-full"
                           >
                             <div className="flex items-center gap-2">
                               <FileStack size={16} className="text-blue-500" />
@@ -887,7 +889,7 @@ export default function AdvanceRequests() {
                               </div>
                             </div>
                             <Zap size={14} className="text-blue-400 opacity-0 group-hover/file:opacity-100 transition-opacity" />
-                          </a>
+                          </button>
                         ) : (
                           <div 
                             key={idx}

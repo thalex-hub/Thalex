@@ -438,8 +438,8 @@ export default function OrderDetail() {
     for (const file of files) {
       try {
         const storageRef = ref(storage, `requests/${type}/${Date.now()}_${file.name}`);
-        const snapshot = await withTimeout(uploadBytes(storageRef, file));
-        const url = await withTimeout(getDownloadURL(snapshot.ref));
+        const snapshot = await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(snapshot.ref);
         
         newAttachments.push({
           name: file.name,

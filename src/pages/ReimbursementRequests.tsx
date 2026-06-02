@@ -163,8 +163,8 @@ export default function ReimbursementRequests() {
         selectedFiles.map(async (f) => {
           try {
             const fileRef = ref(storage, `reimbursements/${Date.now()}_${f.name}`);
-            await withTimeout(uploadBytes(fileRef, f), 8000);
-            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 8000);
+            await uploadBytes(fileRef, f);
+            const downloadUrl = await getDownloadURL(fileRef);
             return {
               name: f.name,
               type: f.type,
@@ -173,13 +173,7 @@ export default function ReimbursementRequests() {
             };
           } catch (uploadErr) {
             console.error("Lỗi tải tệp lên Storage:", uploadErr);
-            return {
-              name: f.name,
-              type: f.type,
-              size: f.size,
-              url: '',
-              error: 'Không thể tải lên (Firebase Storage Error)'
-            };
+            throw new Error(`Không thể tải lên tệp: ${f.name}. Vui lòng thử lại.`);
           }
         })
       );
@@ -935,13 +929,15 @@ export default function ReimbursementRequests() {
                                const fileName = typeof file === 'string' ? file : file.name;
                                const fileUrl = typeof file === 'string' ? undefined : file.url;
                                return fileUrl ? (
-                             <a 
+                             <button 
                                key={idx} 
-                               href={fileUrl}
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               download={fileName}
-                               className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-blue-200 transition-colors group cursor-pointer"
+                               type="button"
+                               onClick={(e) => {
+                                 e.preventDefault();
+                                 e.stopPropagation();
+                                 downloadFile(fileUrl, fileName || 'document');
+                               }}
+                               className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-blue-200 transition-colors group cursor-pointer text-left w-full"
                              >
                                 <div className="flex items-center gap-3 overflow-hidden">
                                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
@@ -955,7 +951,7 @@ export default function ReimbursementRequests() {
                                    </div>
                                 </div>
                                 <span className="text-[10px] font-black text-blue-600 uppercase group-hover:underline">Tải về</span>
-                             </a>
+                             </button>
                                ) : (
                              <div 
                                key={idx} 

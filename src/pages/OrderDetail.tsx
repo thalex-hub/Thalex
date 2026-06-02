@@ -563,35 +563,79 @@ export default function OrderDetail() {
 
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [updatingInvoice, setUpdatingInvoice] = React.useState(false);
-  const [invoiceFile, setInvoiceFile] = React.useState<File | null>(null);
 
-  const handleToggleInvoice = async () => {
-    if (!id || !canConfirmInvoice || updatingInvoice) return;
+  // States for multiple invoices
+  const [showAddInvoiceModal, setShowAddInvoiceModal] = React.useState(false);
+  const [newInvoiceAmount, setNewInvoiceAmount] = React.useState<number>(0);
+  const [newInvoiceAmountStr, setNewInvoiceAmountStr] = React.useState('');
+  const [newInvoiceNo, setNewInvoiceNo] = React.useState('');
+  const [newInvoiceDate, setNewInvoiceDate] = React.useState(new Date().toISOString().split('T')[0]);
+  const [newInvoiceNotes, setNewInvoiceNotes] = React.useState('');
+  const [newInvoiceFile, setNewInvoiceFile] = React.useState<File | null>(null);
+
+  const handleInvoiceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setNewInvoiceFile(e.target.files[0]);
+    }
+  };
+
+  const handleAddInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountVal = parseCurrencyInput(newInvoiceAmountStr) || newInvoiceAmount;
+    if (!id || !canConfirmInvoice || updatingInvoice || amountVal <= 0) {
+      if (amountVal <= 0) {
+        alert("Vui lòng nhập số tiền hợp lệ lớn hơn 0");
+      }
+      return;
+    }
     setUpdatingInvoice(true);
     try {
-      const newValue = !order.isInvoiced;
-      let updateData: any = {
-        isInvoiced: newValue,
-        invoicedAt: newValue ? new Date().toISOString() : null,
-        updatedAt: new Date().toISOString()
-      };
-
-      if (newValue && invoiceFile) {
-        if (invoiceFile.size < 800000) {
+      let fileUrl = '';
+      if (newInvoiceFile) {
+        if (newInvoiceFile.size < 800000) {
           const reader = new FileReader();
           const base64Promise = new Promise<string>((resolve) => {
             reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(invoiceFile);
+            reader.readAsDataURL(newInvoiceFile);
           });
-          updateData.invoiceFileUrl = await base64Promise;
+          fileUrl = await base64Promise;
         } else {
-          updateData.invoiceFileUrl = `local-file://${invoiceFile.name}`;
+          fileUrl = `local-file://${newInvoiceFile.name}`;
         }
       }
 
+      const newInv = {
+        id: Math.random().toString(36).substring(2, 9),
+        amount: Number(amountVal),
+        invoiceNo: newInvoiceNo,
+        date: newInvoiceDate,
+        fileUrl: fileUrl,
+        fileName: newInvoiceFile ? newInvoiceFile.name : undefined,
+        notes: newInvoiceNotes,
+        createdAt: new Date().toISOString()
+      };
+
+      const existingInvoices = order?.invoices || [];
+      const updatedInvoices = [...existingInvoices, newInv];
+      
+      const updateData = {
+        invoices: updatedInvoices,
+        isInvoiced: true,
+        invoicedAt: newInvoiceDate ? new Date(newInvoiceDate).toISOString() : new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
       await updateDoc(doc(db, 'orders', id), updateData);
       setOrder({ ...order, ...updateData });
-      setInvoiceFile(null);
+      
+      // Reset form
+      setNewInvoiceAmount(0);
+      setNewInvoiceAmountStr('');
+      setNewInvoiceNo('');
+      setNewInvoiceDate(new Date().toISOString().split('T')[0]);
+      setNewInvoiceNotes('');
+      setNewInvoiceFile(null);
+      setShowAddInvoiceModal(false);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `orders/${id}`);
     } finally {
@@ -599,9 +643,28 @@ export default function OrderDetail() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setInvoiceFile(e.target.files[0]);
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    if (!id || !canConfirmInvoice || updatingInvoice) return;
+    if (!window.confirm('Bạn có chắc chắn muốn xóa hóa đơn này khỏi danh sách?')) return;
+    
+    setUpdatingInvoice(true);
+    try {
+      const existingInvoices = order?.invoices || [];
+      const updatedInvoices = existingInvoices.filter((inv: any) => inv.id !== invoiceId);
+      
+      const updateData = {
+        invoices: updatedInvoices,
+        isInvoiced: updatedInvoices.length > 0,
+        invoicedAt: updatedInvoices.length > 0 ? new Date(updatedInvoices[updatedInvoices.length - 1].date).toISOString() : null,
+        updatedAt: new Date().toISOString()
+      };
+
+      await updateDoc(doc(db, 'orders', id), updateData);
+      setOrder({ ...order, ...updateData });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `orders/${id}`);
+    } finally {
+      setUpdatingInvoice(false);
     }
   };
 
@@ -2494,57 +2557,123 @@ export default function OrderDetail() {
               </div>
 
               {/* Invoice Section Integrated in Operations Panel */}
-              <div className="pt-6 border-t border-white/10">
-                 <div className="flex items-center justify-between mb-4">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Chứng từ hóa đơn</p>
-                    {order.isInvoiced && <span className="bg-emerald-500 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">Đã xuất</span>}
-                 </div>
-                 
-                 {!order.isInvoiced ? (
-                   <div className="space-y-3">
-                      <div className="relative bg-white/5 border border-white/10 border-dashed rounded-xl p-3 text-center group cursor-pointer overflow-hidden">
-                         <input type="file" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                         {invoiceFile ? (
-                           <p className="text-[10px] font-bold text-blue-400 truncate tracking-tight">{invoiceFile.name}</p>
-                         ) : (
-                           <div className="flex flex-col items-center gap-1 opacity-60">
-                             <Upload size={14} className="group-hover:translate-y-[-2px] transition-transform" />
-                             <p className="text-[9px] font-black uppercase tracking-widest">Tải tệp chứng từ</p>
-                           </div>
-                         )}
-                      </div>
-                      <button 
-                        onClick={handleToggleInvoice}
-                        disabled={updatingInvoice || !canConfirmInvoice}
-                        className="w-full py-3 bg-white text-gray-900 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-400 hover:text-white transition-all disabled:opacity-50"
-                      >
-                         Xác nhận xuất hóa đơn
-                      </button>
-                   </div>
-                 ) : (
-                   <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10">
-                      <div className="flex items-center gap-3">
-                        <FileCheck className="text-emerald-400" size={16} />
+              {(() => {
+                const orderBeforeVat = order?.basePrice || Math.round(Number(order?.contractValueWithVAT || order?.totalValue) / 1.1) || 0;
+                const totalInvoicedAmount = (order?.invoices || []).reduce((sum: number, inv: any) => sum + (Number(inv.amount) || 0), 0);
+                const remainingInvoicedAmount = Math.max(0, orderBeforeVat - totalInvoicedAmount);
+
+                return (
+                  <div className="pt-6 border-t border-white/10 space-y-4">
+                     <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-[10px] font-black tracking-widest">HOÀN TẤT XUẤT</p>
-                          <p className="text-[9px] text-gray-400 font-bold">{safeFormatDate(order.invoicedAt, 'dd/MM/yyyy')}</p>
+                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Hóa đơn giá trị gia tăng (VAT)</p>
+                           <p className="text-[9px] text-gray-500 font-bold">
+                              Doanh thu VAT trước thuế: {formatCurrency(orderBeforeVat)}
+                           </p>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {order.invoiceFileUrl && (
-                          <a href={order.invoiceFileUrl} target="_blank" rel="noreferrer" className="p-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-all">
-                            <Download size={12} />
-                          </a>
+                        {totalInvoicedAmount >= orderBeforeVat && orderBeforeVat > 0 ? (
+                           <span className="bg-emerald-500 text-[8px] font-black uppercase px-2 py-0.5 rounded-full text-white">Đã xuất hết</span>
+                        ) : totalInvoicedAmount > 0 ? (
+                           <span className="bg-amber-500 text-[8px] font-black uppercase px-2 py-0.5 rounded-full text-white">Đã xuất {Math.round((totalInvoicedAmount / orderBeforeVat) * 100)}%</span>
+                        ) : (
+                           <span className="bg-gray-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full text-gray-300">Chưa xuất</span>
                         )}
-                        {canConfirmInvoice && (
-                          <button onClick={handleToggleInvoice} className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-all" title="Hủy xác nhận">
-                            <Trash2 size={12} />
-                          </button>
-                        )}
-                      </div>
-                   </div>
-                 )}
-              </div>
+                     </div>
+
+                     {/* Summary progress bar */}
+                     <div className="space-y-1">
+                        <div className="flex justify-between text-[9px] text-gray-400 font-bold">
+                           <span>Đã xuất: {formatCurrency(totalInvoicedAmount)}</span>
+                           <span>Còn lại: {formatCurrency(remainingInvoicedAmount)}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                           <div 
+                             className="h-full bg-blue-500 transition-all duration-300" 
+                             style={{ width: `${Math.min(100, orderBeforeVat > 0 ? (totalInvoicedAmount / orderBeforeVat) * 100 : 0)}%` }}
+                           />
+                        </div>
+                     </div>
+
+                     {/* Invoice list */}
+                     {order?.invoices && order.invoices.length > 0 ? (
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                           {order.invoices.map((inv: any) => {
+                             let formattedDate = '';
+                             try {
+                               formattedDate = inv.date ? format(new Date(inv.date), 'dd/MM/yyyy') : (inv.createdAt ? format(new Date(inv.createdAt), 'dd/MM/yyyy') : '');
+                             } catch(e) {
+                               formattedDate = inv.date || '';
+                             }
+                             return (
+                               <div key={inv.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                                  <div className="text-left space-y-1">
+                                     <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black text-gray-200 tracking-wider">
+                                           {inv.invoiceNo || 'Số HD chưa rõ'}
+                                        </span>
+                                        <span className="text-[9px] text-gray-400 font-medium">
+                                           {formattedDate}
+                                        </span>
+                                     </div>
+                                     <div className="flex items-center gap-2">
+                                        <p className="text-[10px] text-emerald-400 font-extrabold">
+                                           +{formatCurrency(inv.amount || 0)}
+                                        </p>
+                                        {inv.notes && (
+                                           <span className="text-[9px] text-gray-400 truncate max-w-[120px]" title={inv.notes}>
+                                              ({inv.notes})
+                                           </span>
+                                        )}
+                                     </div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                     {inv.fileUrl && (
+                                        <a 
+                                          href={inv.fileUrl} 
+                                          target="_blank" 
+                                          rel="noreferrer" 
+                                          className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white transition-all"
+                                          title="Tải chứng từ"
+                                        >
+                                           <Download size={10} />
+                                        </a>
+                                      )}
+                                     {canConfirmInvoice && (
+                                        <button 
+                                          onClick={() => handleDeleteInvoice(inv.id)}
+                                          className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg transition-all" 
+                                          title="Xóa hóa đơn"
+                                        >
+                                           <Trash2 size={10} />
+                                        </button>
+                                     )}
+                                  </div>
+                               </div>
+                             );
+                           })}
+                        </div>
+                     ) : (
+                        <div className="py-4 bg-white/5 rounded-xl border border-white/5 border-dashed text-center">
+                           <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Chưa ghi nhận hóa đơn nào</p>
+                        </div>
+                     )}
+
+                     {/* Add action */}
+                     {canConfirmInvoice && (
+                        <button 
+                          onClick={() => {
+                             setNewInvoiceAmount(remainingInvoicedAmount);
+                             setNewInvoiceAmountStr(formatCurrencyInput(remainingInvoicedAmount));
+                             setShowAddInvoiceModal(true);
+                          }}
+                          className="w-full py-2.5 bg-white text-gray-900 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-400 hover:text-white transition-all animate-pulse"
+                        >
+                           Khai báo xuất hóa đơn mới
+                        </button>
+                     )}
+                  </div>
+                );
+              })()}
            </div>
 
            {/* Followers Minimal List */}
@@ -2712,6 +2841,95 @@ export default function OrderDetail() {
                      <button type="button" onClick={() => setShowQuickAdvanceModal(false)} className="flex-1 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-50 text-sm">Hủy</button>
                      <button type="submit" disabled={submittingPayment} className="flex-1 bg-emerald-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all text-sm uppercase tracking-wider">
                        {submittingPayment ? 'Đang gửi...' : 'Gửi đề xuất'}
+                     </button>
+                  </div>
+               </form>
+            </motion.div>
+          </div>
+        )}
+
+        {showAddInvoiceModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAddInvoiceModal(false)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+               <form onSubmit={handleAddInvoice} className="p-8 overflow-y-auto">
+                  <h3 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
+                    <FileText className="text-blue-500" size={24} />
+                    Khai báo xuất hóa đơn mới
+                  </h3>
+                  <div className="space-y-4">
+                     <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Số hóa đơn <span className="text-red-500">*</span></label>
+                        <input 
+                          type="text" 
+                          required 
+                          placeholder="Ví dụ: HD-001245" 
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-bold text-sm text-gray-800 focus:border-blue-300 focus:bg-white" 
+                          value={newInvoiceNo} 
+                          onChange={e => setNewInvoiceNo(e.target.value)} 
+                        />
+                     </div>
+                     <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Số tiền hóa đơn (VND) <span className="text-red-500">*</span></label>
+                        <input 
+                          type="text"
+                          inputMode="decimal"
+                          required 
+                          placeholder="Nhập số tiền xuất hóa đơn" 
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-black text-blue-600 focus:border-blue-300 focus:bg-white" 
+                          value={newInvoiceAmountStr} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setNewInvoiceAmountStr(val);
+                            setNewInvoiceAmount(parseCurrencyInput(val));
+                          }} 
+                        />
+                        <p className="text-[10px] text-gray-405 mt-1">
+                           Số tiền hiển thị: {formatCurrency(newInvoiceAmount)}
+                        </p>
+                     </div>
+                     <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ngày xuất hóa đơn <span className="text-red-500">*</span></label>
+                        <input 
+                          type="date" 
+                          required 
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-bold text-sm text-gray-800 focus:border-blue-300 focus:bg-white" 
+                          value={newInvoiceDate} 
+                          onChange={e => setNewInvoiceDate(e.target.value)} 
+                        />
+                     </div>
+                     <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ghi chú</label>
+                        <textarea 
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none min-h-[80px] text-sm text-gray-800 focus:border-blue-300 focus:bg-white" 
+                          placeholder="Ví dụ: Xuất hóa đơn đợt 1 nghiệm thu"
+                          value={newInvoiceNotes} 
+                          onChange={e => setNewInvoiceNotes(e.target.value)} 
+                        />
+                     </div>
+                     <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Chứng từ đi kèm (Dưới 800KB)</label>
+                        <div className="relative bg-gray-50 border border-gray-200 border-dashed rounded-xl p-4 text-center group cursor-pointer overflow-hidden hover:border-blue-500 transition-all">
+                           <input type="file" onChange={handleInvoiceFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                           {newInvoiceFile ? (
+                             <p className="text-xs font-bold text-blue-600 truncate">{newInvoiceFile.name}</p>
+                           ) : (
+                             <div className="flex flex-col items-center gap-1 text-gray-400 group-hover:text-blue-500 transition-colors">
+                               <Upload size={18} />
+                               <p className="text-[10px] font-black uppercase tracking-widest">Tải lên tệp chứng từ</p>
+                             </div>
+                           )}
+                        </div>
+                     </div>
+                  </div>
+                  <div className="mt-8 flex gap-3">
+                     <button type="button" onClick={() => setShowAddInvoiceModal(false)} className="flex-1 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-50 text-sm">Hủy</button>
+                     <button 
+                       type="submit" 
+                       disabled={updatingInvoice} 
+                       className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all text-sm uppercase tracking-wider disabled:opacity-50"
+                     >
+                       {updatingInvoice ? 'Đang lưu...' : 'Ghi nhận'}
                      </button>
                   </div>
                </form>
@@ -3632,6 +3850,112 @@ export default function OrderDetail() {
                     </div>
                   )}
                </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showAddInvoiceModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAddInvoiceModal(false)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] text-gray-900">
+               <form onSubmit={handleAddInvoice} className="p-8 overflow-y-auto">
+                  <h3 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
+                     <FileCheck className="text-blue-500" size={24} />
+                     Xuất hóa đơn mới
+                  </h3>
+                  <div className="space-y-4 text-left">
+                     <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Số tiền (Không VAT) <span className="text-red-500">*</span></label>
+                        <input 
+                           type="text"
+                           inputMode="decimal"
+                           required 
+                           className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-600/20 font-black text-blue-600" 
+                           value={newInvoiceAmountStr}
+                           placeholder="Nhập số tiền..."
+                           onChange={e => {
+                             const rawValue = e.target.value;
+                             const numericValue = parseCurrencyInput(rawValue);
+                             setNewInvoiceAmount(numericValue);
+                             setNewInvoiceAmountStr(formatCurrencyInput(numericValue));
+                           }} 
+                        />
+                        {newInvoiceAmount > 0 && (
+                          <p className="mt-1 text-xs font-bold text-gray-400 italic text-right">
+                            = {formatCurrency(newInvoiceAmount)}
+                          </p>
+                        )}
+                     </div>
+                     <div className="grid grid-cols-2 gap-3">
+                        <div>
+                           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Số Hóa Đơn</label>
+                           <input 
+                              type="text"
+                              placeholder="VD: HD-001" 
+                              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-bold text-sm" 
+                              value={newInvoiceNo} 
+                              onChange={e => setNewInvoiceNo(e.target.value)} 
+                           />
+                        </div>
+                        <div>
+                           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ngày xuất <span className="text-red-500">*</span></label>
+                           <input 
+                              type="date" 
+                              required
+                              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-bold text-sm" 
+                              value={newInvoiceDate} 
+                              onChange={e => setNewInvoiceDate(e.target.value)} 
+                           />
+                        </div>
+                     </div>
+                     <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ghi chú / Nội dung đợt xuất</label>
+                        <textarea 
+                           className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none min-h-[85px] text-sm" 
+                           placeholder="Ví dụ: Nghiệm thu đợt kết thúc 1, đợt thanh toán 2..."
+                           value={newInvoiceNotes} 
+                           onChange={e => setNewInvoiceNotes(e.target.value)} 
+                        />
+                     </div>
+                     <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Chứng từ đính kèm (Ảnh / PDF)</label>
+                        <div className="space-y-3">
+                           {newInvoiceFile && (
+                              <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg text-[10px] font-bold text-blue-700 border border-blue-100">
+                                 <FileText size={12} />
+                                 <span className="truncate max-w-[180px]">{newInvoiceFile.name}</span>
+                                 <button type="button" onClick={() => setNewInvoiceFile(null)} className="p-1 hover:bg-blue-100 rounded-full ml-auto">
+                                    <XCircle size={12} className="text-blue-400" />
+                                 </button>
+                              </div>
+                           )}
+                           <button 
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById('modal-invoice-file-input');
+                                if (input) (input as HTMLInputElement).click();
+                              }}
+                              className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:border-blue-500 hover:text-blue-500 transition-all font-bold text-xs"
+                           >
+                              <Upload size={16} />
+                              {newInvoiceFile ? 'Thay đổi chứng từ' : 'Thêm tệp chứng từ'}
+                           </button>
+                           <input 
+                              type="file"
+                              id="modal-invoice-file-input"
+                              className="hidden"
+                              onChange={handleInvoiceFileChange}
+                           />
+                        </div>
+                     </div>
+                  </div>
+                  <div className="mt-8 flex gap-3 sticky bottom-0 bg-white pt-2">
+                     <button type="button" onClick={() => setShowAddInvoiceModal(false)} className="flex-1 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-50 text-sm">Hủy</button>
+                     <button type="submit" disabled={updatingInvoice || newInvoiceAmount <= 0} className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all text-sm uppercase tracking-wider">
+                       {updatingInvoice ? 'Đang tạo...' : 'Xác nhận tạo'}
+                     </button>
+                  </div>
+               </form>
             </motion.div>
           </div>
         )}

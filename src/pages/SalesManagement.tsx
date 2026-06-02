@@ -177,7 +177,11 @@ export default function SalesManagement() {
     });
 
     filteredOrders.forEach(o => {
-      if (o.isInvoiced) invoiced += (o.basePrice || Math.round(Number(o.contractValueWithVAT || o.totalValue) / 1.1) || 0);
+      if (o.invoices && o.invoices.length > 0) {
+        invoiced += o.invoices.reduce((sum: number, inv: any) => sum + (Number(inv.amount) || 0), 0);
+      } else if (o.isInvoiced) {
+        invoiced += (o.basePrice || Math.round(Number(o.contractValueWithVAT || o.totalValue) / 1.1) || 0);
+      }
     });
     
     return { revenue, invoicedRevenue: invoiced, profit, netProfit, costs, count: filteredOrders.length };

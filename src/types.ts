@@ -148,6 +148,17 @@ export interface OrderProposal {
   createdAt: string;
 }
 
+export interface OrderInvoice {
+  id: string;
+  amount: number;
+  invoiceNo?: string;
+  date: string;
+  fileUrl?: string;
+  fileName?: string;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface Order {
   id: string;
   proposalId?: string;
@@ -166,6 +177,7 @@ export interface Order {
   invoiceFileUrl?: string;
   responsibleUserId: string;
   createdAt?: string;
+  invoices?: OrderInvoice[];
 }
 
 export interface UserActivityLog {

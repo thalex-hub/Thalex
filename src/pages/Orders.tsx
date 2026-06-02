@@ -257,7 +257,13 @@ export default function Orders() {
         totalNetProfit += netProfit;
         activeCount++;
 
-        if (o.isInvoiced) {
+        if (o.invoices && o.invoices.length > 0) {
+          const invSum = o.invoices.reduce((sum: number, inv: any) => sum + (Number(inv.amount) || 0), 0);
+          invoicedRevenue += invSum;
+          if (invSum >= basePrice) {
+            invoicedCount++;
+          }
+        } else if (o.isInvoiced) {
           invoicedCount++;
           invoicedRevenue += basePrice;
         }

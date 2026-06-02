@@ -257,19 +257,27 @@ export function calculateSingleMonthSalary(
   const userKpi = targetUser?.kpiRevenue?.['default'] || targetUser?.kpiRevenue || 0;
   const isDirectorOrAdmin = targetUser?.roleId === 'Director' || targetUser?.roleId === 'SuperAdmin';
 
-  const relevantOrders = orders.filter(o => {
-    if (!o.isInvoiced || !o.invoicedAt) return false;
-    const invDate = new Date(o.invoicedAt);
-    if (invDate.getMonth() !== currentMonth.getMonth() || invDate.getFullYear() !== currentMonth.getFullYear()) return false;
-    
-    if (isDirectorOrAdmin) return true;
-    return o.responsibleUserId === targetUser.uid;
-  });
+  let monthlyRevenue = 0;
 
-  const monthlyRevenue = relevantOrders.reduce((sum, o) => {
-    const val = o.basePrice || Math.round(Number(o.contractValueWithVAT || o.totalValue) / 1.1) || 0;
-    return sum + Number(val);
-  }, 0);
+  orders.forEach(o => {
+    const isOwner = isDirectorOrAdmin || (o.responsibleUserId === targetUser?.uid);
+    if (!isOwner) return;
+
+    if (o.invoices && o.invoices.length > 0) {
+      o.invoices.forEach((inv: any) => {
+        const invDate = inv.date ? new Date(inv.date) : (inv.createdAt ? new Date(inv.createdAt) : null);
+        if (invDate && invDate.getMonth() === currentMonth.getMonth() && invDate.getFullYear() === currentMonth.getFullYear()) {
+          monthlyRevenue += Number(inv.amount) || 0;
+        }
+      });
+    } else if (o.isInvoiced && o.invoicedAt) {
+      const invDate = new Date(o.invoicedAt);
+      if (invDate.getMonth() === currentMonth.getMonth() && invDate.getFullYear() === currentMonth.getFullYear()) {
+        const val = o.basePrice || Math.round(Number(o.contractValueWithVAT || o.totalValue) / 1.1) || 0;
+        monthlyRevenue += Number(val);
+      }
+    }
+  });
   
   const userDept = departments.find(d => d.id === targetUser?.departmentId);
   const deptName = userDept?.name?.toLowerCase() || '';

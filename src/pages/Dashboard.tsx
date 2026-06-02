@@ -245,7 +245,13 @@ export default function Dashboard() {
     const unsubTasks = onSnapshot(tasksQ, (snap) => {
       const allTasks = snap.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter((t: any) => !t.isParent && t.type !== 'parent' && !t.name?.startsWith('Triển khai –') && !t.name?.startsWith('Triển khai -'));
+        .filter((t: any) => 
+          !t.isParent && 
+          t.type !== 'parent' && 
+          !t.name?.startsWith('Triển khai –') && 
+          !t.name?.startsWith('Triển khai -') && 
+          !t.name?.toLowerCase()?.includes('triển khai đơn hàng')
+        );
       setTasks(allTasks);
 
       // Recent unfinished tasks
@@ -385,7 +391,9 @@ export default function Dashboard() {
         : (profit - ((basePrice - costPrice) > 0 ? 0.2 * (basePrice - costPrice) : 0));
 
       totalInvoicedRevenue += basePrice;
-      if (o.isInvoiced) {
+      if (o.invoices && o.invoices.length > 0) {
+        totalActuallyInvoiced += o.invoices.reduce((sum: number, inv: any) => sum + (Number(inv.amount) || 0), 0);
+      } else if (o.isInvoiced) {
         totalActuallyInvoiced += basePrice;
       }
       totalCostPrice += costPrice;
@@ -511,13 +519,28 @@ export default function Dashboard() {
     }));
 
     activeOrdersForYear.forEach(o => {
-      const date = toDate(o.createdAt || o.startDate);
-      if (!date) return;
-      const m = date.getMonth();
-      const basePrice = Number(o.basePrice) || Math.round(Number(o.contractValueWithVAT || o.totalValue) / 1.1) || 0;
-      dataset[m]['Trước VAT'] += basePrice;
-      if (o.isInvoiced) {
-        dataset[m]['Đã xuất hóa đơn'] += basePrice;
+      const orderDate = toDate(o.createdAt || o.startDate);
+      if (orderDate) {
+        const m = orderDate.getMonth();
+        const basePrice = Number(o.basePrice) || Math.round(Number(o.contractValueWithVAT || o.totalValue) / 1.1) || 0;
+        dataset[m]['Trước VAT'] += basePrice;
+      }
+
+      if (o.invoices && o.invoices.length > 0) {
+        o.invoices.forEach((inv: any) => {
+          const invDate = toDate(inv.date || inv.createdAt);
+          if (invDate && invDate.getFullYear() === selectedYear) {
+            const m = invDate.getMonth();
+            dataset[m]['Đã xuất hóa đơn'] += Number(inv.amount) || 0;
+          }
+        });
+      } else if (o.isInvoiced) {
+        const invDate = toDate(o.invoicedAt || o.createdAt || o.startDate);
+        if (invDate && invDate.getFullYear() === selectedYear) {
+          const m = invDate.getMonth();
+          const basePrice = Number(o.basePrice) || Math.round(Number(o.contractValueWithVAT || o.totalValue) / 1.1) || 0;
+          dataset[m]['Đã xuất hóa đơn'] += basePrice;
+        }
       }
     });
 

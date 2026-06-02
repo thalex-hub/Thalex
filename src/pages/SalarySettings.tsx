@@ -222,7 +222,25 @@ export default function SalarySettings() {
       'COMPANY_TOTAL': {}
     };
     orders.forEach(o => {
-      if (o.isInvoiced && o.invoicedAt) {
+      if (o.invoices && o.invoices.length > 0) {
+        o.invoices.forEach((inv: any) => {
+          const invDate = inv.date ? new Date(inv.date) : (inv.createdAt ? new Date(inv.createdAt) : null);
+          if (invDate && invDate.getFullYear() === selectedYear) {
+            const month = invDate.getMonth() + 1;
+            const monthKey = `${selectedYear}-${String(month).padStart(2, '0')}`;
+            const invAmount = Number(inv.amount) || 0;
+
+            // Company Total
+            map['COMPANY_TOTAL'][monthKey] = (map['COMPANY_TOTAL'][monthKey] || 0) + invAmount;
+
+            // Personal Revenue
+            if (o.responsibleUserId) {
+              if (!map[o.responsibleUserId]) map[o.responsibleUserId] = {};
+              map[o.responsibleUserId][monthKey] = (map[o.responsibleUserId][monthKey] || 0) + invAmount;
+            }
+          }
+        });
+      } else if (o.isInvoiced && o.invoicedAt) {
         const date = new Date(o.invoicedAt);
         if (date.getFullYear() === selectedYear) {
           const month = date.getMonth() + 1;

@@ -325,7 +325,7 @@ export default function OrderProposals() {
     if (!user) return;
     
     if (!editingProposal && (!contractFile || !businessPlanFile)) {
-      alert('Vui lòng tải lên Hợp đồng dự kiến và Phương án kinh doanh');
+      alert('Vui lòng tải lên Hợp đồng dự kiến và PAKD');
       return;
     }
 
@@ -1122,7 +1122,7 @@ export default function OrderProposals() {
                                 <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                    <TrendingUp size={16} />
                                 </div>
-                                <span className="text-[10px] font-bold text-gray-600 uppercase">PA kinh doanh</span>
+                                <span className="text-[10px] font-bold text-gray-600 uppercase">PAKD</span>
                              </a>
                            )}
                         </div>
@@ -1702,17 +1702,17 @@ export default function OrderProposals() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed rounded-2xl cursor-pointer hover:bg-white transition-colors">
-                             <input type="file" className="hidden" onChange={e => setContractFile(e.target.files?.[0] || null)} />
+                             <input type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.xlsm,.csv,.txt,image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e => setContractFile(e.target.files?.[0] || null)} />
                              <Paperclip size={20} className="mb-1 text-gray-400" />
                              <span className="text-[10px] font-bold text-gray-500">
                                 {contractFile ? contractFile.name : (editingProposal ? 'Thay đổi HĐ Dự kiến' : 'HĐ Dự kiến')}
                               </span>
                           </label>
                           <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed rounded-2xl cursor-pointer hover:bg-white transition-colors">
-                             <input type="file" className="hidden" onChange={e => setBusinessPlanFile(e.target.files?.[0] || null)} />
+                             <input type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.xlsm,.csv,.txt,image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e => setBusinessPlanFile(e.target.files?.[0] || null)} />
                              <Paperclip size={20} className="mb-1 text-gray-400" />
                              <span className="text-[10px] font-bold text-gray-500">
-                                {businessPlanFile ? businessPlanFile.name : (editingProposal ? 'Thay đổi chi phí' : 'Chi phí đơn hàng')}
+                                {businessPlanFile ? businessPlanFile.name : (editingProposal ? 'Thay đổi PAKD' : 'PAKD')}
                               </span>
                           </label>
                         </div>

@@ -140,31 +140,44 @@ export function getApiUrl(path: string): string {
   return cleanPath;
 }
 
-export function downloadFile(url: string | undefined, fileName: string) {
+export async function downloadFile(url: string | undefined, fileName: string) {
   if (!url) {
     alert('Không tìm thấy liên kết tải về cho tệp này. Tệp có thể chưa được tải lên máy chủ.');
     return;
   }
   
   try {
-    // Attempt download using backend proxy with base64 encoded URL to prevent decoding issues
-    const proxyUrl = getAppletUrl(`/api/download?url=${encodeURIComponent(btoa(url))}&filename=${encodeURIComponent(fileName || 'download')}`);
+    // Attempt download using backend proxy
+    const proxyUrl = getAppletUrl(`/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName || 'download')}`);
     
-    // Create an invisible iframe to download to prevent opening a new blank tab
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = proxyUrl;
-    document.body.appendChild(iframe);
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+       throw new Error(`Server returned ${response.status}`);
+    }
     
-    // Clean up iframe after download starts
+    // Check if what we got was actually a JSON error message instead of the file
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+        throw new Error('Received error response from proxy');
+    }
+
+    const blob = await response.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.style.display = 'none';
+    link.href = objectUrl;
+    link.download = fileName || 'download';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
     setTimeout(() => {
-      if (document.body.contains(iframe)) {
-        document.body.removeChild(iframe);
-      }
-    }, 5000);
+        window.URL.revokeObjectURL(objectUrl);
+    }, 10000);
     
   } catch (error) {
     console.error('Download failed, falling back to direct link:', error);
+    alert('Tải xuống qua proxy thất bại, đang mở liên kết trực tiếp. (Nếu lỗi, tệp có thể bị xóa hoặc do quyền truy cập)');
     try {
       const link = document.createElement('a');
       link.href = url;

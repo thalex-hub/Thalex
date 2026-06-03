@@ -553,7 +553,12 @@ app.get("/api/download", async (req, res) => {
       return res.status(400).json({ error: "Missing url parameter" });
     }
 
-    const fileUrl = Buffer.from(rawUrl, 'base64').toString('utf-8');
+    // Try to decode as base64 first just in case there are old requests pending,
+    // otherwise use the URL directly
+    let fileUrl = rawUrl;
+    if (!rawUrl.startsWith('http')) {
+        try { fileUrl = Buffer.from(rawUrl, 'base64').toString('utf-8'); } catch(e) {}
+    }
 
     const response = await fetch(fileUrl);
     if (!response.ok) {

@@ -163,6 +163,16 @@ export default function NotificationManager() {
             }
           }
           return item;
+        }).filter((item: any) => {
+           // Purge old zombie approval/returned notifications that don't have docId
+           if ((item.type === 'approval' || item.type === 'returned') && !item.docId) {
+             return false;
+           }
+           // Purge after 4 days to keep memory clean
+           if (new Date().getTime() - new Date(item.time).getTime() > 4 * 24 * 60 * 60 * 1000) {
+             return false;
+           }
+           return true;
         });
         loadedNotifications = loaded;
       } catch (e) {

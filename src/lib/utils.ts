@@ -148,7 +148,7 @@ export async function downloadFile(url: string | undefined, fileName: string) {
   
   try {
     // Attempt download using backend proxy
-    const proxyUrl = getAppletUrl(`/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName || 'download')}`);
+    const proxyUrl = getApiUrl(`/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName || 'download')}`);
     
     const response = await fetch(proxyUrl);
     if (!response.ok) {

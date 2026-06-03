@@ -6,7 +6,7 @@ import { Wallet, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, Fil
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { Link, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../lib/utils';
+import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/authContext';
 import { exportToExcel } from '../lib/excel';

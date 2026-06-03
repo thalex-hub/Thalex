@@ -18,7 +18,7 @@ import {
 import { useAuth } from '../lib/authContext';
 import { auth, db, storage } from '../lib/firebase';
 import { updatePassword, updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { doc, updateDoc, writeBatch, collection, getDocs, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, collection, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, withTimeout } from '../lib/utils';
@@ -42,41 +42,180 @@ export default function Settings() {
   const [resetSuccess, setResetSuccess] = React.useState(false);
   const [resetError, setResetError] = React.useState('');
 
+  // Raw Database Diagnostics & Recovery
+  const [rawPayments, setRawPayments] = React.useState<any[]>([]);
+  const [rawExpenses, setRawExpenses] = React.useState<any[]>([]);
+  const [rawPayReqs, setRawPayReqs] = React.useState<any[]>([]);
+  const [rawAdvReqs, setRawAdvReqs] = React.useState<any[]>([]);
+  const [rawReimbReqs, setRawReimbReqs] = React.useState<any[]>([]);
+  const [loadingRaw, setLoadingRaw] = React.useState(false);
+  const [rawTab, setRawTab] = React.useState<'payments' | 'expenses' | 'payment_requests' | 'advance_requests' | 'reimbursement_requests'>('payments');
+
+  const fetchRawData = async () => {
+    if (!isSuperAdmin) return;
+    setLoadingRaw(true);
+    try {
+      const pSnap = await getDocs(collection(db, 'payments'));
+      setRawPayments(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      const eSnap = await getDocs(collection(db, 'business_expenses'));
+      setRawExpenses(eSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      const prSnap = await getDocs(collection(db, 'payment_requests'));
+      setRawPayReqs(prSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      const arSnap = await getDocs(collection(db, 'advance_requests'));
+      setRawAdvReqs(arSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      const rrSnap = await getDocs(collection(db, 'reimbursement_requests'));
+      setRawReimbReqs(rrSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e: any) {
+      console.error("Error loading raw troubleshooting data:", e);
+    } finally {
+      setLoadingRaw(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeTab === 'reset' && isSuperAdmin) {
+      fetchRawData();
+    }
+  }, [activeTab, isSuperAdmin]);
+
+  const handleDeleteRawDoc = async (colName: string, id: string) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN tài liệu này (${colName}/${id}) khỏi cơ sở dữ liệu?`)) return;
+    try {
+      await deleteDoc(doc(db, colName, id));
+      window.alert("Đã xóa vĩnh viễn tài liệu thành công!");
+      fetchRawData();
+    } catch (e: any) {
+      window.alert("Lỗi khi xóa tài liệu: " + e.message);
+    }
+  };
+
   const handleCleanupOrphans = async () => {
-    if (!window.confirm('Hệ thống sẽ quét và làm sạch (xóa) tất cả các đầu việc, thu/chi, yêu cầu thanh toán... mồ côi (không thuộc về đơn hàng nào hiện có). Bạn có chắc chắn?')) return;
+    if (!window.confirm('Hệ thống sẽ quét và nhận diện tự động tất cả các bản ghi mồ côi (yêu cầu thanh toán, tạm ứng, hoàn ứng, phiếu chi/thu có liên kết đến đơn hàng hoặc yêu cầu đã bị xóa). Bạn có chắc chắn muốn dọn dẹp?')) return;
     
     setResetting(true);
-    setResetMessage('Đang lấy danh sách Orders hợp lệ...');
+    setResetMessage('Đang phân tích cấu trúc dữ liệu...');
     setResetError('');
     try {
+      // Fetch all core document IDs
       const ordersSnap = await getDocs(collection(db, 'orders'));
-      const validIds = new Set(ordersSnap.docs.map(d => d.id));
-      
-      const collectionsToCheck = [
-        { name: 'tasks', field: 'orderId' },
-        { name: 'task_reports', field: 'orderId' },
-        { name: 'payments', field: 'orderId' },
-        { name: 'advance_requests', field: 'relatedOrderId' },
-        { name: 'payment_requests', field: 'relatedOrderId' },
-        { name: 'reimbursement_requests', field: 'relatedOrderId' },
-        { name: 'stock_transactions', field: 'orderId' },
-        { name: 'user_activity_logs', field: 'entityId' }
-      ];
+      const validOrderIds = new Set(ordersSnap.docs.map(d => d.id));
+
+      const advancesSnap = await getDocs(collection(db, 'advance_requests'));
+      const validAdvanceIds = new Set(advancesSnap.docs.map(d => d.id));
+
+      const payReqsSnap = await getDocs(collection(db, 'payment_requests'));
+      const validPayReqIds = new Set(payReqsSnap.docs.map(d => d.id));
+
+      const reimbursementsSnap = await getDocs(collection(db, 'reimbursement_requests'));
+      const validReimbIds = new Set(reimbursementsSnap.docs.map(d => d.id));
 
       let deletedSum = 0;
-      for (const col of collectionsToCheck) {
-        setResetMessage(`Đang quét dọn: ${col.name}...`);
-        const snap = await getDocs(collection(db, col.name));
+
+      // 1. Clean tasks linked to deleted orders
+      setResetMessage('Đang quét dọn: tasks mồ côi...');
+      const tasksSnap = await getDocs(collection(db, 'tasks'));
+      for (const d of tasksSnap.docs) {
+        const orderId = d.data().orderId;
+        if (orderId && !validOrderIds.has(orderId)) {
+          await deleteDoc(doc(db, 'tasks', d.id));
+          deletedSum++;
+        }
+      }
+
+      // 2. Clean task reports linked to deleted orders
+      setResetMessage('Đang quét dọn: task_reports mồ côi...');
+      const reportsSnap = await getDocs(collection(db, 'task_reports'));
+      for (const d of reportsSnap.docs) {
+        const orderId = d.data().orderId;
+        if (orderId && !validOrderIds.has(orderId)) {
+          await deleteDoc(doc(db, 'task_reports', d.id));
+          deletedSum++;
+        }
+      }
+
+      // 3. Clean stock transactions linked to deleted orders
+      setResetMessage('Đang quét dọn: stock_transactions mồ côi...');
+      const stockSnap = await getDocs(collection(db, 'stock_transactions'));
+      for (const d of stockSnap.docs) {
+        const orderId = d.data().orderId;
+        if (orderId && !validOrderIds.has(orderId)) {
+          await deleteDoc(doc(db, 'stock_transactions', d.id));
+          deletedSum++;
+        }
+      }
+
+      // 4. Clean proposals linked to deleted orders
+      const proposalCollections = ['advance_requests', 'payment_requests', 'reimbursement_requests'];
+      for (const colName of proposalCollections) {
+        setResetMessage(`Đang quét dọn: ${colName} liên kết đơn hàng đã xóa...`);
+        const snap = await getDocs(collection(db, colName));
         for (const d of snap.docs) {
-          const fieldVal = d.data()[col.field];
-          if (fieldVal && !validIds.has(fieldVal)) {
-            await deleteDoc(doc(db, col.name, d.id));
+          const relatedOrderId = d.data().relatedOrderId;
+          if (relatedOrderId && !validOrderIds.has(relatedOrderId)) {
+            await deleteDoc(doc(db, colName, d.id));
             deletedSum++;
           }
         }
       }
+
+      // Re-fetch proposal IDs after cleaning
+      const currentAdvances = await getDocs(collection(db, 'advance_requests'));
+      const currentValidAdvanceIds = new Set(currentAdvances.docs.map(d => d.id));
+
+      const currentPayReqs = await getDocs(collection(db, 'payment_requests'));
+      const currentValidPayReqIds = new Set(currentPayReqs.docs.map(d => d.id));
+
+      const currentReimbs = await getDocs(collection(db, 'reimbursement_requests'));
+      const currentValidReimbIds = new Set(currentReimbs.docs.map(d => d.id));
+
+      // 5. Clean payments linked to deleted orders or requests, or general transactions when system is empty
+      setResetMessage('Đang quét dọn: payments mồ côi...');
+      const paymentsSnap = await getDocs(collection(db, 'payments'));
+      for (const d of paymentsSnap.docs) {
+        const data = d.data();
+        let isOrphan = false;
+
+        // Check order link
+        if (data.orderId && !validOrderIds.has(data.orderId)) {
+          isOrphan = true;
+        }
+        // Check related order link
+        if (data.relatedOrderId && !validOrderIds.has(data.relatedOrderId)) {
+          isOrphan = true;
+        }
+        // Check request link
+        if (data.requestId) {
+          const isRequestValid = currentValidAdvanceIds.has(data.requestId) ||
+                                currentValidPayReqIds.has(data.requestId) ||
+                                currentValidReimbIds.has(data.requestId);
+          if (!isRequestValid) {
+            isOrphan = true;
+          }
+        }
+
+        // If there are zero valid orders and zero valid proposals, but a general cost exists, it's a residual/stale transaction
+        if (!isOrphan && validOrderIds.size === 0 && (data.note?.includes('Chi tạm ứng') || data.note?.includes('Chi thanh toán') || data.note?.includes('quyết toán'))) {
+          const hasLinkedProposal = currentValidAdvanceIds.has(data.requestId || '') ||
+                                   currentValidPayReqIds.has(data.requestId || '') ||
+                                   currentValidReimbIds.has(data.requestId || '');
+          if (!hasLinkedProposal) {
+            isOrphan = true;
+          }
+        }
+
+        if (isOrphan) {
+          await deleteDoc(doc(db, 'payments', d.id));
+          deletedSum++;
+        }
+      }
+
       setResetSuccess(true);
-      window.alert(`Dọn dẹp thành công. Đã xóa ${deletedSum} bản ghi rác.`);
+      fetchRawData();
+      window.alert(`Dọn dẹp thành công! Đã loại bỏ ${deletedSum} bản ghi mồ côi.`);
     } catch (e: any) {
       setResetError('Lỗi dọn dẹp: ' + e.message);
     } finally {
@@ -720,6 +859,291 @@ export default function Settings() {
                       Chỉ dọn rác (Dữ liệu mồ côi)
                     </button>
                   </div>
+                </div>
+
+                {/* TOOL SỬA LỖI & QUẢN LÝ DỰ LIỆU GIAO DỊCH CHUYÊN SÂU */}
+                <div id="raw-data-troubleshooting-panel" className="bg-white border border-gray-150 rounded-3xl p-6 mt-8 space-y-6 text-left">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                    <div>
+                      <h3 className="font-extrabold text-gray-900 text-sm">Chẩn đoán & Quản trị cơ sở dữ liệu gốc</h3>
+                      <p className="text-[11px] text-gray-400 font-medium mt-1">Dành riêng cho SuperAdmin để kiểm tra các khoản phát sinh âm thầm</p>
+                    </div>
+                    <button
+                      onClick={fetchRawData}
+                      disabled={loadingRaw}
+                      className="p-2 border border-gray-250 bg-gray-50 text-gray-600 rounded-xl hover:bg-gray-100 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <RefreshCw size={14} className={loadingRaw ? "animate-spin" : ""} />
+                      Tải lại
+                    </button>
+                  </div>
+
+                  {/* Tabs for RAW viewing */}
+                  <div className="flex flex-wrap gap-1.5 bg-gray-50 p-1 rounded-2xl">
+                    {[
+                      { id: 'payments', label: `Dòng tiền (${rawPayments.length})` },
+                      { id: 'expenses', label: `C.Phí doanh nghiệp (${rawExpenses.length})` },
+                      { id: 'payment_requests', label: `Y/C Thanh toán (${rawPayReqs.length})` },
+                      { id: 'advance_requests', label: `Y/C Tạm ứng (${rawAdvReqs.length})` },
+                      { id: 'reimbursement_requests', label: `Y/C Hoàn ứng (${rawReimbReqs.length})` }
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setRawTab(t.id as any)}
+                        className={cn(
+                          "flex-1 min-w-[120px] text-center py-2 px-3 rounded-xl font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer",
+                          rawTab === t.id 
+                            ? "bg-white text-gray-900 shadow-sm animate-fade-in" 
+                            : "text-gray-400 hover:text-gray-600"
+                        )}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {loadingRaw ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-gray-400 gap-2">
+                      <Loader2 size={24} className="animate-spin text-blue-600" />
+                      <span className="text-xs font-bold font-semibold">Đang tải dữ liệu gốc từ Firestore...</span>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto max-h-96 overflow-y-auto border border-gray-100 rounded-2xl">
+                      {rawTab === 'payments' && (
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-gray-50 text-gray-400 uppercase tracking-widest text-[9px] font-black sticky top-0">
+                            <tr>
+                              <th className="px-4 py-3">ID / Ngày</th>
+                              <th className="px-4 py-3">Ghi chú / Phân loại</th>
+                              <th className="px-4 py-3 text-right">Số tiền</th>
+                              <th className="px-4 py-3 text-center">Hành động</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 font-medium">
+                            {rawPayments.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="text-center py-10 font-bold text-gray-400">Không có phiếu thu/chi nào.</td>
+                              </tr>
+                            ) : (
+                              rawPayments.map((p) => (
+                                <tr key={p.id} className="hover:bg-slate-50/40">
+                                  <td className="px-4 py-3">
+                                    <p className="font-extrabold text-gray-900">{p.id.substring(0, 8)}...</p>
+                                    <p className="text-[10px] text-gray-400">{p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('vi-VN') : 'null'}</p>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <p className="text-gray-800 font-bold">{p.note || 'Không có ghi chú'}</p>
+                                    <p className="text-[10px] text-gray-400">Chuyên mục: {p.category || 'N/A'} | ID nguồn: {p.requestId || p.orderId || 'N/A'}</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <p className={cn("font-black text-xs", p.type === 'income' ? 'text-emerald-600' : 'text-rose-600')}>
+                                      {p.type === 'income' ? '+' : '-'}{ (p.amount || 0).toLocaleString('vi-VN') } đ
+                                    </p>
+                                    <p className="text-[10px] uppercase text-gray-400 font-bold">{p.type === 'income' ? 'THU (Inflow)' : 'CHI (Outflow)'}</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteRawDoc('payments', p.id)}
+                                      className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all cursor-pointer"
+                                      title="Xóa vĩnh viễn"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      )}
+
+                      {rawTab === 'expenses' && (
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-gray-50 text-gray-400 uppercase tracking-widest text-[9px] font-black sticky top-0 font-bold">
+                            <tr>
+                              <th className="px-4 py-3">Tháng / ID</th>
+                              <th className="px-4 py-3">Tên / Phân loại</th>
+                              <th className="px-4 py-3 text-right">Số tiền</th>
+                              <th className="px-4 py-3 text-center">Hành động</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 font-medium">
+                            {rawExpenses.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="text-center py-10 font-bold text-gray-400">Không có hóa đơn chi phí doanh nghiệp nào.</td>
+                              </tr>
+                            ) : (
+                              rawExpenses.map((e) => (
+                                <tr key={e.id} className="hover:bg-slate-50/40">
+                                  <td className="px-4 py-3">
+                                    <p className="font-extrabold text-gray-900">{e.month || 'Không rõ tháng'}</p>
+                                    <p className="text-[10px] text-gray-400">{e.id.substring(0, 8)}...</p>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <p className="text-gray-800 font-bold">{e.name}</p>
+                                    <p className="text-[10px] text-gray-400">Danh mục: {e.category} | Ghi chú: {e.description || 'N/A'}</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <p className="font-black text-rose-600 text-xs">-{ (e.amount || 0).toLocaleString('vi-VN') } đ</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteRawDoc('business_expenses', e.id)}
+                                      className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all cursor-pointer"
+                                      title="Xóa vĩnh viễn"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      )}
+
+                      {rawTab === 'payment_requests' && (
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-gray-50 text-gray-400 uppercase tracking-widest text-[9px] font-black sticky top-0 font-bold">
+                            <tr>
+                              <th className="px-4 py-3">Ngày gửi / ID</th>
+                              <th className="px-4 py-3">Tiêu đề / Trạng thái</th>
+                              <th className="px-4 py-3 text-right">Số tiền</th>
+                              <th className="px-4 py-3 text-center">Hành động</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 font-medium">
+                            {rawPayReqs.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="text-center py-10 font-bold text-gray-400">Không có yêu cầu thanh toán nào.</td>
+                              </tr>
+                            ) : (
+                              rawPayReqs.map((pr) => (
+                                <tr key={pr.id} className="hover:bg-slate-50/40">
+                                  <td className="px-4 py-3">
+                                    <p className="font-extrabold text-gray-900">{pr.id.substring(0, 8)}...</p>
+                                    <p className="text-[10px] text-gray-400">{pr.requestDate ? new Date(pr.requestDate).toLocaleDateString('vi-VN') : 'N/A'}</p>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <p className="text-gray-800 font-bold">{pr.title}</p>
+                                    <p className="text-[10px] text-gray-400">Trạng thái: <span className="text-blue-600 font-bold">{pr.status}</span> | Đơn hàng: {pr.relatedOrderId || 'N/A'}</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-right font-black text-rose-600">
+                                    { (pr.amount || 0).toLocaleString('vi-VN') } đ
+                                  </td>
+                                  <td className="px-4 py-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteRawDoc('payment_requests', pr.id)}
+                                      className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all cursor-pointer"
+                                      title="Xóa vĩnh viễn"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      )}
+
+                      {rawTab === 'advance_requests' && (
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-gray-50 text-gray-400 uppercase tracking-widest text-[9px] font-black sticky top-0 font-bold">
+                            <tr>
+                              <th className="px-4 py-3">Ngày gửi / ID</th>
+                              <th className="px-4 py-3">Tiêu đề / Trạng thái</th>
+                              <th className="px-4 py-3 text-right">Số tiền</th>
+                              <th className="px-4 py-3 text-center">Hành động</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 font-medium">
+                            {rawAdvReqs.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="text-center py-10 font-bold text-gray-400">Không có yêu cầu tạm ứng nào.</td>
+                              </tr>
+                            ) : (
+                              rawAdvReqs.map((ar) => (
+                                <tr key={ar.id} className="hover:bg-slate-50/40">
+                                  <td className="px-4 py-3">
+                                    <p className="font-extrabold text-gray-900">{ar.id.substring(0, 8)}...</p>
+                                    <p className="text-[10px] text-gray-400">{ar.requestDate ? new Date(ar.requestDate).toLocaleDateString('vi-VN') : 'N/A'}</p>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <p className="text-gray-800 font-bold">{ar.title}</p>
+                                    <p className="text-[10px] text-gray-400">Trạng thái: <span className="text-blue-600 font-bold">{ar.status}</span> | Q.Toán: {ar.isSettled ? 'Đã quyết toán' : 'Chưa quyết toán'}</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-right font-black text-rose-600">
+                                    { (ar.amount || 0).toLocaleString('vi-VN') } đ
+                                  </td>
+                                  <td className="px-4 py-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteRawDoc('advance_requests', ar.id)}
+                                      className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all cursor-pointer"
+                                      title="Xóa vĩnh viễn"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      )}
+
+                      {rawTab === 'reimbursement_requests' && (
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-gray-50 text-gray-400 uppercase tracking-widest text-[9px] font-black sticky top-0 font-bold">
+                            <tr>
+                              <th className="px-4 py-3">Ngày gửi / ID</th>
+                              <th className="px-4 py-3">Tiêu đề / Trạng thái</th>
+                              <th className="px-4 py-3 text-right">Số tiền</th>
+                              <th className="px-4 py-3 text-center">Hành động</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 font-medium">
+                            {rawReimbReqs.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="text-center py-10 font-bold text-gray-400">Không có yêu cầu hoàn ứng nào.</td>
+                              </tr>
+                            ) : (
+                              rawReimbReqs.map((rr) => (
+                                <tr key={rr.id} className="hover:bg-slate-50/40">
+                                  <td className="px-4 py-3">
+                                    <p className="font-extrabold text-gray-900">{rr.id.substring(0, 8)}...</p>
+                                    <p className="text-[10px] text-gray-400">{rr.requestDate ? new Date(rr.requestDate).toLocaleDateString('vi-VN') : 'N/A'}</p>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <p className="text-gray-800 font-bold">{rr.title}</p>
+                                    <p className="text-[10px] text-gray-400">Trạng thái: <span className="text-blue-600 font-bold">{rr.status}</span> | Ứng: {rr.advanceRequestId ? 'Có ứng' : 'Không ứng'}</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-right font-black text-rose-600">
+                                    { (rr.amount || 0).toLocaleString('vi-VN') } đ
+                                  </td>
+                                  <td className="px-4 py-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteRawDoc('reimbursement_requests', rr.id)}
+                                      className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all cursor-pointer"
+                                      title="Xóa vĩnh viễn"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ) : null}

@@ -53,6 +53,37 @@ function AppContent() {
   React.useEffect(() => {
     if (user && !loading && !isVerifying) {
       if (user.email === 'info.vinasglobal@gmail.com') {
+        // Auto clean orphans when super admin logs in (temporary fix)
+        const cleanOrphans = async () => {
+          try {
+            const { collection, getDocs, deleteDoc } = await import('firebase/firestore');
+            const ordersSnap = await getDocs(collection(db, 'orders'));
+            const validIds = new Set(ordersSnap.docs.map(d => d.id));
+            const collectionsToCheck = [
+              { name: 'tasks', field: 'orderId' },
+              { name: 'task_reports', field: 'orderId' },
+              { name: 'payments', field: 'orderId' },
+              { name: 'advance_requests', field: 'relatedOrderId' },
+              { name: 'payment_requests', field: 'relatedOrderId' },
+              { name: 'reimbursement_requests', field: 'relatedOrderId' },
+              { name: 'stock_transactions', field: 'orderId' },
+              { name: 'user_activity_logs', field: 'entityId' }
+            ];
+            let count = 0;
+            for (const col of collectionsToCheck) {
+              const snap = await getDocs(collection(db, col.name));
+              for (const d of snap.docs) {
+                const f = d.data()[col.field];
+                if (f && !validIds.has(f)) {
+                  await deleteDoc(doc(db, col.name, d.id));
+                  count++;
+                }
+              }
+            }
+            if (count > 0) console.log('Cleaned up ' + count + ' orphans');
+          } catch(e) {}
+        };
+        cleanOrphans();
         return;
       }
       if (!appUser) {

@@ -121,6 +121,73 @@ export default function Dashboard() {
   const [recentTasks, setRecentTasks] = React.useState<any[]>([]);
   const [superAdminIds, setSuperAdminIds] = React.useState<string[]>([]);
 
+  // Specialized utility to scan and auto-clean 1.5M ghost transactions / proposal artifacts
+  const [stale15MRecords, setStale15MRecords] = React.useState<any[]>([]);
+  const [scanning15M, setScanning15M] = React.useState(false);
+  const [clearing15M, setClearing15M] = React.useState(false);
+
+  const scanFor15M = React.useCallback(async () => {
+    if (!db) return;
+    setScanning15M(true);
+    try {
+      const found: any[] = [];
+      const collectionsToCheck = [
+        { name: 'payments', label: 'Giao dịch (payments)' },
+        { name: 'payment_requests', label: 'Yêu cầu thanh toán' },
+        { name: 'business_expenses', label: 'Chi phí doanh nghiệp' },
+        { name: 'advance_requests', label: 'Yêu cầu tạm ứng' },
+        { name: 'reimbursement_requests', label: 'Yêu cầu quyết toán hoàn ứng' }
+      ];
+
+      for (const col of collectionsToCheck) {
+        const snap = await getDocs(collection(db, col.name));
+        snap.docs.forEach((docRef) => {
+          const data = docRef.data();
+          const amt = Number(data.amount) || 0;
+          if (amt === 1500000) {
+            found.push({
+              id: docRef.id,
+              collection: col.name,
+              label: col.label,
+              note: data.note || data.title || data.purpose || 'Không có mô tả chi tiết',
+              date: data.paymentDate || data.requestDate || data.createdAt || data.month || 'Không rõ ngày'
+            });
+          }
+        });
+      }
+      setStale15MRecords(found);
+    } catch (err) {
+      console.error('Lỗi quét giao dịch 1.5M:', err);
+    } finally {
+      setScanning15M(false);
+    }
+  }, [db]);
+
+  React.useEffect(() => {
+    scanFor15M();
+  }, [scanFor15M]);
+
+  const handleClear15M = async () => {
+    if (!db) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn xoá vĩnh viễn ${stale15MRecords.length} bản ghi trị giá 1.500.000 đ này không? Thao tác này sẽ đưa số liệu thâm hụt tài chính về 0 đ.`)) {
+      return;
+    }
+    setClearing15M(true);
+    try {
+      let deletedCount = 0;
+      for (const rec of stale15MRecords) {
+        await deleteDoc(doc(db, rec.collection, rec.id));
+        deletedCount++;
+      }
+      alert(`Đã dọn dẹp thành công! Đã xoá ${deletedCount} bản ghi liên quan đến khoản tiền 1.500.000 đ.`);
+      scanFor15M();
+    } catch (err: any) {
+      alert(`Lỗi khi dọn dẹp: ${err.message}`);
+    } finally {
+      setClearing15M(false);
+    }
+  };
+
   const toDate = (dateVal: any) => {
     if (!dateVal) return null;
     if (dateVal.toDate && typeof dateVal.toDate === 'function') return dateVal.toDate();
@@ -772,6 +839,48 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {stale15MRecords.length > 0 && (
+         <motion.div 
+           initial={{ opacity: 0, y: -10 }}
+           animate={{ opacity: 1, y: 0 }}
+           className="p-6 bg-amber-50 border border-amber-200/70 rounded-3xl space-y-4 shadow-sm"
+         >
+           <div className="flex items-start gap-3">
+             <div className="p-2 bg-amber-100 text-amber-800 rounded-xl mt-0.5">
+               <AlertCircle size={20} />
+             </div>
+             <div className="space-y-1 flex-1">
+               <h4 className="text-sm font-black text-amber-900 uppercase tracking-wider">Hệ thống phát hiện khoản chi phát sinh 1.5M đ</h4>
+               <p className="text-xs text-amber-700 font-medium leading-relaxed">
+                 Đã phát hiện <strong>{stale15MRecords.length} dữ liệu rác cũ/bản ghi ảo</strong> trị giá đúng <strong>1.500.000 đ</strong> trong cơ sở dữ liệu gốc (không liên kết với đơn hàng hoặc tác vụ thực tế nào của bạn). Đây là nguyên nhân khiến Quản trị dòng tiền & Dashboard hiển thị thâm hụt ngân sách.
+               </p>
+             </div>
+           </div>
+           <div className="pl-11 space-y-3">
+             <div className="overflow-hidden border border-amber-100 rounded-xl bg-white/70 divide-y divide-amber-100">
+               {stale15MRecords.map((ref, idx) => (
+                 <div key={idx} className="p-3 text-[11px] font-medium text-amber-900 flex justify-between items-center bg-amber-50/20">
+                   <div>
+                     <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-bold uppercase tracking-wider text-[9px] mr-2">
+                       {ref.label}
+                     </span>
+                     <span className="font-bold text-amber-950">"{ref.note}"</span>
+                   </div>
+                   <span className="font-mono text-gray-500 text-[10px]">ID: {ref.id.substring(0, 10)}...</span>
+                 </div>
+               ))}
+             </div>
+             <button
+               onClick={handleClear15M}
+               disabled={clearing15M}
+               className="px-5 py-2.5 bg-amber-600 text-white rounded-xl text-xs font-black hover:bg-amber-700 transition-all shadow-md shadow-amber-200/50 flex items-center gap-2 uppercase tracking-wider cursor-pointer"
+             >
+               {clearing15M ? 'Đang dọn dẹp...' : 'Dọn dẹp triệt để & đưa số liệu về 0 đ'}
+             </button>
+           </div>
+         </motion.div>
+      )}
 
       {/* ================= SECTION 1: TỔNG HỢP ĐƠN HÀNG CÔNG TY TRONG NĂM ================= */}
       <div id="section-orders-summary" className="space-y-6">

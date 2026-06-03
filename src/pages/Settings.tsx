@@ -42,6 +42,49 @@ export default function Settings() {
   const [resetSuccess, setResetSuccess] = React.useState(false);
   const [resetError, setResetError] = React.useState('');
 
+  const handleCleanupOrphans = async () => {
+    if (!window.confirm('Hệ thống sẽ quét và làm sạch (xóa) tất cả các đầu việc, thu/chi, yêu cầu thanh toán... mồ côi (không thuộc về đơn hàng nào hiện có). Bạn có chắc chắn?')) return;
+    
+    setResetting(true);
+    setResetMessage('Đang lấy danh sách Orders hợp lệ...');
+    setResetError('');
+    try {
+      const ordersSnap = await getDocs(collection(db, 'orders'));
+      const validIds = new Set(ordersSnap.docs.map(d => d.id));
+      
+      const collectionsToCheck = [
+        { name: 'tasks', field: 'orderId' },
+        { name: 'task_reports', field: 'orderId' },
+        { name: 'payments', field: 'orderId' },
+        { name: 'advance_requests', field: 'relatedOrderId' },
+        { name: 'payment_requests', field: 'relatedOrderId' },
+        { name: 'reimbursement_requests', field: 'relatedOrderId' },
+        { name: 'stock_transactions', field: 'orderId' },
+        { name: 'user_activity_logs', field: 'entityId' }
+      ];
+
+      let deletedSum = 0;
+      for (const col of collectionsToCheck) {
+        setResetMessage(`Đang quét dọn: ${col.name}...`);
+        const snap = await getDocs(collection(db, col.name));
+        for (const d of snap.docs) {
+          const fieldVal = d.data()[col.field];
+          if (fieldVal && !validIds.has(fieldVal)) {
+            await deleteDoc(doc(db, col.name, d.id));
+            deletedSum++;
+          }
+        }
+      }
+      setResetSuccess(true);
+      window.alert(`Dọn dẹp thành công. Đã xóa ${deletedSum} bản ghi rác.`);
+    } catch (e: any) {
+      setResetError('Lỗi dọn dẹp: ' + e.message);
+    } finally {
+      setResetting(false);
+      setResetMessage('');
+    }
+  };
+
   const handleSystemReset = async () => {
     if (resetConfirmInput !== 'CONFIRM RESET') {
       setResetError('Vui lòng nhập chính xác cụm từ CONFIRM RESET để xác nhận.');
@@ -649,23 +692,34 @@ export default function Settings() {
                     </div>
                   )}
 
-                  <button
-                    onClick={handleSystemReset}
-                    disabled={resetting || resetConfirmInput !== 'CONFIRM RESET'}
-                    className="w-full py-4 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl font-bold shadow-lg shadow-rose-100 hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 uppercase tracking-wider text-sm cursor-pointer"
-                  >
-                    {resetting ? (
-                      <>
-                        <Loader2 size={18} className="animate-spin" />
-                        Đang làm sạch cơ sở dữ liệu...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw size={18} />
-                        Khởi đặt lại hệ thống
-                      </>
-                    )}
-                  </button>
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={handleSystemReset}
+                      disabled={resetting || resetConfirmInput !== 'CONFIRM RESET'}
+                      className="w-full py-4 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl font-bold shadow-lg shadow-rose-100 hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 uppercase tracking-wider text-sm cursor-pointer"
+                    >
+                      {resetting ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          Đang làm sạch cơ sở dữ liệu...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw size={18} />
+                          Khởi đặt lại hệ thống
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleCleanupOrphans}
+                      disabled={resetting}
+                      className="w-full py-4 bg-gray-700 text-white rounded-xl font-bold hover:bg-gray-800 disabled:opacity-50 transition-all flex items-center justify-center gap-2 uppercase tracking-wider text-sm cursor-pointer"
+                    >
+                      <Trash2 size={18} />
+                      Chỉ dọn rác (Dữ liệu mồ côi)
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             ) : null}

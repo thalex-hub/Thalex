@@ -1242,6 +1242,28 @@ export default function Orders() {
                     const id = deleteConfirmId;
                     setDeleteConfirmId(null);
                     try {
+                      // Wipe related collections first
+                      const collectionsToDelete = [
+                        { name: 'tasks', field: 'orderId' },
+                        { name: 'task_reports', field: 'orderId' },
+                        { name: 'payments', field: 'orderId' },
+                        { name: 'advance_requests', field: 'relatedOrderId' },
+                        { name: 'payment_requests', field: 'relatedOrderId' },
+                        { name: 'reimbursement_requests', field: 'relatedOrderId' },
+                        { name: 'stock_transactions', field: 'orderId' },
+                        { name: 'user_activity_logs', field: 'entityId' }
+                      ];
+
+                      await Promise.all(collectionsToDelete.map(async (col) => {
+                        try {
+                          const snap = await getDocs(query(collection(db, col.name), where(col.field, '==', id)));
+                          await Promise.all(snap.docs.map(d => deleteDoc(doc(db, col.name, d.id))));
+                        } catch (err) {
+                          console.log('Ignore cleanup err:', col.name, err);
+                        }
+                      }));
+
+                      // Now delete the order
                       await deleteDoc(doc(db, 'orders', id));
                     } catch (err: any) {
                       alert('Lỗi: ' + err.message);

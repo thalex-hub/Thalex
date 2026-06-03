@@ -1,7 +1,7 @@
 import React from 'react';
 import { db } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, or, getDoc, getDocs, deleteDoc } from 'firebase/firestore';
-import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search } from 'lucide-react';
+import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput, withTimeout } from '../lib/utils';
@@ -50,6 +50,7 @@ export default function OrderProposals() {
 
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
   const [customers, setCustomers] = React.useState<any[]>([]);
+  const [showGuide, setShowGuide] = React.useState(true);
   const { isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user, isSuperAdmin } = useAuth();
   const location = useLocation();
   const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR;
@@ -802,6 +803,116 @@ export default function OrderProposals() {
             Tạo đơn hàng mới
           </button>
         </div>
+      </div>
+
+      {/* Hướng dẫn quy trình lập & duyệt đề xuất đơn hàng */}
+      <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+        <div className="flex items-center justify-between pb-3 border-b border-gray-50 mb-4">
+          <div className="flex items-center gap-2.5 text-purple-600">
+            <div className="p-1.5 bg-purple-50 rounded-lg">
+              <HelpCircle size={18} className="stroke-[2.5]" />
+            </div>
+            <h3 className="font-extrabold text-sm uppercase tracking-wider text-gray-800">
+              Hướng dẫn quy trình thực hiện cho nhân sự
+            </h3>
+          </div>
+          <button 
+            type="button"
+            onClick={() => setShowGuide(!showGuide)}
+            className="flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-purple-600 transition-all border border-gray-100 hover:border-purple-100 bg-gray-50/50 hover:bg-purple-50 px-3 py-1.5 rounded-xl cursor-pointer select-none"
+          >
+            {showGuide ? (
+              <>
+                <span>Ẩn quy trình</span>
+                <ChevronUp size={14} />
+              </>
+            ) : (
+              <>
+                <span>Xem quy trình (5 bước)</span>
+                <ChevronDown size={14} />
+              </>
+            )}
+          </button>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {showGuide && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-2">
+                {/* Step 1 */}
+                <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-100 flex flex-col justify-between hover:bg-purple-50/20 transition-all">
+                  <div>
+                    <div className="inline-flex items-center justify-center w-7 h-7 bg-purple-600 text-white rounded-full font-black text-xs mb-3 shadow-md shadow-purple-100">
+                      1
+                    </div>
+                    <h4 className="font-extrabold text-gray-900 text-xs mb-1.5 uppercase tracking-tight">Khởi tạo khách hàng</h4>
+                    <p className="text-[11px] text-gray-500 leading-relaxed font-medium">
+                      Nếu khách hàng mới chưa có thông tin trong dữ liệu công ty, kinh doanh cần vào <Link to="/customers" className="text-purple-600 hover:underline font-bold">module Khách hàng</Link> để khởi tạo khách hàng.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-100 flex flex-col justify-between hover:bg-purple-50/20 transition-all">
+                  <div>
+                    <div className="inline-flex items-center justify-center w-7 h-7 bg-purple-600 text-white rounded-full font-black text-xs mb-3 shadow-md shadow-purple-100">
+                      2
+                    </div>
+                    <h4 className="font-extrabold text-gray-900 text-xs mb-1.5 uppercase tracking-tight">Tạo đơn hàng mới</h4>
+                    <p className="text-[11px] text-gray-500 leading-relaxed font-medium">
+                      Khi đã có thông tin khách hàng, kinh doanh click <b className="text-purple-600">Tạo đơn hàng mới</b> và điền chính xác thông tin. <span className="font-bold text-rose-600">Bắt buộc</span> tải lên file <b>Hợp đồng dự kiến</b> và phương án kinh doanh (<b>PAKD</b>).
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-100 flex flex-col justify-between hover:bg-purple-50/20 transition-all">
+                  <div>
+                    <div className="inline-flex items-center justify-center w-7 h-7 bg-purple-600 text-white rounded-full font-black text-xs mb-3 shadow-md shadow-purple-100">
+                      3
+                    </div>
+                    <h4 className="font-extrabold text-gray-900 text-xs mb-1.5 uppercase tracking-tight">Kế toán kiểm duyệt</h4>
+                    <p className="text-[11px] text-gray-500 leading-relaxed font-medium">
+                      Khi tạo đơn hàng xong, đề xuất sẽ tự động chuyển đến bước kế toán thẩm định và kiểm duyệt các chỉ số tài chính.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 4 */}
+                <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-100 flex flex-col justify-between hover:bg-purple-50/20 transition-all">
+                  <div>
+                    <div className="inline-flex items-center justify-center w-7 h-7 bg-purple-600 text-white rounded-full font-black text-xs mb-3 shadow-md shadow-purple-100">
+                      4
+                    </div>
+                    <h4 className="font-extrabold text-gray-900 text-xs mb-1.5 uppercase tracking-tight">Giám đốc duyệt</h4>
+                    <p className="text-[11px] text-gray-500 leading-relaxed font-medium">
+                      Sau khi kế toán thẩm định hoàn tất và phê duyệt trực tuyến, đề xuất sẽ được chuyển trực tiếp lên giám đốc xem xét duyệt cuối cùng.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 5 */}
+                <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-100 flex flex-col justify-between hover:bg-emerald-50/80 transition-all">
+                  <div>
+                    <div className="inline-flex items-center justify-center w-7 h-7 bg-emerald-600 text-white rounded-full font-black text-xs mb-3 shadow-md shadow-emerald-100">
+                      5
+                    </div>
+                    <h4 className="font-extrabold text-emerald-900 text-xs mb-1.5 uppercase tracking-tight">Triển khai đơn hàng</h4>
+                    <p className="text-[11px] text-emerald-700 leading-relaxed font-semibold">
+                      Khi giám đốc duyệt hoàn tất (Trạng thái DONE), đề xuất đơn hàng sẽ tự động chuyển thành đơn hàng chính thức sang <Link to="/orders" className="text-emerald-800 hover:underline font-bold">module Đơn hàng</Link> để triển khai thực hiện.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100">

@@ -570,7 +570,8 @@ export default function BusinessManagement() {
 
     setUploading(true);
     try {
-      const storageRef = ref(storage, `contracts/${userId}/${file.name}`);
+      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+      const storageRef = ref(storage, `contracts/${userId}/${safeName}`);
       await withTimeout(uploadBytes(storageRef, file), 25000);
       const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
 

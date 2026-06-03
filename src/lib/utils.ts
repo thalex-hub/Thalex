@@ -176,8 +176,7 @@ export async function downloadFile(url: string | undefined, fileName: string) {
     }, 10000);
     
   } catch (error) {
-    console.error('Download failed, falling back to direct link:', error);
-    alert('Tải xuống qua proxy thất bại, đang mở liên kết trực tiếp. (Nếu lỗi, tệp có thể bị xóa hoặc do quyền truy cập)');
+    console.error('Download proxy failed, falling back to direct link:', error);
     try {
       const link = document.createElement('a');
       link.href = url;

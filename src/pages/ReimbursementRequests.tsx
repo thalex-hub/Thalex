@@ -162,7 +162,8 @@ export default function ReimbursementRequests() {
       const uploadedAttachments = await Promise.all(
         selectedFiles.map(async (f) => {
           try {
-            const fileRef = ref(storage, `reimbursements/${Date.now()}_${f.name}`);
+            const safeName = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+            const fileRef = ref(storage, `reimbursements/${Date.now()}_${safeName}`);
             await withTimeout(uploadBytes(fileRef, f), 25000);
             const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
             return {

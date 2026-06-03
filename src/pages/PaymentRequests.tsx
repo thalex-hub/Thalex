@@ -220,7 +220,8 @@ export default function PaymentRequests() {
         newRequest.attachments.map(async (att) => {
           if (att.file) {
             try {
-              const fileRef = ref(storage, `payment_requests/${Date.now()}_${att.file.name}`);
+              const safeName = att.file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+              const fileRef = ref(storage, `payment_requests/${Date.now()}_${safeName}`);
               await withTimeout(uploadBytes(fileRef, att.file), 25000);
               const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
               return {

@@ -283,7 +283,8 @@ export default function Storage() {
           throw new Error('Vui lòng chọn một tệp tin từ máy tính.');
         }
 
-        const fileRef = ref(storage, `storage/${Date.now()}_${selectedFile.name}`);
+        const safeName = selectedFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+        const fileRef = ref(storage, `storage/${Date.now()}_${safeName}`);
         await withTimeout(uploadBytes(fileRef, selectedFile), 25000);
         fileUrl = await withTimeout(getDownloadURL(fileRef), 10000);
         fileSize = selectedFile.size;

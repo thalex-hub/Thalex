@@ -437,7 +437,8 @@ export default function OrderDetail() {
 
     for (const file of files) {
       try {
-        const storageRef = ref(storage, `requests/${type}/${Date.now()}_${file.name}`);
+        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+        const storageRef = ref(storage, `requests/${type}/${Date.now()}_${safeName}`);
         const snapshot = await withTimeout(uploadBytes(storageRef, file), 25000);
         const url = await withTimeout(getDownloadURL(snapshot.ref), 10000);
         

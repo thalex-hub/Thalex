@@ -1523,7 +1523,7 @@ export default function OrderProposals() {
                                />
                              </div>
 
-                             <div className="col-span-2">
+                             <div className="col-span-1 md:col-span-2">
                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Giá trị hợp đồng bán có VAT (VND)</label>
                                <div className="w-full bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 font-black text-purple-700">
                                  {formatCurrency(contractValueWithVAT)}

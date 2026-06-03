@@ -42,6 +42,47 @@ export default function Settings() {
   const [resetSuccess, setResetSuccess] = React.useState(false);
   const [resetError, setResetError] = React.useState('');
 
+  // Custom Popups / Dialogs State to replace window.confirm and window.alert
+  const [confirmDialog, setConfirmDialog] = React.useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void | Promise<void>;
+    confirmText?: string;
+    cancelText?: string;
+    type?: 'warning' | 'danger' | 'info';
+  } | null>(null);
+
+  const [notificationDialog, setNotificationDialog] = React.useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'success' | 'error' | 'info';
+  } | null>(null);
+
+  const showConfirm = (options: {
+    title: string;
+    message: string;
+    onConfirm: () => void | Promise<void>;
+    confirmText?: string;
+    cancelText?: string;
+    type?: 'warning' | 'danger' | 'info';
+  }) => {
+    setConfirmDialog({
+      isOpen: true,
+      ...options
+    });
+  };
+
+  const showNotification = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotificationDialog({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
   // Raw Database Diagnostics & Recovery
   const [rawPayments, setRawPayments] = React.useState<any[]>([]);
   const [rawExpenses, setRawExpenses] = React.useState<any[]>([]);
@@ -82,20 +123,37 @@ export default function Settings() {
     }
   }, [activeTab, isSuperAdmin]);
 
-  const handleDeleteRawDoc = async (colName: string, id: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN tài liệu này (${colName}/${id}) khỏi cơ sở dữ liệu?`)) return;
-    try {
-      await deleteDoc(doc(db, colName, id));
-      window.alert("Đã xóa vĩnh viễn tài liệu thành công!");
-      fetchRawData();
-    } catch (e: any) {
-      window.alert("Lỗi khi xóa tài liệu: " + e.message);
-    }
+  const handleDeleteRawDoc = (colName: string, id: string) => {
+    showConfirm({
+      title: 'Xóa vĩnh viễn tài liệu gốc',
+      message: `Bạn có chắc chắn muốn XÓA VĨNH VIỄN tài liệu này (${colName}/${id}) khỏi cơ sở dữ liệu? Hành động này không thể hoàn tác.`,
+      confirmText: 'Xóa vĩnh viễn',
+      cancelText: 'Hủy bỏ',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, colName, id));
+          showNotification('Xóa tài liệu thành công', `Đã xóa vĩnh viễn tài liệu ${id} khỏi bộ sưu tập ${colName}.`, 'success');
+          fetchRawData();
+        } catch (e: any) {
+          showNotification('Lỗi xóa tài liệu', `Lỗi khi xóa tài liệu: ${e.message}`, 'error');
+        }
+      }
+    });
   };
 
-  const handleCleanupOrphans = async () => {
-    if (!window.confirm('Hệ thống sẽ quét và nhận diện tự động tất cả các bản ghi mồ côi (yêu cầu thanh toán, tạm ứng, hoàn ứng, phiếu chi/thu có liên kết đến đơn hàng hoặc yêu cầu đã bị xóa). Bạn có chắc chắn muốn dọn dẹp?')) return;
-    
+  const handleCleanupOrphans = () => {
+    showConfirm({
+      title: 'Dọn dẹp dữ liệu mồ côi',
+      message: 'Hệ thống sẽ quét và nhận diện tự động tất cả các bản ghi mồ côi (yêu cầu thanh toán, tạm ứng, hoàn ứng, phiếu chi/thu có liên kết đến đơn hàng hoặc yêu cầu đã bị xóa). Bạn có chắc chắn muốn dọn dẹp?',
+      confirmText: 'Bắt đầu dọn dẹp',
+      cancelText: 'Hủy bỏ',
+      type: 'warning',
+      onConfirm: executeCleanupOrphans
+    });
+  };
+
+  const executeCleanupOrphans = async () => {
     setResetting(true);
     setResetMessage('Đang phân tích cấu trúc dữ liệu...');
     setResetError('');
@@ -215,25 +273,33 @@ export default function Settings() {
 
       setResetSuccess(true);
       fetchRawData();
-      window.alert(`Dọn dẹp thành công! Đã loại bỏ ${deletedSum} bản ghi mồ côi.`);
+      showNotification('Dọn dẹp hoàn tất', `Dọn dẹp thành công! Đã loại bỏ hoàn toàn ${deletedSum} bản ghi mồ côi khỏi hệ thống.`, 'success');
     } catch (e: any) {
       setResetError('Lỗi dọn dẹp: ' + e.message);
+      showNotification('Lỗi dọn dẹp', `Có lỗi xảy ra: ${e.message}`, 'error');
     } finally {
       setResetting(false);
       setResetMessage('');
     }
   };
 
-  const handleSystemReset = async () => {
+  const handleSystemReset = () => {
     if (resetConfirmInput !== 'CONFIRM RESET') {
       setResetError('Vui lòng nhập chính xác cụm từ CONFIRM RESET để xác nhận.');
       return;
     }
 
-    if (!window.confirm('CẢNH BÁO: Bạn có chắc chắn muốn thiết lập lại toàn bộ hệ thống? Thao tác này sẽ xóa vĩnh viễn tất cả đơn hàng, sản phẩm, kho hàng, khách hàng, hoạt động chấm công, tài chính và tài khoản nhân viên (ngoại trừ tài khoản của bạn), đưa hệ thống về trạng thái ban đầu hoàn toàn sạch sẽ.')) {
-      return;
-    }
+    showConfirm({
+      title: '🚨 CẢNH BÁO THIẾT LẬP LẠI HỆ THỐNG 🚨',
+      message: 'Bạn có chắc chắn muốn thiết lập lại toàn bộ hệ thống? Thao tác này sẽ xóa vĩnh viễn tất cả đơn hàng, sản phẩm, kho hàng, khách hàng, hoạt động chấm công, tài chính và tài liệu (ngoại trừ tài khoản của bạn), đưa hệ thống về trạng thái ban đầu hoàn toàn sạch sẽ.',
+      confirmText: 'Xóa sạch hệ thống',
+      cancelText: 'Hủy bỏ',
+      type: 'danger',
+      onConfirm: executeSystemReset
+    });
+  };
 
+  const executeSystemReset = async () => {
     setResetting(true);
     setResetError('');
     setResetSuccess(false);
@@ -326,9 +392,12 @@ export default function Settings() {
       setResetSuccess(true);
       setResetConfirmInput('');
       setResetMessage('');
+      showNotification('Khôi phục thành công', 'Toàn bộ hệ thống đã được thiết lập lại về trạng thái ban đầu sạch sẽ!', 'success');
     } catch (err: any) {
       console.error('Lỗi khi thiết lập lại hệ thống:', err);
-      setResetError(`Lỗi bảo mật hoặc lỗi kết nối: ${err.message || 'Không xác định'}`);
+      const errMsg = err.message || 'Không xác định';
+      setResetError(`Lỗi bảo mật hoặc lỗi kết nối: ${errMsg}`);
+      showNotification('Lỗi thiết lập lại', `Khôi phục thất bại: ${errMsg}`, 'error');
     } finally {
       setResetting(false);
     }
@@ -1150,6 +1219,121 @@ export default function Settings() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Custom Confirmation Modal */}
+      <AnimatePresence>
+        {confirmDialog?.isOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm shadow-2xl"
+              onClick={() => setConfirmDialog(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden pointer-events-auto border border-gray-100 p-6 flex flex-col space-y-4 text-left"
+            >
+              <div className="flex gap-3 items-start">
+                <div className={cn(
+                  "p-3 rounded-2xl",
+                  confirmDialog.type === 'danger' ? "bg-rose-50 text-rose-600" :
+                  confirmDialog.type === 'warning' ? "bg-amber-50 text-amber-600" :
+                  "bg-blue-50 text-blue-600"
+                )}>
+                  {confirmDialog.type === 'danger' ? <AlertTriangle size={24} /> : <AlertCircle size={24} />}
+                </div>
+                <div className="space-y-1 flex-1">
+                  <h3 className="text-base font-black text-gray-900 uppercase tracking-tight leading-snug">
+                    {confirmDialog.title}
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                    {confirmDialog.message}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDialog(null)}
+                  className="px-4 py-2 border border-gray-200 text-gray-600 bg-white font-black rounded-xl text-xs hover:bg-gray-50 transition-all uppercase tracking-wider cursor-pointer"
+                >
+                  {confirmDialog.cancelText || 'Hủy bỏ'}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const cb = confirmDialog.onConfirm;
+                    setConfirmDialog(null);
+                    if (cb) await cb();
+                  }}
+                  className={cn(
+                    "px-4 py-2 text-white font-semibold rounded-xl text-xs transition-all uppercase tracking-wider cursor-pointer shadow-md",
+                    confirmDialog.type === 'danger' ? "bg-rose-600 hover:bg-rose-700 shadow-rose-100 font-bold" :
+                    confirmDialog.type === 'warning' ? "bg-amber-500 hover:bg-amber-600 shadow-amber-100 font-bold" :
+                    "bg-blue-600 hover:bg-blue-700 shadow-blue-100 font-bold"
+                  )}
+                >
+                  {confirmDialog.confirmText || 'Xác nhận'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Notification Modal */}
+      <AnimatePresence>
+        {notificationDialog?.isOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setNotificationDialog(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden pointer-events-auto border border-gray-100 p-6 flex flex-col space-y-4 text-center items-center font-medium"
+            >
+              <div className={cn(
+                "p-3 rounded-full",
+                notificationDialog.type === 'success' ? "bg-emerald-50 text-emerald-600" :
+                notificationDialog.type === 'error' ? "bg-rose-50 text-rose-600" :
+                "bg-blue-50 text-blue-600"
+              )}>
+                {notificationDialog.type === 'success' ? <CheckCircle2 size={32} /> :
+                 notificationDialog.type === 'error' ? <AlertTriangle size={32} /> :
+                 <AlertCircle size={32} />}
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-gray-900 uppercase tracking-tight">
+                  {notificationDialog.title}
+                </h3>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  {notificationDialog.message}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setNotificationDialog(null)}
+                className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-xs font-black hover:bg-gray-800 transition-all uppercase tracking-wider cursor-pointer"
+              >
+                Đóng
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

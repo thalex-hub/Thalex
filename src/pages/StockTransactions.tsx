@@ -459,7 +459,7 @@ export default function StockTransactions() {
     }
     const normalizedItems = formItems.map(item => ({
       ...item,
-      sn: item.sn.trim() ? item.sn.trim() : '-'
+      sn: (item.sn && typeof item.sn === 'string') ? item.sn.trim() : '-'
     }));
 
     if (normalizedItems.some(i => !i.productCode.trim() || !i.productName.trim() || i.quantity <= 0)) {
@@ -503,14 +503,16 @@ export default function StockTransactions() {
       status: 'pending'
     };
 
+    const cleanTx = JSON.parse(JSON.stringify(newTx));
+
     try {
       if (editingTransaction) {
         await updateDoc(doc(db, 'stock_transactions', editingTransaction.id), {
-          ...newTx,
+          ...cleanTx,
           updatedAt: new Date().toISOString()
         });
       } else {
-        await addDoc(collection(db, 'stock_transactions'), newTx);
+        await addDoc(collection(db, 'stock_transactions'), cleanTx);
       }
       setShowAddModal(false);
       setEditingTransaction(null);

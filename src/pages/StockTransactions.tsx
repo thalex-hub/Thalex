@@ -457,20 +457,25 @@ export default function StockTransactions() {
       window.alert("Vui lòng nhập tên nhiệm vụ!");
       return;
     }
-    if (formItems.some(i => !i.productCode.trim() || !i.productName.trim() || i.quantity <= 0 || !i.sn.trim())) {
-      window.alert("Vui lòng nhập đầy đủ Mã hàng, Tên hàng, Số lượng và Số SN!");
+    const normalizedItems = formItems.map(item => ({
+      ...item,
+      sn: item.sn.trim() ? item.sn.trim() : '-'
+    }));
+
+    if (normalizedItems.some(i => !i.productCode.trim() || !i.productName.trim() || i.quantity <= 0)) {
+      window.alert("Vui lòng nhập đầy đủ Mã hàng, Tên hàng và Số lượng!");
       return;
     }
 
     if (transactionType === 'inbound') {
-      if (formItems.some(i => !i.brandWarrantyStartDate || i.brandWarrantyMonths === undefined || i.brandWarrantyMonths < 0)) {
+      if (normalizedItems.some(i => !i.brandWarrantyStartDate || i.brandWarrantyMonths === undefined || i.brandWarrantyMonths < 0)) {
         window.alert("Vui lòng nhập đầy đủ thông tin bảo hành của hãng (Ngày bắt đầu và số tháng) cho tất cả mặt hàng!");
         return;
       }
     }
 
     if (transactionType === 'outbound') {
-      if (formItems.some(i => !i.customerWarrantyStartDate || i.customerWarrantyMonths === undefined || i.customerWarrantyMonths < 0)) {
+      if (normalizedItems.some(i => !i.customerWarrantyStartDate || i.customerWarrantyMonths === undefined || i.customerWarrantyMonths < 0)) {
         window.alert("Vui lòng nhập đầy đủ thông tin bảo hành cho khách hàng (Ngày bắt đầu và số tháng) cho tất cả mặt hàng!");
         return;
       }
@@ -493,7 +498,7 @@ export default function StockTransactions() {
       taskName: transactionType === 'outbound' && outboundPurpose === 'task' ? taskName : undefined,
       outboundPurpose: transactionType === 'outbound' ? outboundPurpose : undefined,
       note,
-      items: formItems,
+      items: normalizedItems,
       transactionDate: new Date().toISOString(),
       status: 'pending'
     };
@@ -626,51 +631,14 @@ export default function StockTransactions() {
 
           if (tx.type === 'inbound') {
             addChange(tx.warehouseId, targetProductId, changeQty);
-            const stockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
-            const stockItemRef = doc(db, 'stock_items', stockId);
-            transaction.set(stockItemRef, {
-              productId: targetProductId,
-              productCode: item.productCode,
-              productName: item.productName,
-              warehouseId: tx.warehouseId,
-              sn: item.sn,
-              entryDate: tx.transactionDate,
-              brandWarrantyStartDate: item.brandWarrantyStartDate || '',
-              brandWarrantyMonths: item.brandWarrantyMonths || 0,
-              brandWarrantyEndDate: item.brandWarrantyEndDate || '',
-              lastUpdated: new Date().toISOString()
-            });
-          } else if (tx.type === 'outbound') {
-            addChange(tx.warehouseId, targetProductId, -changeQty);
-            const stockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
-            const stockItemRef = doc(db, 'stock_items', stockId);
-            transaction.delete(stockItemRef);
-          } else if (tx.type === 'transfer') {
-            addChange(tx.warehouseId, targetProductId, -changeQty);
-            if (tx.toWarehouseId) {
-              addChange(tx.toWarehouseId, targetProductId, changeQty);
-            }
-            
-            const fromStockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
-            const toStockId = `${tx.toWarehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
-            const stockItemRef = doc(db, 'stock_items', fromStockId);
-            const toStockItemRef = doc(db, 'stock_items', toStockId);
-            
-            const stockItemSnap = stockSnaps[fromStockId];
-            if (stockItemSnap && stockItemSnap.exists()) {
-              const stockData = stockItemSnap.data();
-              transaction.set(toStockItemRef, {
-                ...stockData,
-                warehouseId: tx.toWarehouseId,
-                lastUpdated: new Date().toISOString()
-              });
-              transaction.delete(stockItemRef);
-            } else {
-              transaction.set(toStockItemRef, {
+            if (item.sn && item.sn !== '-') {
+              const stockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
+              const stockItemRef = doc(db, 'stock_items', stockId);
+              transaction.set(stockItemRef, {
                 productId: targetProductId,
                 productCode: item.productCode,
                 productName: item.productName,
-                warehouseId: tx.toWarehouseId,
+                warehouseId: tx.warehouseId,
                 sn: item.sn,
                 entryDate: tx.transactionDate,
                 brandWarrantyStartDate: item.brandWarrantyStartDate || '',
@@ -678,6 +646,49 @@ export default function StockTransactions() {
                 brandWarrantyEndDate: item.brandWarrantyEndDate || '',
                 lastUpdated: new Date().toISOString()
               });
+            }
+          } else if (tx.type === 'outbound') {
+            addChange(tx.warehouseId, targetProductId, -changeQty);
+            if (item.sn && item.sn !== '-') {
+              const stockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
+              const stockItemRef = doc(db, 'stock_items', stockId);
+              transaction.delete(stockItemRef);
+            }
+          } else if (tx.type === 'transfer') {
+            addChange(tx.warehouseId, targetProductId, -changeQty);
+            if (tx.toWarehouseId) {
+              addChange(tx.toWarehouseId, targetProductId, changeQty);
+            }
+            
+            if (item.sn && item.sn !== '-') {
+              const fromStockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
+              const toStockId = `${tx.toWarehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
+              const stockItemRef = doc(db, 'stock_items', fromStockId);
+              const toStockItemRef = doc(db, 'stock_items', toStockId);
+              
+              const stockItemSnap = stockSnaps[fromStockId];
+              if (stockItemSnap && stockItemSnap.exists()) {
+                const stockData = stockItemSnap.data();
+                transaction.set(toStockItemRef, {
+                  ...stockData,
+                  warehouseId: tx.toWarehouseId,
+                  lastUpdated: new Date().toISOString()
+                });
+                transaction.delete(stockItemRef);
+              } else {
+                transaction.set(toStockItemRef, {
+                  productId: targetProductId,
+                  productCode: item.productCode,
+                  productName: item.productName,
+                  warehouseId: tx.toWarehouseId,
+                  sn: item.sn,
+                  entryDate: tx.transactionDate,
+                  brandWarrantyStartDate: item.brandWarrantyStartDate || '',
+                  brandWarrantyMonths: item.brandWarrantyMonths || 0,
+                  brandWarrantyEndDate: item.brandWarrantyEndDate || '',
+                  lastUpdated: new Date().toISOString()
+                });
+              }
             }
           }
         }

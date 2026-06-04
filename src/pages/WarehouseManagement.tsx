@@ -216,15 +216,17 @@ export default function WarehouseManagement() {
 
   const handleExportStock = () => {
     const exportData = products.flatMap(product => {
-      const productStockItems = stockItems.filter(si => si.productId === product.id);
+      // Filter out any dummy S/N like sn: '-'
+      const productStockItems = stockItems.filter(si => si.productId === product.id && si.sn && si.sn !== '-');
       const productInventory = inventory.filter(i => i.productId === product.id);
       
       const results: any[] = [];
 
-      // Add items with SN
+      // 1. Add matching serialized items
       productStockItems.filter(si => selectedWarehouse === 'all' || si.warehouseId === selectedWarehouse)
         .forEach(si => {
-          const entryDate = new Date(si.entryDate);
+          const entryDateStr = si.entryDate || '';
+          const entryDate = entryDateStr && !isNaN(new Date(entryDateStr).getTime()) ? new Date(entryDateStr) : new Date();
           const diffDays = Math.ceil(Math.abs(new Date().getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24));
           const warehouse = warehouses.find(w => w.id === si.warehouseId);
           
@@ -235,7 +237,7 @@ export default function WarehouseManagement() {
             'Số lượng': 1,
             'SN': si.sn,
             'Kho đang tồn': warehouse?.name || 'KHO LẠ',
-            'Ngày nhập Kho': format(entryDate, 'dd/MM/yyyy'),
+            'Ngày nhập Kho': entryDateStr && !isNaN(entryDate.getTime()) ? format(entryDate, 'dd/MM/yyyy') : '-',
             'Thời gian đã tồn kho (ngày)': diffDays,
             'Bảo hành hãng (tháng)': si.brandWarrantyMonths || '-',
             'Ngày bắt đầu bảo hành': si.brandWarrantyStartDate && !isNaN(new Date(si.brandWarrantyStartDate).getTime()) ? format(new Date(si.brandWarrantyStartDate), 'dd/MM/yyyy') : '-',
@@ -243,34 +245,34 @@ export default function WarehouseManagement() {
           });
         });
 
-      // Add items without SN (aggregate inventory but only if not fully represented by SNs)
-      // This is a simplification: if there are no SN records but there is quantity in inventory, show it.
-      if (productStockItems.length === 0) {
-        productInventory.filter(i => selectedWarehouse === 'all' || i.warehouseId === selectedWarehouse)
-          .forEach(i => {
-            if (i.quantity <= 0) return;
-            const lastUpdated = i.lastUpdated ? new Date(i.lastUpdated) : new Date();
-            const diffDays = Math.ceil(Math.abs(new Date().getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24));
-            const warehouse = warehouses.find(w => w.id === i.warehouseId);
+      // 2. Add remaining/unserialized inventory per warehouse
+      productInventory.filter(i => selectedWarehouse === 'all' || i.warehouseId === selectedWarehouse)
+        .forEach(i => {
+          const serializedInWhCount = productStockItems.filter(si => si.warehouseId === i.warehouseId).length;
+          const leftOverQty = (i.quantity || 0) - serializedInWhCount;
+          if (leftOverQty <= 0) return;
 
-            results.push({
-              'Tên sản phẩm': product.name,
-              'Mã hàng': product.code,
-              'Đơn vị Tính': product.unit,
-              'Số lượng': i.quantity,
-              'SN': '-',
-              'Kho đang tồn': warehouse?.name || 'KHO LẠ',
-              'Ngày nhập Kho': i.lastUpdated ? format(lastUpdated, 'dd/MM/yyyy') : '-',
-              'Thời gian đã tồn kho (ngày)': diffDays,
-              'Bảo hành hãng (tháng)': '-',
-              'Ngày bắt đầu bảo hành': '-',
-              'Ngày hết hạn bảo hành': '-'
-            });
+          const lastUpdatedStr = i.lastUpdated || '';
+          const lastUpdated = lastUpdatedStr && !isNaN(new Date(lastUpdatedStr).getTime()) ? new Date(lastUpdatedStr) : new Date();
+          const diffDays = Math.ceil(Math.abs(new Date().getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24));
+          const warehouse = warehouses.find(w => w.id === i.warehouseId);
+
+          results.push({
+            'Tên sản phẩm': product.name,
+            'Mã hàng': product.code,
+            'Đơn vị Tính': product.unit,
+            'Số lượng': leftOverQty,
+            'SN': '-',
+            'Kho đang tồn': warehouse?.name || 'KHO LẠ',
+            'Ngày nhập Kho': lastUpdatedStr && !isNaN(lastUpdated.getTime()) ? format(lastUpdated, 'dd/MM/yyyy') : '-',
+            'Thời gian đã tồn kho (ngày)': diffDays,
+            'Bảo hành hãng (tháng)': '-',
+            'Ngày bắt đầu bảo hành': '-',
+            'Ngày hết hạn bảo hành': '-'
           });
-      }
+        });
 
       return results.filter(r => 
-        r['Chi tiết']?.toLowerCase().includes(searchTerm.toLowerCase()) || // This is not in columns but I keep it for future? No.
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (r['SN'] && r['SN'] !== '-' && r['SN'].toLowerCase().includes(searchTerm.toLowerCase()))
@@ -322,6 +324,62 @@ export default function WarehouseManagement() {
       : inventory.some(i => i.productId === p.id && i.warehouseId === selectedWarehouse && i.quantity > 0);
     return matchesSearch && matchesWarehouse;
   });
+
+  const computedInStockItems = React.useMemo(() => {
+    const results: any[] = [];
+
+    products.forEach(product => {
+      // Filter out any dummy S/N like sn: '-'
+      const productStockItems = stockItems.filter(si => si.productId === product.id && si.sn && si.sn !== '-');
+      const productInventory = inventory.filter(i => i.productId === product.id);
+      
+      // 1. Show matching serialized items
+      productStockItems.filter(si => selectedWarehouse === 'all' || si.warehouseId === selectedWarehouse)
+        .forEach(si => {
+          if (
+            product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            si.sn.toLowerCase().includes(searchTerm.toLowerCase())
+          ) {
+            results.push({
+              id: si.id,
+              product,
+              sn: si.sn,
+              quantity: 1,
+              warehouse: warehouses.find(w => w.id === si.warehouseId),
+              entryDate: si.entryDate,
+              brandWarrantyStartDate: si.brandWarrantyStartDate || '',
+              brandWarrantyMonths: si.brandWarrantyMonths || 0,
+              brandWarrantyEndDate: si.brandWarrantyEndDate || ''
+            });
+          }
+        });
+
+      // 2. Show remaining/unserialized inventory per warehouse
+      productInventory.filter(i => selectedWarehouse === 'all' || i.warehouseId === selectedWarehouse)
+        .forEach(i => {
+          const serializedInWhCount = productStockItems.filter(si => si.warehouseId === i.warehouseId).length;
+          const leftOverQty = (i.quantity || 0) - serializedInWhCount;
+          if (leftOverQty <= 0) return;
+
+          if (
+            product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            product.code.toLowerCase().includes(searchTerm.toLowerCase())
+          ) {
+            results.push({
+              id: `${i.id}_unserialized`,
+              product,
+              sn: '-',
+              quantity: leftOverQty,
+              warehouse: warehouses.find(w => w.id === i.warehouseId),
+              entryDate: i.lastUpdated
+            });
+          }
+        });
+    });
+
+    return results;
+  }, [products, stockItems, inventory, warehouses, selectedWarehouse, searchTerm]);
 
   if (loading) return <div className="p-8 text-center">Đang tải...</div>;
 
@@ -501,153 +559,95 @@ export default function WarehouseManagement() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {(() => {
-                        const results: any[] = [];
+                      {computedInStockItems.map((item) => {
+                        const entryDate = item.entryDate && !isNaN(new Date(item.entryDate).getTime()) ? new Date(item.entryDate) : null;
+                        const diffTime = entryDate ? Math.abs(new Date().getTime() - entryDate.getTime()) : 0;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        const isAging = diffDays > 30 && entryDate;
 
-                        products.forEach(product => {
-                          const productStockItems = stockItems.filter(si => si.productId === product.id);
-                          const productInventory = inventory.filter(i => i.productId === product.id);
-                          
-                          // Priority: Show specific items with SN
-                          productStockItems.filter(si => selectedWarehouse === 'all' || si.warehouseId === selectedWarehouse)
-                            .forEach(si => {
-                              if (
-                                product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                si.sn.toLowerCase().includes(searchTerm.toLowerCase())
-                              ) {
-                                results.push({
-                                  id: si.id,
-                                  product,
-                                  sn: si.sn,
-                                  quantity: 1,
-                                  warehouse: warehouses.find(w => w.id === si.warehouseId),
-                                  entryDate: si.entryDate,
-                                  brandWarrantyStartDate: si.brandWarrantyStartDate || '',
-                                  brandWarrantyMonths: si.brandWarrantyMonths || 0,
-                                  brandWarrantyEndDate: si.brandWarrantyEndDate || ''
-                                });
-                              }
-                            });
-
-                          // If no SN records for this product, show aggregate quantity
-                          if (productStockItems.length === 0) {
-                            productInventory.filter(i => selectedWarehouse === 'all' || i.warehouseId === selectedWarehouse)
-                              .forEach(i => {
-                                if (i.quantity <= 0) return;
-                                if (
-                                  product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                  product.code.toLowerCase().includes(searchTerm.toLowerCase())
-                                ) {
-                                  results.push({
-                                    id: i.id,
-                                    product,
-                                    sn: '-',
-                                    quantity: i.quantity,
-                                    warehouse: warehouses.find(w => w.id === i.warehouseId),
-                                    entryDate: i.lastUpdated
-                                  });
-                                }
-                              });
-                          }
-                        });
-
-                        if (results.length === 0) return null;
-
-                        return results.map((item) => {
-                          const entryDate = item.entryDate && !isNaN(new Date(item.entryDate).getTime()) ? new Date(item.entryDate) : null;
-                          const diffTime = entryDate ? Math.abs(new Date().getTime() - entryDate.getTime()) : 0;
-                          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                          const isAging = diffDays > 30 && entryDate;
-
-                          return (
-                            <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
-                                    <Package size={16} />
-                                  </div>
-                                  <div>
-                                    <p className="font-bold text-gray-900 leading-tight uppercase text-xs">
-                                      {item.product.name}
-                                    </p>
-                                  </div>
+                        return (
+                          <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
+                                  <Package size={16} />
                                 </div>
-                              </td>
-                              <td className="px-6 py-4 text-[10px] font-black text-gray-500 uppercase">
-                                {item.product.code}
-                              </td>
-                              <td className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">
-                                {item.product.unit}
-                              </td>
-                              <td className="px-6 py-4 text-xs font-black text-gray-900">
-                                {item.quantity}
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={cn(
-                                  "px-2 py-1 rounded text-[10px] font-black tracking-tight border",
-                                  item.sn === '-' 
-                                    ? "bg-gray-55 text-gray-400 border-gray-100" 
-                                    : "bg-blue-50 text-blue-600 border-blue-100"
-                                )}>
-                                  {item.sn}
+                                <div>
+                                  <p className="font-bold text-gray-900 leading-tight uppercase text-xs">
+                                    {item.product.name}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-[10px] font-black text-gray-500 uppercase">
+                              {item.product.code}
+                            </td>
+                            <td className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">
+                              {item.product.unit}
+                            </td>
+                            <td className="px-6 py-4 text-xs font-black text-gray-900">
+                              {item.quantity}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={cn(
+                                "px-2 py-1 rounded text-[10px] font-black tracking-tight border",
+                                item.sn === '-' 
+                                  ? "bg-gray-55 text-gray-400 border-gray-100" 
+                                  : "bg-blue-50 text-blue-600 border-blue-100"
+                              )}>
+                                {item.sn}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-md bg-gray-100 flex items-center justify-center text-gray-400">
+                                  <Building2 size={12} />
+                                </div>
+                                <span className="text-[10px] font-black text-gray-600 uppercase tracking-tight">
+                                  {item.warehouse?.name || 'KHO LẠ'}
                                 </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-md bg-gray-100 flex items-center justify-center text-gray-400">
-                                    <Building2 size={12} />
-                                  </div>
-                                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-tight">
-                                    {item.warehouse?.name || 'KHO LẠ'}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-[10px] font-bold text-gray-500">
+                              {entryDate ? format(entryDate, 'dd/MM/yyyy') : '-'}
+                            </td>
+                            <td className="px-6 py-4">
+                              {item.brandWarrantyStartDate && !isNaN(new Date(item.brandWarrantyStartDate).getTime()) ? (
+                                <div className="inline-flex flex-col gap-0.5 text-xs text-emerald-800">
+                                  <span className="text-[10px] font-black font-sans tracking-tight uppercase bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded text-center">
+                                    BH {item.brandWarrantyMonths} tháng
+                                  </span>
+                                  <span className="text-[9px] text-gray-500 font-bold tracking-tight text-left mt-1">
+                                    Bắt đầu: {format(new Date(item.brandWarrantyStartDate), 'dd/MM/yyyy')}
+                                  </span>
+                                  <span className="text-[9px] text-gray-500 font-bold tracking-tight text-left">
+                                    Hết hạn: {item.brandWarrantyEndDate && !isNaN(new Date(item.brandWarrantyEndDate).getTime()) ? format(new Date(item.brandWarrantyEndDate), 'dd/MM/yyyy') : '-'}
                                   </span>
                                 </div>
-                              </td>
-                              <td className="px-6 py-4 text-[10px] font-bold text-gray-500">
-                                {entryDate ? format(entryDate, 'dd/MM/yyyy') : '-'}
-                              </td>
-                              <td className="px-6 py-4">
-                                {item.brandWarrantyStartDate ? (
-                                  <div className="inline-flex flex-col gap-0.5 text-xs text-emerald-800">
-                                    <span className="text-[10px] font-black font-sans tracking-tight uppercase bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded text-center">
-                                      BH {item.brandWarrantyMonths} tháng
-                                    </span>
-                                    <span className="text-[9px] text-gray-500 font-bold tracking-tight text-left mt-1">
-                                      Bắt đầu: {format(new Date(item.brandWarrantyStartDate), 'dd/MM/yyyy')}
-                                    </span>
-                                    <span className="text-[9px] text-gray-500 font-bold tracking-tight text-left">
-                                      Hết hạn: {item.brandWarrantyEndDate && !isNaN(new Date(item.brandWarrantyEndDate).getTime()) ? format(new Date(item.brandWarrantyEndDate), 'dd/MM/yyyy') : '-'}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-400 italic text-[10px] pl-2">-</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4">
-                                {entryDate ? (
-                                  <div className={cn(
-                                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider",
-                                    isAging 
-                                      ? "bg-rose-50 text-rose-600 border-rose-100 italic" 
-                                      : "bg-blue-50 text-blue-600 border-blue-100"
-                                  )}>
-                                    <Clock size={12} />
-                                    {diffDays} ngày
-                                  </div>
-                                ) : '-'}
-                              </td>
-                            </tr>
-                          );
-                        });
-                      })()}
+                              ) : (
+                                <span className="text-gray-400 italic text-[10px] pl-2">-</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              {entryDate ? (
+                                <div className={cn(
+                                  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider",
+                                  isAging 
+                                    ? "bg-rose-50 text-rose-600 border-rose-100 italic" 
+                                    : "bg-blue-50 text-blue-600 border-blue-100"
+                                )}>
+                                  <Clock size={12} />
+                                  {diffDays} ngày
+                                </div>
+                              ) : '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
-                  {products.every(p => {
-                    const hasStock = stockItems.some(si => si.productId === p.id && (selectedWarehouse === 'all' || si.warehouseId === selectedWarehouse));
-                    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.code.toLowerCase().includes(searchTerm.toLowerCase());
-                    return !(hasStock && matchesSearch);
-                  }) && (
-                    <div className="py-20 text-center text-gray-400 italic uppercase tracking-widest text-[10px] font-black">
+                  {computedInStockItems.length === 0 && (
+                    <div className="py-20 text-center text-gray-400 italic uppercase tracking-widest text-[10px] font-black bg-white select-none">
                       Chưa có dữ liệu tồn kho chi tiết
                     </div>
                   )}

@@ -270,51 +270,14 @@ export default function WarehouseApprovals() {
 
           if (tx.type === 'inbound') {
             addChange(tx.warehouseId, targetProductId, changeQty);
-            const stockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
-            const stockItemRef = doc(db, 'stock_items', stockId);
-            transaction.set(stockItemRef, {
-              productId: targetProductId,
-              productCode: item.productCode,
-              productName: item.productName,
-              warehouseId: tx.warehouseId,
-              sn: item.sn,
-              entryDate: tx.transactionDate,
-              brandWarrantyStartDate: item.brandWarrantyStartDate || '',
-              brandWarrantyMonths: item.brandWarrantyMonths || 0,
-              brandWarrantyEndDate: item.brandWarrantyEndDate || '',
-              lastUpdated: new Date().toISOString()
-            });
-          } else if (tx.type === 'outbound') {
-            addChange(tx.warehouseId, targetProductId, -changeQty);
-            const stockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
-            const stockItemRef = doc(db, 'stock_items', stockId);
-            transaction.delete(stockItemRef);
-          } else if (tx.type === 'transfer') {
-            addChange(tx.warehouseId, targetProductId, -changeQty);
-            if (tx.toWarehouseId) {
-              addChange(tx.toWarehouseId, targetProductId, changeQty);
-            }
-            
-            const fromStockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
-            const toStockId = `${tx.toWarehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
-            const stockItemRef = doc(db, 'stock_items', fromStockId);
-            const toStockItemRef = doc(db, 'stock_items', toStockId);
-            
-            const stockItemSnap = stockSnaps[fromStockId];
-            if (stockItemSnap && stockItemSnap.exists()) {
-              const stockData = stockItemSnap.data();
-              transaction.set(toStockItemRef, {
-                ...stockData,
-                warehouseId: tx.toWarehouseId,
-                lastUpdated: new Date().toISOString()
-              });
-              transaction.delete(stockItemRef);
-            } else {
-              transaction.set(toStockItemRef, {
+            if (item.sn && item.sn !== '-') {
+              const stockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
+              const stockItemRef = doc(db, 'stock_items', stockId);
+              transaction.set(stockItemRef, {
                 productId: targetProductId,
                 productCode: item.productCode,
                 productName: item.productName,
-                warehouseId: tx.toWarehouseId,
+                warehouseId: tx.warehouseId,
                 sn: item.sn,
                 entryDate: tx.transactionDate,
                 brandWarrantyStartDate: item.brandWarrantyStartDate || '',
@@ -322,6 +285,49 @@ export default function WarehouseApprovals() {
                 brandWarrantyEndDate: item.brandWarrantyEndDate || '',
                 lastUpdated: new Date().toISOString()
               });
+            }
+          } else if (tx.type === 'outbound') {
+            addChange(tx.warehouseId, targetProductId, -changeQty);
+            if (item.sn && item.sn !== '-') {
+              const stockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
+              const stockItemRef = doc(db, 'stock_items', stockId);
+              transaction.delete(stockItemRef);
+            }
+          } else if (tx.type === 'transfer') {
+            addChange(tx.warehouseId, targetProductId, -changeQty);
+            if (tx.toWarehouseId) {
+              addChange(tx.toWarehouseId, targetProductId, changeQty);
+            }
+            
+            if (item.sn && item.sn !== '-') {
+              const fromStockId = `${tx.warehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
+              const toStockId = `${tx.toWarehouseId}_${item.sn}`.replace(/[^a-zA-Z0-9_\\-]/g, '_');
+              const stockItemRef = doc(db, 'stock_items', fromStockId);
+              const toStockItemRef = doc(db, 'stock_items', toStockId);
+              
+              const stockItemSnap = stockSnaps[fromStockId];
+              if (stockItemSnap && stockItemSnap.exists()) {
+                const stockData = stockItemSnap.data();
+                transaction.set(toStockItemRef, {
+                  ...stockData,
+                  warehouseId: tx.toWarehouseId,
+                  lastUpdated: new Date().toISOString()
+                });
+                transaction.delete(stockItemRef);
+              } else {
+                transaction.set(toStockItemRef, {
+                  productId: targetProductId,
+                  productCode: item.productCode,
+                  productName: item.productName,
+                  warehouseId: tx.toWarehouseId,
+                  sn: item.sn,
+                  entryDate: tx.transactionDate,
+                  brandWarrantyStartDate: item.brandWarrantyStartDate || '',
+                  brandWarrantyMonths: item.brandWarrantyMonths || 0,
+                  brandWarrantyEndDate: item.brandWarrantyEndDate || '',
+                  lastUpdated: new Date().toISOString()
+                });
+              }
             }
           }
         }

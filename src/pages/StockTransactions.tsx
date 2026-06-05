@@ -539,9 +539,10 @@ export default function StockTransactions() {
       setOrderSearchTerm('');
       setTaskName('');
       setOutboundPurpose('order');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving transaction:", error);
-      window.alert("Lỗi khi lưu phiếu");
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      window.alert(`Lỗi khi lưu phiếu: ${errorMsg}`);
     }
   };
 

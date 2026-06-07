@@ -330,17 +330,17 @@ service cloud.firestore {
     }
 
     // Warehouse & Inventory
-    match /warehouses/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff() || isManager() || hasPermission('manage_warehouse'); }
-    match /product_categories/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff() || isManager() || hasPermission('manage_warehouse'); }
-    match /products/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff() || isManager() || hasPermission('manage_warehouse'); }
-    match /inventory/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff() || isManager() || hasPermission('manage_warehouse'); }
+    match /warehouses/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('manage_warehouse'); }
+    match /product_categories/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('manage_warehouse'); }
+    match /products/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('manage_warehouse'); }
+    match /inventory/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('manage_warehouse'); }
     match /stock_transactions/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isManager() || hasPermission('view_warehouse') || hasPermission('manage_warehouse');
-      allow create: if isDirector() || isHR() || isFinanceStaff() || isManager() || hasPermission('manage_warehouse');
-      allow update: if isDirector() || isFinanceStaff() || isManager() || hasPermission('manage_warehouse');
+      allow read: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('view_warehouse') || hasPermission('manage_warehouse');
+      allow create: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('manage_warehouse');
+      allow update: if isDirector() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('manage_warehouse');
       allow delete: if isDirector();
     }
-    match /stock_items/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff() || isManager() || hasPermission('manage_warehouse'); }
+    match /stock_items/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('manage_warehouse'); }
 
     // Business Expenses
     match /business_expenses/{id} {

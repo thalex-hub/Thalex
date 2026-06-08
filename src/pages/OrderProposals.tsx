@@ -51,7 +51,7 @@ export default function OrderProposals() {
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
   const [customers, setCustomers] = React.useState<any[]>([]);
   const [showGuide, setShowGuide] = React.useState(true);
-  const { isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user, isSuperAdmin } = useAuth();
+  const { appUser, isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user, isSuperAdmin } = useAuth();
   const location = useLocation();
   const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR;
 
@@ -190,7 +190,7 @@ export default function OrderProposals() {
       });
     } else if (user) {
       // At least put self in the users list
-      setUsers([{ id: user.uid, fullName: user.displayName, email: user.email }]);
+      setUsers([{ id: user.uid, fullName: appUser?.fullName || user.displayName || 'Self', email: user.email }]);
     }
     
     let unsubProposals = () => {};
@@ -346,7 +346,7 @@ export default function OrderProposals() {
       const payload = {
           name: newProposal.name,
           customerId: newProposal.customerId,
-          customerName: customer?.name || 'Khách hàng lẻ',
+          customerName: customer?.companyName || customer?.name || 'Khách hàng lẻ',
           sellingPrice: Number(newProposal.sellingPrice),
           sellingVAT: Number(newProposal.sellingVAT),
           contractValueWithVAT: financials.contractValueWithVAT,
@@ -381,7 +381,7 @@ export default function OrderProposals() {
           const docRef = await addDoc(collection(db, 'order_proposals'), {
             ...payload,
             createdBy: user.uid,
-            userName: user.displayName || 'Kinh doanh',
+            userName: appUser?.fullName || user.displayName || 'Kinh doanh',
             createdAt: new Date().toISOString(),
             status: 'pending'
           });
@@ -393,7 +393,7 @@ export default function OrderProposals() {
           sendProposalEmailNotification({
             proposalType: 'order_proposals',
             status: 'pending',
-            requesterName: user.displayName || 'Kinh doanh',
+            requesterName: appUser?.fullName || user.displayName || 'Kinh doanh',
             details: detailStr
           }).catch(err => console.error("Error sending proposal creation notification email:", err));
         }
@@ -487,7 +487,7 @@ export default function OrderProposals() {
         sendProposalEmailNotification({
           proposalType: 'order_proposals',
           status: 'pending_director',
-          requesterName: proposal.userName || 'Kinh doanh',
+          requesterName: users.find(u => u.id === proposal.createdBy)?.fullName || proposal.userName || 'Kinh doanh',
           details: detailStr
         }).catch(err => console.error("Error sending proposal transition notification email:", err));
       }
@@ -581,7 +581,7 @@ export default function OrderProposals() {
 
         // Find General Department Manager (Phòng tổng hợp)
         let generalManagerId = proposal.createdBy; // Fallback
-        let generalManagerName = proposal.userName;
+        let generalManagerName = users.find(u => u.id === proposal.createdBy)?.fullName || proposal.userName;
         
         try {
           const allDepts = await getDocs(collection(db, 'departments'));
@@ -974,7 +974,7 @@ export default function OrderProposals() {
                </div>
                <div>
                   <div className="flex items-center gap-2 text-sm">
-                    <p className="font-bold text-gray-900">{prop.userName}</p>
+                    <p className="font-bold text-gray-900">{users.find(u => u.id === prop.createdBy)?.fullName || prop.userName}</p>
                     <span className="text-gray-400">•</span>
                     <p className="text-gray-500">{safeFormatDate(prop.createdAt, 'dd/MM/yyyy')}</p>
                   </div>
@@ -1169,11 +1169,11 @@ export default function OrderProposals() {
                            </div>
                            <div>
                               <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Khách hàng</p>
-                              <p className="font-bold text-gray-900">{viewingProposal.customerName}</p>
+                              <p className="font-bold text-gray-900">{customers.find(c => c.id === viewingProposal.customerId)?.companyName || customers.find(c => c.id === viewingProposal.customerId)?.name || viewingProposal.customerName}</p>
                            </div>
                            <div>
                               <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Người đề xuất</p>
-                              <p className="font-bold text-gray-900">{viewingProposal.userName}</p>
+                              <p className="font-bold text-gray-900">{users.find(u => u.id === viewingProposal.createdBy)?.fullName || viewingProposal.userName}</p>
                            </div>
                            <div>
                               <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Ngày đề xuất</p>

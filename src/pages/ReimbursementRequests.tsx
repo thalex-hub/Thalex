@@ -2,7 +2,7 @@ import React from 'react';
 import { db, auth, storage } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, ShieldCheck, Wallet, FileText, Upload, RefreshCcw, ArrowRight, FileSpreadsheet, Banknote, ReceiptText, ClipboardCheck, Trash2, Search } from 'lucide-react';
+import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, ShieldCheck, Wallet, FileText, Upload, RefreshCcw, ArrowRight, FileSpreadsheet, Banknote, ReceiptText, ClipboardCheck, Trash2, Search, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { cn, formatCurrency, formatCurrencyInput, parseCurrencyInput, downloadFile, withTimeout } from '../lib/utils';
@@ -63,7 +63,11 @@ export default function ReimbursementRequests() {
     purpose: '',
     advanceRequestId: '',
     relatedOrderId: '',
+    followers: [] as string[]
   });
+  const [followerSearch, setFollowerSearch] = React.useState('');
+  const [showFollowerDropdown, setShowFollowerDropdown] = React.useState(false);
+  const [users, setUsers] = React.useState<any[]>([]);
 
   const { isAdmin, isFinanceStaff, user, appUser, isManager, isAccountant, isSuperAdmin, isDirector, hasPermission } = useAuth();
   const canApprove = isDirector || hasPermission('approve_reimbursements');
@@ -71,6 +75,14 @@ export default function ReimbursementRequests() {
 
   React.useEffect(() => {
     if (!user) return;
+
+    let unsubUsers = () => {};
+    unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+      setUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error("Error loading users:", err);
+      setUsers([]);
+    });
 
     // Fetch orders for selection
     const fetchOrders = async () => {
@@ -102,26 +114,57 @@ export default function ReimbursementRequests() {
       setAdvances(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // Viewing logic: Staff sees their own + settlements for their advances, Accountant/Director sees all
-    const q = (isDirector || isFinanceStaff || hasPermission('view_reimbursements') || hasPermission('menu_proposals_view'))
-      ? query(collection(db, 'reimbursement_requests'))
-      : query(
-          collection(db, 'reimbursement_requests'), 
-          or(
-            where('userId', '==', user.uid),
-            where('advanceOwnerId', '==', user.uid)
-          )
-        );
-      
-    const unsubRequests = onSnapshot(q, (snap) => {
-      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      data.sort((a: any, b: any) => new Date(b.requestDate || b.createdAt).getTime() - new Date(a.requestDate || a.createdAt).getTime());
-      setRequests(data);
-    }, (error) => {
-      console.error("Firestore read error:", error);
-    });
+    // Viewing logic: Staff sees their own + settlements for their advances + followers, Accountant/Director sees all
+    let unsubRequests = () => {};
+    if (isDirector || isFinanceStaff || hasPermission('view_reimbursements') || hasPermission('menu_proposals_view')) {
+      const q = query(collection(db, 'reimbursement_requests'));
+      unsubRequests = onSnapshot(q, (snap) => {
+        let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        data.sort((a: any, b: any) => new Date(b.requestDate || b.createdAt).getTime() - new Date(a.requestDate || a.createdAt).getTime());
+        setRequests(data);
+      }, (error) => {
+        console.error("Firestore read error:", error);
+      });
+    } else {
+      let listCreatedOrOwned: any[] = [];
+      let listFollowed: any[] = [];
+
+      const combineAndSort = () => {
+        const mergedMap = new Map();
+        listCreatedOrOwned.forEach(item => mergedMap.set(item.id, item));
+        listFollowed.forEach(item => mergedMap.set(item.id, item));
+        const mergedList = Array.from(mergedMap.values());
+        mergedList.sort((a: any, b: any) => new Date(b.requestDate || b.createdAt).getTime() - new Date(a.requestDate || a.createdAt).getTime());
+        setRequests(mergedList);
+      };
+
+      const q1 = query(
+        collection(db, 'reimbursement_requests'), 
+        or(
+          where('userId', '==', user.uid),
+          where('advanceOwnerId', '==', user.uid)
+        )
+      );
+      const q2 = query(collection(db, 'reimbursement_requests'), where('followers', 'array-contains', user.uid));
+
+      const unsub1 = onSnapshot(q1, (snap) => {
+        listCreatedOrOwned = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        combineAndSort();
+      });
+
+      const unsub2 = onSnapshot(q2, (snap) => {
+        listFollowed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        combineAndSort();
+      });
+
+      unsubRequests = () => {
+        unsub1();
+        unsub2();
+      };
+    }
 
     return () => {
+      unsubUsers();
       unsubAdvances();
       unsubRequests();
     };
@@ -200,6 +243,7 @@ export default function ReimbursementRequests() {
         advanceRequestId: newRequest.advanceRequestId || null,
         relatedOrderId: newRequest.relatedOrderId || null,
         attachments: uploadedAttachments,
+        followers: newRequest.followers || [],
         requestDate: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         status: 'pending', // Step 1: Accountant Review
@@ -224,7 +268,7 @@ export default function ReimbursementRequests() {
       }).catch(err => console.error("Error sending proposal creation notification email:", err));
 
       setShowAddModal(false);
-      setNewRequest({ title: '', amount: '', purpose: '', advanceRequestId: '', relatedOrderId: '' });
+      setNewRequest({ title: '', amount: '', purpose: '', advanceRequestId: '', relatedOrderId: '', followers: [] });
       setSearchTerm('');
       setSelectedFiles([]);
       setError(null);
@@ -1290,6 +1334,91 @@ export default function ReimbursementRequests() {
                           )}
                       </div>
                      )}
+                     <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-2">
+                           Người theo dõi
+                        </label>
+                        <div className="space-y-3">
+                           <div className="relative">
+                              <div className="relative">
+                                 <input 
+                                    type="text"
+                                    placeholder="Tìm nhân viên..."
+                                    className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all shadow-sm font-medium"
+                                    value={followerSearch}
+                                    onChange={e => {
+                                       setFollowerSearch(e.target.value);
+                                       setShowFollowerDropdown(true);
+                                    }}
+                                    onFocus={() => setShowFollowerDropdown(true)}
+                                 />
+                                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                              </div>
+
+                              <AnimatePresence>
+                                 {showFollowerDropdown && (
+                                    <>
+                                       <div className="fixed inset-0 z-10" onClick={() => setShowFollowerDropdown(false)} />
+                                       <motion.div 
+                                          initial={{ opacity: 0, y: -10 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          exit={{ opacity: 0, y: -10 }}
+                                          className="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl max-h-60 overflow-y-auto overflow-x-hidden p-2 space-y-1"
+                                       >
+                                          {users
+                                             .filter(u => 
+                                                u.id !== user?.uid && 
+                                                !newRequest.followers.includes(u.id) &&
+                                                (
+                                                   (u.fullName || '').toLowerCase().includes(followerSearch.toLowerCase()) ||
+                                                   (u.email || '').toLowerCase().includes(followerSearch.toLowerCase()) ||
+                                                   (u.employeeCode || '').toLowerCase().includes(followerSearch.toLowerCase())
+                                                )
+                                             )
+                                             .map(u => (
+                                                <button
+                                                   key={u.id}
+                                                   type="button"
+                                                   onClick={() => {
+                                                      setNewRequest({...newRequest, followers: [...newRequest.followers, u.id]});
+                                                      setFollowerSearch('');
+                                                      setShowFollowerDropdown(false);
+                                                   }}
+                                                   className="w-full text-left px-4 py-3 hover:bg-blue-50 rounded-xl transition-colors flex items-center gap-3"
+                                                >
+                                                   <img src={u.avatar} className="w-8 h-8 rounded-full shadow-sm" alt="" />
+                                                   <div>
+                                                      <p className="font-bold text-gray-900 text-sm">{u.fullName}</p>
+                                                      <p className="text-[10px] text-gray-400">{u.email}</p>
+                                                   </div>
+                                                </button>
+                                             ))}
+                                       </motion.div>
+                                    </>
+                                 )}
+                              </AnimatePresence>
+                           </div>
+                           
+                           <div className="flex flex-wrap gap-2">
+                              {newRequest.followers.map(fId => {
+                                 const fUser = users.find(u => u.id === fId);
+                                 return (
+                                    <div key={fId} className="flex items-center gap-2 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-xl border border-blue-100 text-xs font-bold">
+                                       <img src={fUser?.avatar} className="w-5 h-5 rounded-full" alt="" />
+                                       <span>{fUser?.fullName}</span>
+                                       <button 
+                                          type="button"
+                                          onClick={() => setNewRequest({...newRequest, followers: newRequest.followers.filter(id => id !== fId)})}
+                                          className="hover:text-red-500 transition-colors"
+                                       >
+                                          <XCircle size={14} />
+                                       </button>
+                                    </div>
+                                 );
+                              })}
+                           </div>
+                        </div>
+                     </div>
                      <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Lý do / Mô tả chi tiết</label>
                         <textarea 

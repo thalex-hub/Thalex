@@ -35,6 +35,7 @@ import {
   FileSpreadsheet,
   Trash2,
   TrendingUp,
+  User,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -934,9 +935,15 @@ export default function Orders() {
                     {order.name}
                   </h3>
                   <div className="space-y-2 mb-6 text-xs text-gray-600 border-t border-gray-50 pt-3">
-                    <div className="flex items-center gap-2 text-gray-550 mb-2">
-                      <Calendar size={13} />
-                      <span>{safeFormatDate(order.startDate, "dd/MM/yyyy")}</span>
+                    <div className="flex items-center gap-4 text-gray-550 mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar size={13} />
+                        <span>{safeFormatDate(order.startDate, "dd/MM/yyyy")}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <User size={13} className="text-gray-400" />
+                        <span>{users.find(u => u.id === order.responsibleUserId)?.fullName || users.find(u => u.id === order.createdBy)?.fullName || order.responsibleUserName || 'Chưa gán'}</span>
+                      </div>
                     </div>
                     
                     <div className="flex items-center justify-between">
@@ -1086,8 +1093,14 @@ export default function Orders() {
                         {order.name}
                       </Link>
                     </td>
-                    <td className="px-6 py-4 text-xs text-gray-500 font-medium">
-                      {safeFormatDate(order.startDate, "dd/MM/yyyy")}
+                    <td className="px-6 py-4 text-xs font-medium">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-gray-500">{safeFormatDate(order.startDate, "dd/MM/yyyy")}</span>
+                        <span className="text-gray-400 font-bold truncate max-w-[120px]" title={users.find(u => u.id === order.responsibleUserId)?.fullName || users.find(u => u.id === order.createdBy)?.fullName || order.responsibleUserName || 'Chưa gán'}>
+                          <User size={10} className="inline mr-1" />
+                          {users.find(u => u.id === order.responsibleUserId)?.fullName || users.find(u => u.id === order.createdBy)?.fullName || order.responsibleUserName || 'Chưa gán'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className="font-black text-gray-800 text-xs">

@@ -1566,7 +1566,7 @@ export default function OrderDetail() {
             </div>
             <div className="flex items-center gap-4 text-xs font-medium text-gray-500">
               <span className="flex items-center gap-1.5"><Calendar size={13} className="text-gray-400" /> {safeFormatDate(order.createdAt, 'dd/MM/yyyy')}</span>
-              <span className="flex items-center gap-1.5"><User size={13} className="text-gray-400" /> {order.responsibleUserName || 'Chưa gán'}</span>
+              <span className="flex items-center gap-1.5"><User size={13} className="text-gray-400" /> {users.find(u => u.uid === order.responsibleUserId)?.fullName || order.responsibleUserName || 'Chưa gán'}</span>
             </div>
           </div>
         </div>

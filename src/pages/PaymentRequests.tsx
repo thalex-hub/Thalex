@@ -52,6 +52,7 @@ export default function PaymentRequests() {
   const [requests, setRequests] = React.useState<any[]>([]);
   const [orders, setOrders] = React.useState<any[]>([]);
   const [showAddModal, setShowAddModal] = React.useState(false);
+  const [editingRequestId, setEditingRequestId] = React.useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = React.useState<any>(null);
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -254,34 +255,62 @@ export default function PaymentRequests() {
         })
       );
 
-      await withTimeout(addDoc(collection(db, 'payment_requests'), {
-        userId: user.uid,
-        userName: appUser?.fullName || user.displayName || 'Nhân viên',
-        userEmail: user.email,
-        requestType: 'payment',
-        category: newRequest.category,
-        title: newRequest.title,
-        amount: Number(newRequest.amount),
-        purpose: newRequest.purpose,
-        relatedOrderId: newRequest.relatedOrderId || null,
-        paymentMethod: newRequest.paymentMethod,
-        accountName: newRequest.paymentMethod === 'transfer' ? newRequest.accountName : null,
-        accountNumber: newRequest.paymentMethod === 'transfer' ? newRequest.accountNumber : null,
-        bankName: newRequest.paymentMethod === 'transfer' ? newRequest.bankName : null,
-        attachments: uploadedAttachments,
-        approvalLevel: 'Finance -> Director',
-        requestDate: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        status: 'pending_finance',
-        paymentStatus: 'not_disbursed',
-        history: [{
-          action: 'create',
+      if (editingRequestId) {
+        const reqRef = doc(db, 'payment_requests', editingRequestId);
+        const reqSnap = await getDoc(reqRef);
+        let oldHistory = [];
+        if (reqSnap.exists()) {
+          oldHistory = reqSnap.data().history || [];
+        }
+        await withTimeout(updateDoc(reqRef, {
+          category: newRequest.category,
+          title: newRequest.title,
+          amount: Number(newRequest.amount),
+          purpose: newRequest.purpose,
+          relatedOrderId: newRequest.relatedOrderId || null,
+          paymentMethod: newRequest.paymentMethod,
+          accountName: newRequest.paymentMethod === 'transfer' ? newRequest.accountName : null,
+          accountNumber: newRequest.paymentMethod === 'transfer' ? newRequest.accountNumber : null,
+          bankName: newRequest.paymentMethod === 'transfer' ? newRequest.bankName : null,
+          attachments: uploadedAttachments,
+          status: 'pending_finance',
+          paymentStatus: 'not_disbursed',
+          history: [...oldHistory, {
+            action: 'edit',
+            userName: appUser?.fullName || user.displayName || 'Nhân viên',
+            timestamp: new Date().toISOString()
+          }]
+        }));
+      } else {
+        await withTimeout(addDoc(collection(db, 'payment_requests'), {
+          userId: user.uid,
           userName: appUser?.fullName || user.displayName || 'Nhân viên',
-          timestamp: new Date().toISOString()
-        }]
-      }));
+          userEmail: user.email,
+          requestType: 'payment',
+          category: newRequest.category,
+          title: newRequest.title,
+          amount: Number(newRequest.amount),
+          purpose: newRequest.purpose,
+          relatedOrderId: newRequest.relatedOrderId || null,
+          paymentMethod: newRequest.paymentMethod,
+          accountName: newRequest.paymentMethod === 'transfer' ? newRequest.accountName : null,
+          accountNumber: newRequest.paymentMethod === 'transfer' ? newRequest.accountNumber : null,
+          bankName: newRequest.paymentMethod === 'transfer' ? newRequest.bankName : null,
+          attachments: uploadedAttachments,
+          approvalLevel: 'Finance -> Director',
+          requestDate: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          status: 'pending_finance',
+          paymentStatus: 'not_disbursed',
+          history: [{
+            action: 'create',
+            userName: appUser?.fullName || user.displayName || 'Nhân viên',
+            timestamp: new Date().toISOString()
+          }]
+        }));
+      }
 
-      // Trigger proposal email notification on creation
+      // Trigger proposal email notification on creation / edit
       const formattedAmount = Number(newRequest.amount).toLocaleString('vi-VN');
       const detailStr = `Chuyên mục: ${newRequest.category}. Số tiền: ${formattedAmount} VNĐ. Lý do/Nội dung: ${newRequest.purpose || newRequest.title}`;
       
@@ -293,6 +322,7 @@ export default function PaymentRequests() {
       }).catch(err => console.error("Error sending proposal creation notification email:", err));
 
       setShowAddModal(false);
+      setEditingRequestId(null);
       setNewRequest({ 
         category: 'other',
         title: '', 
@@ -682,11 +712,12 @@ export default function PaymentRequests() {
                   </div>
                )}
 
-               {req.userId === user?.uid && req.status === 'returned' && (
+               {req.userId === user?.uid && (req.status === 'returned' || req.status.startsWith('pending')) && (
                  <Link 
                    to="#"
                    onClick={(e) => {
                      e.preventDefault();
+                     setEditingRequestId(req.id);
                      setNewRequest({
                        category: req.category,
                        title: req.title,

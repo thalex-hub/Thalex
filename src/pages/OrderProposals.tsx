@@ -1032,7 +1032,7 @@ export default function OrderProposals() {
                    <Trash2 size={20} />
                  </button>
                )}
-               {prop.status === 'pending' && prop.createdBy === user?.uid && (
+               {prop.createdBy === user?.uid && (prop.status === 'returned' || prop.status.startsWith('pending')) && (
                  <button 
                    onClick={(e) => {
                      e.stopPropagation();

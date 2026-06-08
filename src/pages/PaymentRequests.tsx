@@ -768,6 +768,7 @@ export default function PaymentRequests() {
                    to="#"
                    onClick={(e) => {
                      e.preventDefault();
+                     e.stopPropagation();
                      setEditingRequestId(req.id);
                      setNewRequest({
                        category: req.category,

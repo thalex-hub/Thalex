@@ -764,8 +764,8 @@ export default function PaymentRequests() {
                )}
 
                {req.userId === user?.uid && (req.status === 'returned' || req.status.startsWith('pending')) && (
-                 <Link 
-                   to="#"
+                 <button 
+                   type="button"
                    onClick={(e) => {
                      e.preventDefault();
                      e.stopPropagation();
@@ -783,12 +783,22 @@ export default function PaymentRequests() {
                        attachments: req.attachments || [],
                        followers: req.followers || []
                      });
+                     if (req.relatedOrderId) {
+                       const relatedOrder = orders.find(o => o.id === req.relatedOrderId);
+                       if (relatedOrder) {
+                          setSearchTerm(`${relatedOrder.code} - ${relatedOrder.name}`);
+                       } else {
+                          setSearchTerm('Đơn hàng không tồn tại');
+                       }
+                     } else {
+                       setSearchTerm('');
+                     }
                      setShowAddModal(true);
                    }}
                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold text-xs"
                  >
                    Sửa & Gửi lại
-                 </Link>
+                 </button>
                )}
             </div>
           </div>
@@ -1167,7 +1177,7 @@ export default function PaymentRequests() {
                        setError(null);
                     }} className="flex-1 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-50">Hủy</button>
                     <button type="submit" disabled={loading} className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">
-                      {loading ? 'Đang gửi...' : 'Gửi đề xuất'}
+                      {loading ? 'Đang gửi...' : (editingRequestId ? 'Cập nhật đề xuất' : 'Gửi đề xuất')}
                     </button>
                   </div>
                </form>

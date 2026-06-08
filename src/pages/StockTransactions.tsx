@@ -622,6 +622,14 @@ export default function StockTransactions() {
              });
              targetProductId = newProdRef.id;
              productMapping[item.productCode] = targetProductId;
+          } else {
+             if (item.productName && item.productName.trim()) {
+                const existingProdRef = doc(db, 'products', targetProductId);
+                transaction.update(existingProdRef, {
+                  name: item.productName.trim(),
+                  lastUpdated: new Date().toISOString()
+                });
+             }
           }
 
           const changeQty = item.quantity || 0;

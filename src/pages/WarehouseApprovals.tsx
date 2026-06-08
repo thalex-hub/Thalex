@@ -732,8 +732,7 @@ export default function WarehouseApprovals() {
                     <div key={idx} className="p-4 rounded-2xl border border-gray-100 space-y-2">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-bold text-gray-900 text-sm">{item.productName}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{item.productCode}</p>
+                          <p className="font-bold text-gray-900 text-sm">{item.productName} <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">({item.productCode})</span></p>
                         </div>
                         <p className="text-sm font-black text-gray-900">{item.quantity} {item.unit}</p>
                       </div>

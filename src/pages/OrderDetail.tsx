@@ -3310,11 +3310,12 @@ export default function OrderDetail() {
                                               {tx.items && tx.items.map((item: any, itemIdx: number) => (
                                                  <div key={itemIdx} className="flex items-center justify-between text-xs bg-gray-50/50 p-2.5 rounded-xl border border-gray-50">
                                                     <div>
-                                                       <p className="font-bold text-gray-800">{item.productName}</p>
-                                                       <div className="flex gap-2 text-[10px] text-gray-400 mt-0.5 font-medium font-mono">
-                                                          <span>Mã: <span className="text-gray-500 font-bold">{item.productCode}</span></span>
-                                                          {item.sn && <span>S/N: <span className="text-gray-500 font-bold">{item.sn}</span></span>}
-                                                       </div>
+                                                       <p className="font-bold text-gray-800">{item.productName} ({item.productCode})</p>
+                                                       {item.sn && (
+                                                         <div className="flex gap-2 text-[10px] text-gray-400 mt-0.5 font-medium font-mono">
+                                                            <span>S/N: <span className="text-gray-500 font-bold">{item.sn}</span></span>
+                                                         </div>
+                                                       )}
                                                     </div>
                                                     <div className="text-right font-black text-blue-600 whitespace-nowrap pl-4 font-mono">
                                                        {item.quantity} {item.unit}
@@ -4066,7 +4067,6 @@ export default function OrderDetail() {
                     <thead>
                       <tr className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100">
                         <th className="px-4 py-2.5">Sản phẩm</th>
-                        <th className="px-4 py-2.5">Mã số</th>
                         <th className="px-4 py-2.5 text-right">Số lượng</th>
                       </tr>
                     </thead>
@@ -4074,14 +4074,13 @@ export default function OrderDetail() {
                       {viewingTx.items && viewingTx.items.map((item: any, idx: number) => (
                         <tr key={idx} className="hover:bg-gray-50/50">
                           <td className="px-4 py-3">
-                            <p className="font-bold text-gray-800">{item.productName}</p>
+                            <p className="font-bold text-gray-800">{item.productName} ({item.productCode})</p>
                             {item.sn && (
                               <span className="inline-block mt-1 font-mono text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
                                 S/N: {item.sn}
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 font-mono text-[10px] font-black text-gray-500 uppercase">{item.productCode}</td>
                           <td className="px-4 py-3 text-right font-black text-gray-900 font-mono">
                             {item.quantity} {item.unit}
                           </td>

@@ -1767,7 +1767,6 @@ export default function StockTransactions() {
                     <thead>
                       <tr className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100">
                         <th className="px-4 py-2.5">Sản phẩm</th>
-                        <th className="px-4 py-2.5">Mã số</th>
                         <th className="px-4 py-2.5 text-right">Số lượng</th>
                       </tr>
                     </thead>
@@ -1775,7 +1774,7 @@ export default function StockTransactions() {
                       {detailsTx.items.map((item, idx) => (
                         <tr key={idx} className="hover:bg-gray-50/50">
                           <td className="px-4 py-3 align-top">
-                            <p className="font-bold text-gray-800">{item.productName}</p>
+                            <p className="font-bold text-gray-800">{item.productName} ({item.productCode})</p>
                             <div className="flex flex-col gap-1.5 mt-2">
                               {item.sn && (
                                 <span className="inline-block self-start font-mono text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
@@ -1806,7 +1805,6 @@ export default function StockTransactions() {
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-3 font-mono text-[10px] font-black text-gray-500 uppercase align-top">{item.productCode}</td>
                           <td className="px-4 py-3 text-right font-black text-gray-900 font-mono align-top">
                             {item.quantity} {item.unit}
                           </td>

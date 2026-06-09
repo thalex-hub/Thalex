@@ -968,7 +968,7 @@ export default function AdvanceRequests() {
                     <Wallet className="text-blue-600" size={24} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900">Chi tiết tạm ứng</h3>
+                    <h3 className="text-xl font-bold text-gray-900">{showDetailModal.title || 'Chi tiết tạm ứng'}</h3>
                     <p className="text-sm text-gray-500 font-mono">ID: {showDetailModal.id}</p>
                   </div>
                 </div>

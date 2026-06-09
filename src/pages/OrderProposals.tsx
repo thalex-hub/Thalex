@@ -1114,7 +1114,7 @@ export default function OrderProposals() {
                     <FileText size={24} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-gray-900 uppercase">Chi tiết đề xuất đơn hàng</h3>
+                    <h3 className="text-xl font-black text-gray-900 uppercase">{viewingProposal.name || 'Chi tiết đề xuất đơn hàng'}</h3>
                     <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-0.5">Mã số: {viewingProposal.id.substring(0, 8)}</p>
                   </div>
                 </div>

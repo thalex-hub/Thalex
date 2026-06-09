@@ -30,13 +30,13 @@ export default function Customers() {
     billingEmail: '', 
     customerType: 'agent', 
     customerClass: 'regular', 
-    contacts: [{ name: '', phone: '' }],
+    contacts: [{ name: '', phone: '', email: '' }],
     status: 'new', 
     notes: '' 
   });
 
   const addContact = (isEdit: boolean = false) => {
-    const contact = { name: '', phone: '' };
+    const contact = { name: '', phone: '', email: '' };
     if (isEdit) {
       setEditingCustomer({ ...editingCustomer, contacts: [...editingCustomer.contacts, contact] });
     } else {
@@ -141,7 +141,7 @@ export default function Customers() {
       billingEmail: '', 
       customerType: 'agent', 
       customerClass: 'regular', 
-      contacts: [{ name: '', phone: '' }],
+      contacts: [{ name: '', phone: '', email: '' }],
       status: 'new', 
       notes: '' 
     });
@@ -448,14 +448,18 @@ export default function Customers() {
                                   <X size={12} />
                                 </button>
                               )}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
-                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Họ tên người liên hệ</label>
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Họ tên người liên hệ <span className="text-red-500">*</span></label>
                                   <input required className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 outline-none text-sm" value={contact.name} onChange={e => updateContact(index, 'name', e.target.value, false)} />
                                 </div>
                                 <div>
-                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Số điện thoại</label>
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Số điện thoại <span className="text-red-500">*</span></label>
                                   <input required className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 outline-none text-sm" value={contact.phone} onChange={e => updateContact(index, 'phone', e.target.value, false)} />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Email (Không bắt buộc)</label>
+                                  <input type="email" className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 outline-none text-sm" value={contact.email || ''} onChange={e => updateContact(index, 'email', e.target.value, false)} placeholder="contact@example.com" />
                                 </div>
                               </div>
                             </div>
@@ -581,14 +585,18 @@ export default function Customers() {
                                   <X size={12} />
                                 </button>
                               )}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
-                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Họ tên người liên hệ</label>
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Họ tên người liên hệ <span className="text-red-500">*</span></label>
                                   <input required className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 outline-none text-sm" value={contact.name} onChange={e => updateContact(index, 'name', e.target.value, true)} />
                                 </div>
                                 <div>
-                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Số điện thoại</label>
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Số điện thoại <span className="text-red-500">*</span></label>
                                   <input required className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 outline-none text-sm" value={contact.phone} onChange={e => updateContact(index, 'phone', e.target.value, true)} />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Email (Không bắt buộc)</label>
+                                  <input type="email" className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 outline-none text-sm" value={contact.email || ''} onChange={e => updateContact(index, 'email', e.target.value, true)} placeholder="contact@example.com" />
                                 </div>
                               </div>
                             </div>

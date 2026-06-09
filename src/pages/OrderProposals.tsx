@@ -1229,13 +1229,12 @@ export default function OrderProposals() {
                            {viewingProposal.contractDraft && (
                              <a 
                                href={viewingProposal.contractDraft.url} 
-                               target="_blank" 
+                               target={viewingProposal.contractDraft.url.includes('mock-url') ? '_self' : '_blank'} 
                                rel="noopener noreferrer" 
                                className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 transition-all group shadow-sm"
                                onClick={(e) => {
                                  if (viewingProposal.contractDraft.url.includes('mock-url')) {
                                    e.preventDefault();
-                                   alert('File này là dữ liệu cũ chưa được upload thực tế. Vui lòng cập nhật lại đề xuất bằng cách tải lên file mới.');
                                  }
                                }}
                              >
@@ -1248,13 +1247,12 @@ export default function OrderProposals() {
                            {viewingProposal.businessPlan && (
                              <a 
                                href={viewingProposal.businessPlan.url} 
-                               target="_blank" 
+                               target={viewingProposal.businessPlan.url.includes('mock-url') ? '_self' : '_blank'} 
                                rel="noopener noreferrer" 
                                className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 transition-all group shadow-sm"
                                onClick={(e) => {
                                  if (viewingProposal.businessPlan.url.includes('mock-url')) {
                                    e.preventDefault();
-                                   alert('File này là dữ liệu cũ chưa được upload thực tế. Vui lòng cập nhật lại đề xuất bằng cách tải lên file mới.');
                                  }
                                }}
                              >

@@ -71,22 +71,7 @@ export default function Customers() {
   React.useEffect(() => {
     const q = query(collection(db, 'customers'));
     return onSnapshot(q, (snap) => {
-      const allDocs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // Deduplicate by company name and contact info to prevent UI clones
-      const seen = new Set();
-      const uniqueDocs = allDocs.filter((doc: any) => {
-        const key = `${doc.companyName?.trim().toLowerCase()}-${doc.taxCode?.trim() || ''}-${doc.contacts?.[0]?.name?.trim() || ''}`;
-        if (seen.has(key)) {
-          // Temporarily auto-clean the exact clones created by the race condition bug
-          deleteDoc(doc(db, 'customers', doc.id)).catch(() => {});
-          return false;
-        }
-        seen.add(key);
-        return true;
-      });
-
-      setCustomers(uniqueDocs);
+      setCustomers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
   }, []);
 

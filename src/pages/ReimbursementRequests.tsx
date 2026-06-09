@@ -966,6 +966,13 @@ export default function ReimbursementRequests() {
                   </div>
 
                   <div>
+                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tên đề xuất</p>
+                     <div className="p-4 bg-gray-50 rounded-2xl text-sm font-bold text-gray-900 leading-relaxed whitespace-pre-wrap border border-gray-100 mb-4">
+                        {viewingRequest.title}
+                     </div>
+                  </div>
+
+                  <div>
                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Lý do & Mô tả chi tiết</p>
                      <div className="p-4 bg-gray-50 rounded-2xl text-sm text-gray-700 leading-relaxed font-medium whitespace-pre-wrap border border-gray-100">
                         {viewingRequest.purpose}

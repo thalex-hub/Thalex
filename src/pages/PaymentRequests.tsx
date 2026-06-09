@@ -1225,6 +1225,11 @@ export default function PaymentRequests() {
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tên đề xuất</p>
+                  <p className="text-sm font-bold text-gray-900 leading-relaxed">{showDetailModal.title}</p>
+                </div>
+
+                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Nội dung chi tiết</p>
                   <p className="text-sm font-medium text-gray-700 leading-relaxed">{showDetailModal.purpose}</p>
                 </div>

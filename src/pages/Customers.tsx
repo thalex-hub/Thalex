@@ -459,7 +459,7 @@ export default function Customers() {
                                 </div>
                                 <div className="md:col-span-2">
                                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Email</label>
-                                  <input required type="email" className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 outline-none text-sm" value={contact.email} onChange={e => updateContact(index, 'email', e.target.value, false)} />
+                                  <input type="email" className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 outline-none text-sm" value={contact.email} onChange={e => updateContact(index, 'email', e.target.value, false)} />
                                 </div>
                               </div>
                             </div>
@@ -596,7 +596,7 @@ export default function Customers() {
                                 </div>
                                 <div className="md:col-span-2">
                                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Email</label>
-                                  <input required type="email" className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 outline-none text-sm" value={contact.email} onChange={e => updateContact(index, 'email', e.target.value, true)} />
+                                  <input type="email" className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 outline-none text-sm" value={contact.email} onChange={e => updateContact(index, 'email', e.target.value, true)} />
                                 </div>
                               </div>
                             </div>

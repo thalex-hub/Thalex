@@ -94,7 +94,7 @@ export interface Task {
 
 export interface CustomerContact {
   name: string;
-  email: string;
+  email?: string;
   phone: string;
 }
 

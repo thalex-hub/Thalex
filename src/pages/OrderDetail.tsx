@@ -2446,11 +2446,11 @@ export default function OrderDetail() {
               <div className="grid grid-cols-2 gap-4 pb-2">
                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Chưa thuế</p>
-                    <p className="font-black text-gray-900 text-sm truncate">{formatCurrency(order.basePrice || Math.round(orderValue / 1.1))}</p>
+                    <p className="font-black text-gray-900 text-sm break-words">{formatCurrency(order.basePrice || Math.round(orderValue / 1.1))}</p>
                  </div>
                  <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50">
                     <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Tổng (VAT)</p>
-                    <p className="font-black text-blue-700 text-sm truncate">{formatCurrency(orderValue)}</p>
+                    <p className="font-black text-blue-700 text-sm break-words">{formatCurrency(orderValue)}</p>
                  </div>
               </div>
            </div>

@@ -1046,7 +1046,7 @@ export default function CashFlowManagement() {
                   <div className="p-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-6">
                      <div className="space-y-1 bg-blue-50/30 p-3 rounded-2xl border border-blue-100/50">
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Inflow (Tổng thu)</p>
-                        <p className="text-xl font-black text-blue-600 truncate">{formatCurrency(totalIncome)}</p>
+                        <p className="text-xl font-black text-blue-600 break-words">{formatCurrency(totalIncome)}</p>
                         {settlementMetrics.refund > 0 && (
                           <p className="text-[9px] text-emerald-600 font-bold mt-1 tracking-tight">
                             +{formatCurrency(settlementMetrics.refund)} hoàn trả
@@ -1055,7 +1055,7 @@ export default function CashFlowManagement() {
                      </div>
                      <div className="space-y-1 bg-rose-50/30 p-3 rounded-2xl border border-rose-100/50">
                         <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Outflow (Tổng chi)</p>
-                        <p className="text-xl font-black text-rose-500 truncate">{formatCurrency(totalExpense)}</p>
+                        <p className="text-xl font-black text-rose-500 break-words">{formatCurrency(totalExpense)}</p>
                         {settlementMetrics.topUp > 0 && (
                           <p className="text-[9px] text-rose-500 font-bold mt-1 tracking-tight">
                             -{formatCurrency(settlementMetrics.topUp)} chi bù
@@ -1064,17 +1064,17 @@ export default function CashFlowManagement() {
                      </div>
                      <div className="space-y-1 p-3">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Thanh toán</p>
-                        <p className="text-xl font-black text-gray-900 truncate">{formatCurrency(totalPaymentRequestsVal)}</p>
+                        <p className="text-xl font-black text-gray-900 break-words">{formatCurrency(totalPaymentRequestsVal)}</p>
                         <p className="text-[9px] text-gray-400 font-medium">Chi NCC & ĐH</p>
                      </div>
                      <div className="xl:border-l border-gray-100 xl:pl-6 space-y-1 p-3">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Chi thêm H.Ứng</p>
-                        <p className="text-xl font-black text-amber-600 truncate">{formatCurrency(settlementMetrics.topUp)}</p>
+                        <p className="text-xl font-black text-amber-600 break-words">{formatCurrency(settlementMetrics.topUp)}</p>
                         <p className="text-[9px] text-gray-400 font-medium">Chi quyết toán</p>
                      </div>
                      <div className="md:border-l border-gray-100 md:pl-6 space-y-1 p-3">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Thu hồi H.Ứng</p>
-                        <p className="text-xl font-black text-emerald-600 truncate">{formatCurrency(settlementMetrics.refund)}</p>
+                        <p className="text-xl font-black text-emerald-600 break-words">{formatCurrency(settlementMetrics.refund)}</p>
                         <p className="text-[9px] text-gray-400 font-medium tracking-tight">Hoàn tiền công ty</p>
                      </div>
                      <div className="xl:border-l border-gray-100 xl:pl-6 space-y-1 p-3">

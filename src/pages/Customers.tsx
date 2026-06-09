@@ -35,6 +35,7 @@ export default function Customers() {
     notes: '' 
   });
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const isSubmittingRef = React.useRef(false);
 
   const addContact = (isEdit: boolean = false) => {
     const contact = { name: '', phone: '', email: '' };
@@ -70,7 +71,22 @@ export default function Customers() {
   React.useEffect(() => {
     const q = query(collection(db, 'customers'));
     return onSnapshot(q, (snap) => {
-      setCustomers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const allDocs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Deduplicate by company name and contact info to prevent UI clones
+      const seen = new Set();
+      const uniqueDocs = allDocs.filter((doc: any) => {
+        const key = `${doc.companyName?.trim().toLowerCase()}-${doc.taxCode?.trim() || ''}-${doc.contacts?.[0]?.name?.trim() || ''}`;
+        if (seen.has(key)) {
+          // Temporarily auto-clean the exact clones created by the race condition bug
+          deleteDoc(doc(db, 'customers', doc.id)).catch(() => {});
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
+
+      setCustomers(uniqueDocs);
     });
   }, []);
 
@@ -123,7 +139,8 @@ export default function Customers() {
       return;
     }
     
-    if (isSubmitting) return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -155,14 +172,16 @@ export default function Customers() {
       console.error('Error adding customer:', error);
       alert('Có lỗi xảy ra khi tạo khách hàng');
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingCustomer || isSubmitting) return;
+    if (!editingCustomer || isSubmittingRef.current) return;
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     
     try {
@@ -179,6 +198,7 @@ export default function Customers() {
       console.error('Error updating customer:', error);
       alert('Có lỗi xảy ra khi cập nhật khách hàng');
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };

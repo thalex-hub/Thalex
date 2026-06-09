@@ -1,6 +1,7 @@
 import React from 'react';
-import { db } from '../lib/firebase';
+import { db, storage } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, or, getDoc, getDocs, deleteDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -336,12 +337,17 @@ export default function OrderProposals() {
       const customer = customers.find(c => c.id === newProposal.customerId);
       const financials = calculateFinancials(newProposal);
 
-      const mockUpload = (file: File) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        url: `#mock-url-${file.name}` 
-      });
+      const uploadFile = async (file: File) => {
+        const fileRef = ref(storage, `proposals/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`);
+        const snapshot = await uploadBytes(fileRef, file);
+        const url = await getDownloadURL(snapshot.ref);
+        return {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          url: url
+        };
+      };
 
       const payload = {
           name: newProposal.name,
@@ -367,8 +373,8 @@ export default function OrderProposals() {
           profitMarginAfterCIT: financials.marginAfterCIT,
           profitMarginAfterCITOnSalesPreVAT: financials.marginAfterCITOnSalesPreVAT,
           totalCosts: financials.totalCosts,
-          contractDraft: contractFile ? mockUpload(contractFile) : editingProposal?.contractDraft,
-          businessPlan: businessPlanFile ? mockUpload(businessPlanFile) : editingProposal?.businessPlan,
+          contractDraft: contractFile ? await uploadFile(contractFile) : editingProposal?.contractDraft,
+          businessPlan: businessPlanFile ? await uploadFile(businessPlanFile) : editingProposal?.businessPlan,
           followers: newProposal.followers,
           note: newProposal.note,
           expectedDays: Number(newProposal.expectedDays) || 30,

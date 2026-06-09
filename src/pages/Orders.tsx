@@ -589,7 +589,7 @@ export default function Orders() {
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5" title="Tổng giá vốn hàng hoá (COGS) - Không kèm chi phí phụ">
                 Giá vốn COGS
               </p>
-              <p className="text-xs sm:text-sm font-black text-gray-900 border-b border-gray-100 pb-1 truncate" title={formatCurrency(globalStats.totalCostPrice)}>
+              <p className="text-xs sm:text-sm font-black text-gray-900 border-b border-gray-100 pb-1 break-words" title={formatCurrency(globalStats.totalCostPrice)}>
                 {formatCurrency(globalStats.totalCostPrice)}
               </p>
               <p className="text-[8px] font-extrabold text-blue-600 uppercase mt-1">
@@ -603,7 +603,7 @@ export default function Orders() {
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5" title="Tổng giá vốn full - COGS cộng Toàn bộ chi phí quản lý/vận hành">
                 Giá vốn gồm CP
               </p>
-              <p className="text-xs sm:text-sm font-black text-gray-900 border-b border-gray-100 pb-1 truncate" title={formatCurrency(globalStats.totalBudgetedCosts)}>
+              <p className="text-xs sm:text-sm font-black text-gray-900 border-b border-gray-100 pb-1 break-words" title={formatCurrency(globalStats.totalBudgetedCosts)}>
                 {formatCurrency(globalStats.totalBudgetedCosts)}
               </p>
               <p className="text-[8px] font-extrabold text-indigo-600 uppercase mt-1">
@@ -617,7 +617,7 @@ export default function Orders() {
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5" title="Tổng doanh thu chưa VAT / Giá bán chưa VAT của các đơn hàng">
                 Doanh thu chưa VAT
               </p>
-              <p className="text-xs sm:text-sm font-black text-gray-900 border-b border-gray-100 pb-1 truncate" title={formatCurrency(globalStats.totalRevenue)}>
+              <p className="text-xs sm:text-sm font-black text-gray-900 border-b border-gray-100 pb-1 break-words" title={formatCurrency(globalStats.totalRevenue)}>
                 {formatCurrency(globalStats.totalRevenue)}
               </p>
               <p className="text-[8px] font-extrabold text-fuchsia-600 uppercase mt-1">

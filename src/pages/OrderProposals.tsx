@@ -1125,34 +1125,34 @@ export default function OrderProposals() {
 
               <div className="flex-1 overflow-y-auto p-8 space-y-8">
                 {/* Header Summary */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                    <div className="p-3 sm:p-4 bg-blue-50 rounded-2xl border border-blue-100 flex flex-col justify-between min-h-[82px] shadow-sm">
-                      <p className="text-[10px] font-black text-blue-400 uppercase mb-1 tracking-wider line-clamp-1">Giá bán chưa VAT</p>
-                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-blue-700 truncate" title={formatCurrency(viewingProposal.sellingPrice)}>{formatCurrency(viewingProposal.sellingPrice)}</p>
+                      <p className="text-[10px] font-black text-blue-400 uppercase mb-1 tracking-wider">Giá bán chưa VAT</p>
+                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-blue-700 break-words" title={formatCurrency(viewingProposal.sellingPrice)}>{formatCurrency(viewingProposal.sellingPrice)}</p>
                    </div>
                    <div className="p-3 sm:p-4 bg-purple-50 rounded-2xl border border-purple-100 flex flex-col justify-between min-h-[82px] shadow-sm">
-                      <p className="text-[10px] font-black text-purple-400 uppercase mb-1 tracking-wider line-clamp-1">Giá trị HĐ bán (VAT)</p>
-                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-purple-700 truncate" title={formatCurrency(viewFinancials?.contractValueWithVAT)}>{formatCurrency(viewFinancials?.contractValueWithVAT)}</p>
+                      <p className="text-[10px] font-black text-purple-400 uppercase mb-1 tracking-wider">Giá trị HĐ bán (VAT)</p>
+                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-purple-700 break-words" title={formatCurrency(viewFinancials?.contractValueWithVAT)}>{formatCurrency(viewFinancials?.contractValueWithVAT)}</p>
                    </div>
                    <div className="p-3 sm:p-4 bg-amber-50 rounded-2xl border border-amber-100 flex flex-col justify-between min-h-[82px] shadow-sm">
-                      <p className="text-[10px] font-black text-amber-400 uppercase mb-1 tracking-wider line-clamp-1">Tổng chi phí</p>
-                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-amber-700 truncate" title={formatCurrency(viewFinancials?.totalCosts)}>{formatCurrency(viewFinancials?.totalCosts)}</p>
+                      <p className="text-[10px] font-black text-amber-400 uppercase mb-1 tracking-wider">Tổng chi phí</p>
+                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-amber-700 break-words" title={formatCurrency(viewFinancials?.totalCosts)}>{formatCurrency(viewFinancials?.totalCosts)}</p>
                    </div>
                    <div className="p-3 sm:p-4 bg-green-50 rounded-2xl border border-green-100 flex flex-col justify-between min-h-[82px] shadow-sm">
-                      <p className="text-[10px] font-black text-green-400 uppercase mb-1 tracking-wider line-clamp-1">LN dự kiến</p>
-                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-green-700 truncate" title={formatCurrency(viewFinancials?.expectedProfit)}>{formatCurrency(viewFinancials?.expectedProfit)}</p>
+                      <p className="text-[10px] font-black text-green-400 uppercase mb-1 tracking-wider">LN dự kiến</p>
+                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-green-700 break-words" title={formatCurrency(viewFinancials?.expectedProfit)}>{formatCurrency(viewFinancials?.expectedProfit)}</p>
                     </div>
                    <div className="p-3 sm:p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex flex-col justify-between min-h-[82px] shadow-sm">
-                      <p className="text-[10px] font-black text-indigo-400 uppercase mb-1 tracking-wider line-clamp-1">Tỉ lệ LN/Giá vốn</p>
-                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-indigo-700 truncate" title={formatPercent(viewFinancials?.profitMargin)}>{formatPercent(viewFinancials?.profitMargin)}</p>
+                      <p className="text-[10px] font-black text-indigo-400 uppercase mb-1 tracking-wider">Tỉ lệ LN/Giá vốn</p>
+                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-indigo-700 break-words" title={formatPercent(viewFinancials?.profitMargin)}>{formatPercent(viewFinancials?.profitMargin)}</p>
                    </div>
                    <div className="p-3 sm:p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex flex-col justify-between min-h-[82px] shadow-sm">
-                      <p className="text-[10px] font-black text-emerald-400 uppercase mb-1 tracking-wider line-clamp-1">Tỉ lệ LN ST/Giá vốn</p>
-                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-emerald-700 truncate" title={formatPercent(viewFinancials?.profitMarginAfterCIT)}>{formatPercent(viewFinancials?.profitMarginAfterCIT)}</p>
+                      <p className="text-[10px] font-black text-emerald-400 uppercase mb-1 tracking-wider">Tỉ lệ LN ST/Giá vốn</p>
+                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-emerald-700 break-words" title={formatPercent(viewFinancials?.profitMarginAfterCIT)}>{formatPercent(viewFinancials?.profitMarginAfterCIT)}</p>
                    </div>
                    <div className="p-3 sm:p-4 bg-sky-50 rounded-2xl border border-sky-100 flex flex-col justify-between min-h-[82px] shadow-sm">
-                      <p className="text-[10px] font-black text-sky-400 uppercase mb-1 tracking-wider line-clamp-1">Tỉ lệ LN ST/Giá bán</p>
-                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-sky-700 truncate" title={formatPercent(viewFinancials?.profitMarginAfterCITOnSalesPreVAT)}>{formatPercent(viewFinancials?.profitMarginAfterCITOnSalesPreVAT)}</p>
+                      <p className="text-[10px] font-black text-sky-400 uppercase mb-1 tracking-wider">Tỉ lệ LN ST/Giá bán</p>
+                      <p className="text-xs sm:text-sm lg:text-[15px] font-black text-sky-700 break-words" title={formatPercent(viewFinancials?.profitMarginAfterCITOnSalesPreVAT)}>{formatPercent(viewFinancials?.profitMarginAfterCITOnSalesPreVAT)}</p>
                    </div>
                 </div>
 

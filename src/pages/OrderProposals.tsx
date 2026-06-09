@@ -1227,7 +1227,18 @@ export default function OrderProposals() {
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
                            {viewingProposal.contractDraft && (
-                             <a href={viewingProposal.contractDraft.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 transition-all group shadow-sm">
+                             <a 
+                               href={viewingProposal.contractDraft.url} 
+                               target="_blank" 
+                               rel="noopener noreferrer" 
+                               className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 transition-all group shadow-sm"
+                               onClick={(e) => {
+                                 if (viewingProposal.contractDraft.url.includes('mock-url')) {
+                                   e.preventDefault();
+                                   alert('File này là dữ liệu cũ chưa được upload thực tế. Vui lòng cập nhật lại đề xuất bằng cách tải lên file mới.');
+                                 }
+                               }}
+                             >
                                 <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                    <Paperclip size={16} />
                                 </div>
@@ -1235,7 +1246,18 @@ export default function OrderProposals() {
                              </a>
                            )}
                            {viewingProposal.businessPlan && (
-                             <a href={viewingProposal.businessPlan.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 transition-all group shadow-sm">
+                             <a 
+                               href={viewingProposal.businessPlan.url} 
+                               target="_blank" 
+                               rel="noopener noreferrer" 
+                               className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 transition-all group shadow-sm"
+                               onClick={(e) => {
+                                 if (viewingProposal.businessPlan.url.includes('mock-url')) {
+                                   e.preventDefault();
+                                   alert('File này là dữ liệu cũ chưa được upload thực tế. Vui lòng cập nhật lại đề xuất bằng cách tải lên file mới.');
+                                 }
+                               }}
+                             >
                                 <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                    <TrendingUp size={16} />
                                 </div>

@@ -292,7 +292,7 @@
               "email": { "type": "string", "format": "email" },
               "phone": { "type": "string" }
             },
-            "required": ["name", "email", "phone"]
+            "required": ["name", "phone"]
           }
         },
         "phone": { "type": "string" },

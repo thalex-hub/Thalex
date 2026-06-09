@@ -14,7 +14,7 @@ async function check() {
     snap.docs.forEach(d => {
       const data = d.data();
       if (data.status === 'pending' || data.status === 'pending_director' || data.status === 'pending_finance' || !data.status) {
-         console.log(col, d.id, "subject:", data.purpose || data.reason || data.name, "user:", data.userName || data.fullName, "status:", data.status);
+         console.log(col, d.id, "title:", data.title, "purpose:", data.purpose, "status:", data.status);
       }
     });
   }

@@ -620,7 +620,7 @@ export default function PaymentRequests() {
                       </span>
                     )}
                   </div>
-                  <h4 className="font-black text-gray-800 text-lg leading-tight mb-1 truncate">{req.title || 'Đề xuất thanh toán'}</h4>
+                  <h4 className="font-black text-gray-800 text-lg leading-snug mb-1">{req.title || 'Đề xuất thanh toán'}</h4>
                   <div className="flex items-center gap-2 text-sm">
                     <p className="font-bold text-gray-500">{req.userName}</p>
                     <span className="text-gray-300">•</span>

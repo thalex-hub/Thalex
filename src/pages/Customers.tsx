@@ -34,6 +34,7 @@ export default function Customers() {
     status: 'new', 
     notes: '' 
   });
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const addContact = (isEdit: boolean = false) => {
     const contact = { name: '', phone: '', email: '' };
@@ -121,45 +122,65 @@ export default function Customers() {
       alert('Vui lòng thêm ít nhất một người liên hệ');
       return;
     }
-    const docRef = await addDoc(collection(db, 'customers'), {
-      ...newCustomer,
-      name: newCustomer.companyName, // Use companyName as display name
-      createdAt: new Date().toISOString(),
-      createdBy: auth.currentUser?.uid,
-      assignedTo: auth.currentUser?.uid,
-    });
     
-    await logActivity('Create Customer', 'Customers', docRef.id, { customerName: newCustomer.companyName });
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    setShowAddModal(false);
-    setNewCustomer({ 
-      name: '', 
-      companyName: '', 
-      billingAddress: '', 
-      officeAddress: '', 
-      taxCode: '', 
-      billingEmail: '', 
-      customerType: 'agent', 
-      customerClass: 'regular', 
-      contacts: [{ name: '', phone: '', email: '' }],
-      status: 'new', 
-      notes: '' 
-    });
+    try {
+      const docRef = await addDoc(collection(db, 'customers'), {
+        ...newCustomer,
+        name: newCustomer.companyName, // Use companyName as display name
+        createdAt: new Date().toISOString(),
+        createdBy: auth.currentUser?.uid,
+        assignedTo: auth.currentUser?.uid,
+      });
+      
+      await logActivity('Create Customer', 'Customers', docRef.id, { customerName: newCustomer.companyName });
+
+      setShowAddModal(false);
+      setNewCustomer({ 
+        name: '', 
+        companyName: '', 
+        billingAddress: '', 
+        officeAddress: '', 
+        taxCode: '', 
+        billingEmail: '', 
+        customerType: 'agent', 
+        customerClass: 'regular', 
+        contacts: [{ name: '', phone: '', email: '' }],
+        status: 'new', 
+        notes: '' 
+      });
+    } catch (error) {
+      console.error('Error adding customer:', error);
+      alert('Có lỗi xảy ra khi tạo khách hàng');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingCustomer) return;
+    if (!editingCustomer || isSubmitting) return;
+
+    setIsSubmitting(true);
     
-    const { id, ...data } = editingCustomer;
-    await updateDoc(doc(db, 'customers', id), {
-      ...data,
-      updatedAt: new Date().toISOString(),
-    });
+    try {
+      const { id, ...data } = editingCustomer;
+      await updateDoc(doc(db, 'customers', id), {
+        ...data,
+        updatedAt: new Date().toISOString(),
+      });
 
-    await logActivity('Update Customer', 'Customers', id, { customerName: editingCustomer.name });
+      await logActivity('Update Customer', 'Customers', id, { customerName: editingCustomer.name });
 
-    setEditingCustomer(null);
+      setEditingCustomer(null);
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      alert('Có lỗi xảy ra khi cập nhật khách hàng');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const deleteCustomer = async (id: string, name: string) => {
@@ -491,8 +512,10 @@ export default function Customers() {
                    </div>
                    
                    <div className="mt-8 flex gap-3 sticky bottom-0 bg-white pt-4 border-t border-gray-100">
-                      <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors">Hủy bỏ</button>
-                      <button type="submit" className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">Tạo khách hàng</button>
+                      <button type="button" onClick={() => setShowAddModal(false)} disabled={isSubmitting} className="flex-1 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50">Hủy bỏ</button>
+                      <button type="submit" disabled={isSubmitting} className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                        {isSubmitting ? 'Đang tạo...' : 'Tạo khách hàng'}
+                      </button>
                    </div>
                 </form>
              </motion.div>
@@ -628,8 +651,10 @@ export default function Customers() {
                    </div>
                    
                    <div className="mt-8 flex gap-3 sticky bottom-0 bg-white pt-4 border-t border-gray-100">
-                      <button type="button" onClick={() => setEditingCustomer(null)} className="flex-1 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors">Hủy bỏ</button>
-                      <button type="submit" className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">Lưu thay đổi</button>
+                      <button type="button" onClick={() => setEditingCustomer(null)} disabled={isSubmitting} className="flex-1 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50">Hủy bỏ</button>
+                      <button type="submit" disabled={isSubmitting} className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                        {isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}
+                      </button>
                    </div>
                 </form>
              </motion.div>

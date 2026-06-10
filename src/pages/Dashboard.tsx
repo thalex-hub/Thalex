@@ -640,26 +640,21 @@ export default function Dashboard() {
 
       const month = new Date(selectedYear, index, 1);
       const monthKey = item.monthKey;
-      const monthAttendance = attendance.filter(a => a.workDate && a.workDate.startsWith(monthKey));
 
-      // Calculate salaries of all users
-      const totalSalary = monthAttendance.length === 0 ? 0 : users.reduce((sum, u) => {
-        const userAtt = monthAttendance.filter(a => a.userId === u.uid);
+      // Calculate salaries of all users passing the full attendance array (rolling debt engine relies on full records)
+      const totalSalary = users.reduce((sum, u) => {
         const userAdvances = advanceRequests.filter((r: any) => r.userId === u.uid);
         const userReimbursements = reimbursementRequests.filter((r: any) => r.userId === u.uid);
         const stats = calculateSalary(
           { ...u, allAdvanceRequests: userAdvances, allReimbursementRequests: userReimbursements },
-          userAtt,
+          attendance,
           orders,
           departments,
           month,
           paymentRequests
         );
-        const userSalaryCost = stats.remainingNetSalary;
-        return sum + userSalaryCost;
+        return sum + (stats.finalSalary || 0);
       }, 0);
-
-      item.salary = Math.round(totalSalary);
 
       // Payments from approved/paid payment requests
       const monthPayments = paymentRequests.filter(req => 
@@ -668,6 +663,9 @@ export default function Dashboard() {
         req.status === 'paid' &&
         !superAdminIds.includes(req.userId)
       );
+
+      const manualSalary = monthPayments.filter(p => p.category === 'salary').reduce((sum, p) => sum + (p.amount || 0), 0);
+      item.salary = Math.max(Math.round(totalSalary), manualSalary);
 
       item.office_rent = monthPayments.filter(p => p.category === 'office_rent').reduce((sum, p) => sum + (p.amount || 0), 0);
       item.electricity = monthPayments.filter(p => p.category === 'electricity').reduce((sum, p) => sum + (p.amount || 0), 0);

@@ -616,6 +616,16 @@ export default function Dashboard() {
     return dataset;
   }, [activeOrdersForYear]);
 
+  const maxRevenue = React.useMemo(() => {
+    return Math.max(
+      ...monthlyRevenueChartData.flatMap(d => [
+        d['Trước VAT'] || 0,
+        d['Đã xuất hóa đơn'] || 0
+      ]),
+      0
+    );
+  }, [monthlyRevenueChartData]);
+
   // Dynamic P&L / Business Expenses calculation to align with the Business Expenses module
   const calculatedBusinessExpenses = React.useMemo(() => {
     const monthlyList = Array.from({ length: 12 }, (_, index) => ({
@@ -763,11 +773,21 @@ export default function Dashboard() {
       d['Thặng dư'] = d['Tiền thu'] - d['Tiền chi'];
     });
 
+    const maxVal = Math.max(
+      ...monthlyData.flatMap(d => [
+        Math.abs(d['Tiền thu'] || 0),
+        Math.abs(d['Tiền chi'] || 0),
+        Math.abs(d['Thặng dư'] || 0)
+      ]),
+      0
+    );
+
     return {
       inflow: totalInflow,
       outflow: totalOutflow,
       balance: totalInflow - totalOutflow,
-      monthlyData
+      monthlyData,
+      maxVal
     };
   }, [payments, selectedYear]);
 
@@ -1007,7 +1027,21 @@ export default function Dashboard() {
               <BarChart data={monthlyRevenueChartData} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} axisLine={false} dy={10} />
-                <YAxis stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} axisLine={false} tickFormatter={(val) => `${(val / 1e6).toFixed(0)}Tr`} />
+                <YAxis 
+                  stroke="#94a3b8" 
+                  fontSize={11} 
+                  fontWeight={600} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickFormatter={(val) => {
+                    if (maxRevenue >= 1000000) {
+                      return `${(val / 1e6).toFixed(1).replace(/\.0$/, '')}Tr`;
+                    } else if (maxRevenue >= 1000) {
+                      return `${(val / 1000).toFixed(0)}K`;
+                    }
+                    return `${val}đ`;
+                  }} 
+                />
                 <Tooltip content={<CustomChartTooltip />} cursor={{ fill: '#f8fafc' }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '15px' }} />
                 <Bar name="Hóa đơn trước VAT" dataKey="Trước VAT" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={30} />
@@ -1027,7 +1061,21 @@ export default function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} axisLine={false} tickFormatter={(val) => `${(val / 1e6).toFixed(0)}Tr`} />
+                <YAxis 
+                  stroke="#94a3b8" 
+                  fontSize={11} 
+                  fontWeight={600} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickFormatter={(val) => {
+                    if (maxRevenue >= 1000000) {
+                      return `${(val / 1e6).toFixed(1).replace(/\.0$/, '')}Tr`;
+                    } else if (maxRevenue >= 1000) {
+                      return `${(val / 1000).toFixed(0)}K`;
+                    }
+                    return `${val}đ`;
+                  }} 
+                />
                 <Tooltip content={<CustomChartTooltip />} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '15px' }} />
                 <Area name="Hóa đơn trước VAT" type="monotone" dataKey="Trước VAT" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
@@ -1302,7 +1350,22 @@ export default function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} axisLine={false} tickFormatter={(val) => `${(val / 1e6).toFixed(0)}Tr`} />
+                <YAxis 
+                  stroke="#94a3b8" 
+                  fontSize={11} 
+                  fontWeight={600} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickFormatter={(val) => {
+                    const maxV = cashFlowStats.maxVal || 0;
+                    if (maxV >= 1000000) {
+                      return `${(val / 1e6).toFixed(1).replace(/\.0$/, '')}Tr`;
+                    } else if (maxV >= 1000) {
+                      return `${(val / 1000).toFixed(0)}K`;
+                    }
+                    return `${val}đ`;
+                  }} 
+                />
                 <Tooltip content={<CustomChartTooltip />} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '15px' }} />
                 <Area name="Thực thu" type="monotone" dataKey="Tiền thu" fill="url(#colorCashIn)" stroke="#10b981" strokeWidth={2} />
@@ -1313,7 +1376,22 @@ export default function Dashboard() {
               <BarChart data={cashFlowStats.monthlyData} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} axisLine={false} tickFormatter={(val) => `${(val / 1e6).toFixed(0)}Tr`} />
+                <YAxis 
+                  stroke="#94a3b8" 
+                  fontSize={11} 
+                  fontWeight={600} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickFormatter={(val) => {
+                    const maxV = cashFlowStats.maxVal || 0;
+                    if (maxV >= 1000000) {
+                      return `${(val / 1e6).toFixed(1).replace(/\.0$/, '')}Tr`;
+                    } else if (maxV >= 1000) {
+                      return `${(val / 1000).toFixed(0)}K`;
+                    }
+                    return `${val}đ`;
+                  }} 
+                />
                 <Tooltip content={<CustomChartTooltip />} cursor={{ fill: '#f8fafc' }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '15px' }} />
                 <Bar name="Thực Thu (Dòng tiền vào)" dataKey="Tiền thu" fill="#10b981" radius={[5, 5, 0, 0]} maxBarSize={25} />

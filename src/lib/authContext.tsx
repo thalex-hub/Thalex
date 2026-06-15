@@ -357,6 +357,7 @@ interface AuthContextType {
   isManager: boolean;
   isAccountant: boolean;
   isHR: boolean;
+  isGeneral: boolean;
   isLeader: boolean;
   isFinanceStaff: boolean;
   canViewSalaries: boolean;
@@ -375,6 +376,7 @@ const AuthContext = createContext<AuthContextType>({
   isManager: false,
   isAccountant: false,
   isHR: false,
+  isGeneral: false,
   isLeader: false,
   isFinanceStaff: false,
   canViewSalaries: false,
@@ -589,6 +591,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isManager = role === 'Manager' || role === 'GeneralManager' || role === 'HRManager' || role === 'ChiefAccountant' || role === 'SalesManager' || role === 'TechnicalManager' || role.endsWith('_Manager') || hasPermission('approve_leave_requests');
   const isAccountant = role === 'Accountant' || role === 'ChiefAccountant' || role === 'AccountantStaff' || role.endsWith('_Accountant') || hasPermission('manage_cashflow');
   const isHR = role === 'HR' || role === 'HRManager' || role === 'HRStaff' || role.endsWith('_HR') || hasPermission('manage_users');
+  const isGeneral = role === 'GeneralManager' || role === 'GeneralStaff' || appUser?.departmentId === 'phong-tong-hop' || role.includes('General') || (appUser?.departmentName || '').toLowerCase().includes('tổng hợp');
   
   const canViewSalaries = isSuperAdmin || isDirector || hasPermission('view_salaries') || hasPermission('manage_users') || hasPermission('view_financial_reports');
   const canEditSalaries = isSuperAdmin || isDirector || hasPermission('manage_salaries') || hasPermission('manage_users');
@@ -606,6 +609,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isManager, 
       isAccountant,
       isHR,
+      isGeneral,
       isLeader,
       isFinanceStaff,
       canViewSalaries,

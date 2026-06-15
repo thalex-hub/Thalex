@@ -55,7 +55,7 @@ import { useAuth } from '../lib/authContext';
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isAdmin, isManager, isDirector, isSuperAdmin, isFinanceStaff, appUser, isAccountant, isHR, hasPermission } = useAuth();
+  const { user, isAdmin, isManager, isDirector, isSuperAdmin, isFinanceStaff, appUser, isAccountant, isHR, isGeneral, hasPermission } = useAuth();
   const [order, setOrder] = React.useState<any>(null);
   const [tasks, setTasks] = React.useState<any[]>([]);
   const [processing, setProcessing] = React.useState(false);
@@ -2387,8 +2387,8 @@ export default function OrderDetail() {
                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Trạng thái vận hành</p>
                  <div className="relative">
                     <button 
-                      onClick={() => (isAdmin || isDirector || isSuperAdmin) && setShowStatusMenu(!showStatusMenu)}
-                      disabled={!(isAdmin || isDirector || isSuperAdmin)}
+                      onClick={() => (isAdmin || isDirector || isSuperAdmin || isGeneral) && setShowStatusMenu(!showStatusMenu)}
+                      disabled={!(isAdmin || isDirector || isSuperAdmin || isGeneral)}
                       className={cn(
                         "w-full flex items-center justify-between px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-sm group",
                         statusConfig?.class.includes('blue') ? "bg-blue-600 text-white shadow-blue-100" :
@@ -2401,7 +2401,7 @@ export default function OrderDetail() {
                           {statusConfig && <statusConfig.icon size={18} />}
                           <span>{statusConfig?.label}</span>
                        </div>
-                       {(isAdmin || isDirector || isSuperAdmin) && <ChevronDown size={14} className={cn("transition-transform", showStatusMenu && "rotate-180")} />}
+                       {(isAdmin || isDirector || isSuperAdmin || isGeneral) && <ChevronDown size={14} className={cn("transition-transform", showStatusMenu && "rotate-180")} />}
                     </button>
 
                     <AnimatePresence>

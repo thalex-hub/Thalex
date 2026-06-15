@@ -2475,26 +2475,26 @@ export default function OrderDetail() {
                   <div className="space-y-6">
                     <div className="flex items-center gap-5">
                       <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-[1.5rem] flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-blue-200 shrink-0">
-                        {customer.name[0]}
+                        {(customer.companyName || customer.name || 'C')[0]?.toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-black text-gray-900 text-lg leading-tight truncate">{customer.name}</p>
-                        <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mt-1 truncate">{customer.companyName || 'Khách hàng cá nhân'}</p>
+                        <p className="font-black text-gray-900 text-lg leading-tight truncate">{customer.companyName || customer.name}</p>
+                        <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mt-1 truncate">{customer.customerType === 'supplier' ? 'Nhà cung cấp' : customer.customerType === 'agent' ? 'Đại lý' : customer.customerType === 'brand' ? 'Hãng' : 'Khách hàng'}</p>
                       </div>
                     </div>
 
                     <div className="space-y-4 pt-6 border-t border-gray-50">
-                      <a href={`tel:${customer.phone}`} className="flex items-center gap-4 group/item">
+                      <a href={`tel:${customer.contacts?.[0]?.phone || ''}`} className="flex items-center gap-4 group/item">
                         <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover/item:bg-blue-50 group-hover/item:text-blue-600 transition-all">
                           <Phone size={16} />
                         </div>
-                        <span className="text-sm font-bold text-gray-600 group-hover/item:text-gray-900 transition-colors">{customer.phone}</span>
+                        <span className="text-sm font-bold text-gray-600 group-hover/item:text-gray-900 transition-colors">{customer.contacts?.[0]?.phone || 'Chưa có SĐT'}</span>
                       </a>
-                      <a href={`mailto:${customer.email}`} className="flex items-center gap-4 group/item">
+                      <a href={`mailto:${customer.billingEmail || customer.contacts?.[0]?.email || ''}`} className="flex items-center gap-4 group/item">
                         <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover/item:bg-blue-50 group-hover/item:text-blue-600 transition-all">
                           <Mail size={16} />
                         </div>
-                        <span className="text-sm font-bold text-gray-600 group-hover/item:text-gray-900 transition-colors truncate">{customer.email}</span>
+                        <span className="text-sm font-bold text-gray-600 group-hover/item:text-gray-900 transition-colors truncate">{customer.billingEmail || customer.contacts?.[0]?.email || 'Chưa có Email'}</span>
                       </a>
                     </div>
 

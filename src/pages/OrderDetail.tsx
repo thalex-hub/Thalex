@@ -2123,7 +2123,7 @@ export default function OrderDetail() {
                                   {subtasks.length > 0 ? `${subtasks.length} hạng mục` : 'Công việc'}
                                 </span>
                                 {parentTask.name === '5. Xuất kho và triển khai' && (() => {
-                                  const txCount = stockTransactions.filter(tx => tx.type === 'outbound').length;
+                                  const txCount = stockTransactions.filter(tx => tx.type === 'outbound' && tx.status === 'completed').length;
                                   if (txCount > 0) {
                                     return (
                                       <span className="flex items-center gap-1 text-[8px] font-black text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-md uppercase">
@@ -2274,20 +2274,20 @@ export default function OrderDetail() {
                 </div>
                 <div className="text-right">
                   <span className="text-[10px] font-black text-cyan-600 bg-cyan-50 px-2 py-1 rounded-full uppercase tracking-widest">
-                    {stockTransactions.filter(tx => tx.type === 'outbound').length} Phiếu
+                    {stockTransactions.filter(tx => tx.type === 'outbound' && tx.status === 'completed').length} Phiếu
                   </span>
                 </div>
              </div>
              
              <div className="p-6">
-                {stockTransactions.filter(tx => tx.type === 'outbound').length === 0 ? (
+                {stockTransactions.filter(tx => tx.type === 'outbound' && tx.status === 'completed').length === 0 ? (
                   <div className="py-6 text-center border border-dashed border-gray-100 rounded-[1.5rem] bg-gray-50/50">
                     <Package className="mx-auto text-gray-300 mb-2" size={28} />
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-[10px]">Chưa có phiếu xuất kho liên kết</p>
                   </div>
                 ) : (
                   <div className="grid sm:grid-cols-2 gap-4">
-                     {stockTransactions.filter(tx => tx.type === 'outbound').map((tx, idx) => (
+                     {stockTransactions.filter(tx => tx.type === 'outbound' && tx.status === 'completed').map((tx, idx) => (
                         <div key={tx.id || idx} onClick={() => setViewingTx(tx)} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:border-cyan-400 hover:shadow-md hover:scale-[1.01] transition-all cursor-pointer group/card space-y-3 relative active:scale-[0.99]">
                            <div className="flex justify-between items-start">
                               <div>
@@ -3366,7 +3366,7 @@ export default function OrderDetail() {
                                     Kho hàng liên kết
                                  </span>
                               </div>
-                              {stockTransactions.filter(tx => tx.type === 'outbound').length === 0 ? (
+                              {stockTransactions.filter(tx => tx.type === 'outbound' && tx.status === 'completed').length === 0 ? (
                                  <div className="text-center py-6 bg-white rounded-2xl border border-gray-100/50">
                                     <Package className="mx-auto text-gray-300 mb-2" size={28} />
                                     <p className="text-xs text-gray-400 font-bold">Chưa có phiếu xuất kho liên kết cho đơn hàng này.</p>
@@ -3374,7 +3374,7 @@ export default function OrderDetail() {
                                  </div>
                               ) : (
                                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                                    {stockTransactions.filter(tx => tx.type === 'outbound').map((tx, idx) => (
+                                    {stockTransactions.filter(tx => tx.type === 'outbound' && tx.status === 'completed').map((tx, idx) => (
                                        <div key={tx.id || idx} onClick={() => setViewingTx(tx)} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:border-blue-400 hover:shadow-md hover:scale-[1.01] transition-all cursor-pointer group/card space-y-3 relative active:scale-[0.99]">
                                           <div className="flex justify-between items-start">
                                              <div>

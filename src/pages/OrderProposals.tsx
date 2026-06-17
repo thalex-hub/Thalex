@@ -381,15 +381,28 @@ export default function OrderProposals() {
           updatedAt: new Date().toISOString()
         };
 
+        const baseHistoryItem = {
+          userName: appUser?.fullName || user.displayName || 'Kinh doanh',
+          timestamp: new Date().toISOString()
+        };
+
         if (editingProposal) {
-          await updateDoc(doc(db, 'order_proposals', editingProposal.id), payload);
+          const updatedHistory = [
+            ...(editingProposal.history || []),
+            { ...baseHistoryItem, action: 'edit' }
+          ];
+          await updateDoc(doc(db, 'order_proposals', editingProposal.id), {
+            ...payload,
+            history: updatedHistory
+          });
         } else {
           const docRef = await addDoc(collection(db, 'order_proposals'), {
             ...payload,
             createdBy: user.uid,
             userName: appUser?.fullName || user.displayName || 'Kinh doanh',
             createdAt: new Date().toISOString(),
-            status: 'pending'
+            status: 'pending',
+            history: [{ ...baseHistoryItem, action: 'create' }]
           });
 
           // Trigger proposal email notification on creation
@@ -480,9 +493,21 @@ export default function OrderProposals() {
         }
       }
 
+      const newHistoryItem: any = {
+        action: status,
+        userName: appUser?.fullName || user?.displayName || 'Thành viên',
+        timestamp: new Date().toISOString(),
+      };
+      if (rejectionReason) {
+        newHistoryItem.note = rejectionReason;
+      }
+
+      const history = proposal.history || [];
+
       const updateData: any = {
         status,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        history: [...history, newHistoryItem]
       };
 
       if (rejectionReason) {
@@ -1343,6 +1368,44 @@ export default function OrderProposals() {
                            <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Ghi chú</h4>
                            <div className="p-4 bg-amber-50 text-amber-900 rounded-2xl border border-amber-100 text-sm italic leading-relaxed shadow-sm">
                              "{viewingProposal.note}"
+                           </div>
+                        </div>
+                      )}
+
+                      {viewingProposal.history && viewingProposal.history.length > 0 && (
+                        <div className="mt-8 border-t border-gray-100 pt-6">
+                           <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Tiến trình đề xuất</h4>
+                           <div className="space-y-4">
+                             {viewingProposal.history.map((h: any, i: number) => (
+                               <div key={i} className="flex gap-3">
+                                  <div className="relative flex flex-col items-center">
+                                    <div className={cn(
+                                      "w-2.5 h-2.5 rounded-full ring-4 ring-white shrink-0 mt-1 z-10",
+                                      h.action.includes('approve') || h.action === 'approved' || h.action === 'pending_director' ? "bg-green-500" :
+                                      h.action === 'rejected' ? "bg-red-500" :
+                                      h.action === 'edit' ? "bg-amber-500" : "bg-blue-500"
+                                    )} />
+                                    {i < viewingProposal.history.length - 1 && (
+                                      <div className="w-0.5 h-full bg-gray-100 absolute top-2 bottom-0" />
+                                    )}
+                                  </div>
+                                  <div className="pb-2 flex-1">
+                                    <p className="text-[11px] font-black text-gray-800 uppercase tracking-tight">
+                                      {h.action === 'create' ? 'Khởi tạo' :
+                                       h.action === 'edit' ? 'Cập nhật nội dung' :
+                                       h.action === 'pending_director' ? 'Kế toán thẩm định' :
+                                       h.action === 'approved' ? 'Phê duyệt cuối' :
+                                       h.action === 'rejected' ? 'Từ chối' : h.action}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                      <span className="font-semibold text-gray-700">{h.userName}</span> • {format(new Date(h.timestamp), 'dd/MM/yyyy HH:mm')}
+                                    </p>
+                                    {h.note && (
+                                      <p className="text-xs mt-1 text-red-600 font-medium">Lý do: {h.note}</p>
+                                    )}
+                                  </div>
+                               </div>
+                             ))}
                            </div>
                         </div>
                       )}

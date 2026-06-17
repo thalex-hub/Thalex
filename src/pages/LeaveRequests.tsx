@@ -171,14 +171,28 @@ export default function LeaveRequests() {
       return;
     }
 
+    let rejectionReason = '';
+    if (status === 'rejected' || status === 'returned') {
+      rejectionReason = window.prompt("Vui lòng nhập lý do từ chối/trả lại (bắt buộc):") || '';
+      if (!rejectionReason.trim()) {
+        alert("Bạn phải nhập lý do!");
+        return;
+      }
+    }
+
     try {
-      await updateDoc(doc(db, 'leave_requests', req.id), {
+      const updateData: any = {
         status,
         updatedAt: new Date().toISOString(),
         approverId: auth.currentUser?.uid,
         approverName: appUser.fullName,
         approvedDate: new Date().toISOString()
-      });
+      };
+      if (rejectionReason) {
+        updateData.rejectionReason = rejectionReason;
+      }
+
+      await updateDoc(doc(db, 'leave_requests', req.id), updateData);
 
       // If approved, create attendance records for the leave period
       if (status === 'approved') {
@@ -369,14 +383,22 @@ export default function LeaveRequests() {
                        </span>
                      )}
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">
                     Thời gian: <span className="font-semibold text-gray-700">{format(new Date(req.startDate), 'dd/MM/yyyy')}</span> đến <span className="font-semibold text-gray-700">{format(new Date(req.endDate), 'dd/MM/yyyy')}</span>
                     <span className="ml-2 font-bold text-blue-600">({req.totalDays} ngày)</span>
+                    <br/>
+                    Tạo: {req.createdAt ? format(new Date(req.createdAt), 'dd/MM/yyyy HH:mm') : 'N/A'}
+                    {req.updatedAt && ` | Cập nhật: ${format(new Date(req.updatedAt), 'dd/MM/yyyy HH:mm')}`}
                   </p>
                   {req.approverName && (
                      <p className="text-[10px] text-green-600 font-bold mt-1 uppercase flex items-center gap-1">
                        <UserCheck size={12} /> Đã duyệt bởi: {req.approverName}
                      </p>
+                  )}
+                  {req.rejectionReason && (
+                    <div className="mt-2 text-xs font-medium text-red-600 bg-red-50 p-2 rounded border border-red-100 flex gap-1">
+                      <AlertCircle size={14}/> <span>Lý do từ chối: {req.rejectionReason}</span>
+                    </div>
                   )}
                   <p className="text-xs text-gray-400 mt-1 italic">Lý do: {req.reason}</p>
                </div>

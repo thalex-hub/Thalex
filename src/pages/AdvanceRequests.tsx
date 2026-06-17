@@ -293,29 +293,43 @@ export default function AdvanceRequests() {
       const docRef = doc(db, 'advance_requests', id);
       let nextStatus = '';
 
+      let rejectionReason = '';
       if (action === 'approve_finance') {
         nextStatus = 'pending_director';
       } else if (action === 'approve_director') {
         nextStatus = 'approved';
       } else if (action === 'reject') {
+        rejectionReason = window.prompt("Vui lòng nhập lý do từ chối (bắt buộc):") || '';
+        if (!rejectionReason.trim()) {
+          alert("Bạn phải nhập lý do khi từ chối!");
+          return;
+        }
         nextStatus = 'rejected';
       } else if (action === 'disbursed') {
         nextStatus = 'disbursed';
       }
 
-      const newHistoryItem = {
+      const newHistoryItem: any = {
         action,
         userId: user?.uid,
         userName: appUser?.fullName || user?.displayName || 'Thành viên',
         timestamp: new Date().toISOString()
       };
+      if (rejectionReason) {
+        newHistoryItem.note = rejectionReason;
+      }
 
-      await updateDoc(docRef, {
+      const updatePayload: any = {
         status: nextStatus || request.status,
         approverId: user?.uid,
         updatedAt: new Date().toISOString(),
         history: [...(request.history || []), newHistoryItem]
-      });
+      };
+      if (rejectionReason) {
+        updatePayload.rejectionReason = rejectionReason;
+      }
+
+      await updateDoc(docRef, updatePayload);
 
       // Trigger proposal email notification on status change if there is a next pending status
       if (nextStatus) {
@@ -501,12 +515,22 @@ export default function AdvanceRequests() {
                   <div className="flex items-center gap-2 text-sm">
                     <p className="font-bold text-gray-500">{req.userName}</p>
                     <span className="text-gray-300">•</span>
-                    <p className="text-gray-400 font-medium">{format(new Date(req.requestDate), 'dd/MM/yyyy HH:mm')}</p>
+                    <p className="text-gray-400 font-medium whitespace-pre-wrap">
+                      Tạo: {format(new Date(req.requestDate), 'dd/MM/yyyy HH:mm')}
+                      {req.updatedAt && `\nCập nhật: ${format(new Date(req.updatedAt), 'dd/MM/yyyy HH:mm')}`}
+                    </p>
                   </div>
                   <p className="text-xl font-black text-blue-600 mt-2">
                     {formatCurrency(req.amount)}
                   </p>
                   <p className="text-sm text-gray-600 font-medium mt-1 italic">Lý do: {req.purpose}</p>
+
+                  {req.rejectionReason && (
+                    <div className="mt-3 bg-red-50 p-3 rounded-lg border border-red-100">
+                      <p className="text-xs font-bold text-red-600 mb-1 flex items-center gap-1"><AlertCircle size={14}/> Lý do từ chối:</p>
+                      <p className="text-sm font-medium text-red-700 whitespace-pre-wrap">{req.rejectionReason}</p>
+                    </div>
+                  )}
                   
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span className={cn(

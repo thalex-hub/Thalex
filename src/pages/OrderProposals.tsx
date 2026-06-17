@@ -471,10 +471,23 @@ export default function OrderProposals() {
 
   const handleApprove = async (id: string, status: 'approved' | 'rejected' | 'pending_director', proposal: any) => {
     try {
+      let rejectionReason = '';
+      if (status === 'rejected') {
+        rejectionReason = window.prompt("Vui lòng nhập lý do từ chối (bắt buộc):") || '';
+        if (!rejectionReason.trim()) {
+          alert("Bạn phải nhập lý do khi từ chối!");
+          return;
+        }
+      }
+
       const updateData: any = {
         status,
         updatedAt: new Date().toISOString()
       };
+
+      if (rejectionReason) {
+        updateData.rejectionReason = rejectionReason;
+      }
 
       if (status === 'pending_director') {
         updateData.accountantId = user?.uid;
@@ -982,9 +995,19 @@ export default function OrderProposals() {
                   <div className="flex items-center gap-2 text-sm">
                     <p className="font-bold text-gray-900">{users.find(u => u.id === prop.createdBy)?.fullName || prop.userName}</p>
                     <span className="text-gray-400">•</span>
-                    <p className="text-gray-500">{safeFormatDate(prop.createdAt, 'dd/MM/yyyy')}</p>
+                    <p className="text-gray-500 whitespace-pre-wrap">
+                      Tạo: {safeFormatDate(prop.createdAt, 'dd/MM/yyyy')}
+                      {prop.updatedAt && `\nCập nhật: ${safeFormatDate(prop.updatedAt, 'dd/MM/yyyy HH:mm')}`}
+                    </p>
                   </div>
                   <h4 className="font-black text-gray-800 text-lg">{prop.name}</h4>
+                  
+                  {prop.rejectionReason && (
+                    <div className="mt-2 text-xs font-medium text-red-600 bg-red-50 p-2 rounded border border-red-100 flex gap-1">
+                      <AlertCircle size={14}/> <span>Lý do từ chối: {prop.rejectionReason}</span>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 lg:grid-cols-8 gap-3 mt-3 w-full">
                      <div>
                         <p className="text-[10px] text-gray-400 font-bold uppercase">Giá bán chưa VAT</p>

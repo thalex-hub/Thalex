@@ -287,24 +287,32 @@ export default function ReimbursementRequests() {
         let status = 'pending';
         let step = 1;
 
+        let rejectionReason = '';
         if (action === 'verify') {
           status = 'accountant_verified';
           step = 2;
-        } else if (action === 'return') {
-          status = 'returned';
-          step = 1;
-        } else if (action === 'reject') {
-          status = 'rejected';
-          step = 0;
+        } else if (action === 'return' || action === 'reject') {
+          rejectionReason = window.prompt("Vui lòng nhập lý do từ chối/trả lại (bắt buộc):") || '';
+          if (!rejectionReason.trim()) {
+            alert("Bạn phải nhập lý do!");
+            return;
+          }
+          status = action === 'return' ? 'returned' : 'rejected';
+          step = action === 'return' ? 1 : 0;
         }
         
-        await updateDoc(doc(db, 'reimbursement_requests', id), {
+        const updatePayload: any = {
           status,
           step,
           accountantId: user?.uid,
           accountantName: appUser?.fullName,
           updatedAt: new Date().toISOString()
-        });
+        };
+        if (rejectionReason) {
+          updatePayload.rejectionReason = rejectionReason;
+        }
+
+        await updateDoc(doc(db, 'reimbursement_requests', id), updatePayload);
 
         // Trigger notification to director once accountant verifies
         if (status === 'accountant_verified' && request) {
@@ -384,19 +392,35 @@ export default function ReimbursementRequests() {
       const adv = request?.advanceRequestId ? advances.find(a => a.id === request.advanceRequestId) : null;
       const balance = (request?.amount || 0) - (adv?.amount || 0);
 
-      // If approved, and balance is 0, we can go straight to 'paid' status
-      // because no cash movement is needed. Otherwise go to 'approved' (pending cash)
-      let status = action === 'approve' ? 'approved' : 'rejected';
-      if (action === 'approve' && balance === 0 && request?.advanceRequestId) {
-        status = 'paid';
+      let status = 'pending';
+      let rejectionReason = '';
+
+      if (action === 'approve') {
+        if (balance === 0 && request?.advanceRequestId) {
+          status = 'paid';
+        } else {
+          status = 'approved';
+        }
+      } else if (action === 'reject') {
+        rejectionReason = window.prompt("Vui lòng nhập lý do từ chối (bắt buộc):") || '';
+        if (!rejectionReason.trim()) {
+          alert("Bạn phải nhập lý do!");
+          return;
+        }
+        status = 'rejected';
       }
       
-      await updateDoc(doc(db, 'reimbursement_requests', id), {
+      const updatePayload: any = {
         status,
         directorId: user?.uid,
         directorName: appUser?.fullName,
         updatedAt: new Date().toISOString()
-      });
+      };
+      if (rejectionReason) {
+        updatePayload.rejectionReason = rejectionReason;
+      }
+
+      await updateDoc(doc(db, 'reimbursement_requests', id), updatePayload);
 
       // Trigger notification to accountant if status is 'approved' (meaning pending payout / disbursal)
       if (status === 'approved' && request) {
@@ -793,12 +817,22 @@ export default function ReimbursementRequests() {
                         </span>
                       )}
                       <span className="text-gray-300">•</span>
-                      <p className="text-gray-400 font-medium">{format(new Date(req.requestDate), 'dd/MM/yyyy HH:mm')}</p>
+                      <p className="text-gray-400 font-medium whitespace-pre-wrap">
+                        Tạo: {format(new Date(req.requestDate), 'dd/MM/yyyy HH:mm')}
+                        {req.updatedAt && `\nCập nhật: ${format(new Date(req.updatedAt), 'dd/MM/yyyy HH:mm')}`}
+                      </p>
                     </div>
                     <p className="text-xl font-black text-blue-600 mt-2">
                        {formatCurrency(req.amount)}
                     </p>
                     <p className="text-xs text-gray-600 font-medium mt-1 italic leading-relaxed">Lý do: {req.purpose}</p>
+
+                    {req.rejectionReason && (
+                      <div className="mt-3 bg-red-50 p-3 rounded-lg border border-red-100">
+                        <p className="text-xs font-bold text-red-600 mb-1 flex items-center gap-1"><AlertCircle size={14}/> Lý do từ chối/hoàn lại:</p>
+                        <p className="text-sm font-medium text-red-700 whitespace-pre-wrap">{req.rejectionReason}</p>
+                      </div>
+                    )}
                     
                     <div className="flex flex-wrap gap-2 mt-3">
                       {req.advanceRequestId && (

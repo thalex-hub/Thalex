@@ -2,7 +2,7 @@ import React from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, onSnapshot, or, updateDoc, doc } from 'firebase/firestore';
 import { isBefore, addHours, parseISO, format } from 'date-fns';
-import { Bell, BellOff, AlertTriangle, Clock, X, ExternalLink, RefreshCcw, FileCheck, Search } from 'lucide-react';
+import { Bell, BellOff, AlertTriangle, Clock, X, ExternalLink, RefreshCcw, FileCheck, Search, MessageCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Task } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -18,7 +18,8 @@ export default function NotificationManager() {
   const [notifiedTasks, setNotifiedTasks] = React.useState<Set<string>>(new Set());
   const [notifiedLeave, setNotifiedLeave] = React.useState<Set<string>>(new Set());
   const [notifiedApprovals, setNotifiedApprovals] = React.useState<Set<string>>(new Set());
-  const [notifications, setNotifications] = React.useState<{id: string, title: string, body: string, time: Date, type: 'soon' | 'overdue' | 'returned' | 'approval', read: boolean, taskId?: string, link?: string, docId?: string, colName?: string}[]>([]);
+  const [notifiedComments, setNotifiedComments] = React.useState<Set<string>>(new Set());
+  const [notifications, setNotifications] = React.useState<{id: string, title: string, body: string, time: Date, type: 'soon' | 'overdue' | 'returned' | 'approval' | 'comment', read: boolean, taskId?: string, link?: string, docId?: string, colName?: string}[]>([]);
   const [showHistory, setShowHistory] = React.useState(false);
   const [showAllModal, setShowAllModal] = React.useState(false);
   const [modalSearchTerm, setModalSearchTerm] = React.useState('');
@@ -33,12 +34,12 @@ export default function NotificationManager() {
 
   // Compute counts of unread items for badges
   const importantCount = React.useMemo(() => 
-    notifications.filter(n => !n.read && (n.type === 'approval' || n.type === 'returned')).length,
+    notifications.filter(n => !n.read && (n.type === 'approval' || n.type === 'returned' || n.type === 'comment')).length,
     [notifications]
   );
 
   const todayCount = React.useMemo(() => 
-    notifications.filter(n => !n.read && (n.type === 'soon' || (new Date(n.time).toDateString() === new Date().toDateString() && n.type !== 'overdue' && n.type !== 'approval' && n.type !== 'returned'))).length,
+    notifications.filter(n => !n.read && (n.type === 'soon' || (new Date(n.time).toDateString() === new Date().toDateString() && n.type !== 'overdue' && n.type !== 'approval' && n.type !== 'returned' && n.type !== 'comment'))).length,
     [notifications]
   );
 
@@ -49,9 +50,9 @@ export default function NotificationManager() {
 
   const filteredNotifications = React.useMemo(() => {
     if (activeNotificationTab === 'important') {
-      return notifications.filter(n => n.type === 'approval' || n.type === 'returned');
+      return notifications.filter(n => n.type === 'approval' || n.type === 'returned' || n.type === 'comment');
     } else if (activeNotificationTab === 'today') {
-      return notifications.filter(n => n.type === 'soon' || (new Date(n.time).toDateString() === new Date().toDateString() && n.type !== 'overdue' && n.type !== 'approval' && n.type !== 'returned'));
+      return notifications.filter(n => n.type === 'soon' || (new Date(n.time).toDateString() === new Date().toDateString() && n.type !== 'overdue' && n.type !== 'approval' && n.type !== 'returned' && n.type !== 'comment'));
     } else if (activeNotificationTab === 'late') {
       return notifications.filter(n => n.type === 'overdue');
     }
@@ -280,6 +281,29 @@ export default function NotificationManager() {
 
     const unsubscribeTasks = onSnapshot(q, (snapshot) => {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'modified') {
+          const taskData = change.doc.data() as any;
+          if (taskData.lastCommentAt && taskData.lastCommentBy && taskData.lastCommentBy !== currentUser.uid) {
+            const commentKey = `${change.doc.id}_${taskData.lastCommentAt}`;
+            
+            // Only notify if we haven't already notified about this exact comment
+            if (!notifiedComments.has(commentKey)) {
+              const title = `Bình luận mới: ${taskData.title}`;
+              const body = `${taskData.lastCommentByName || 'Ai đó'} vừa bình luận trong công việc này.`;
+              sendNotification(title, body, 'comment');
+              addHistoricalNotification(title, body, 'comment', change.doc.id);
+              
+              setNotifiedComments(prev => {
+                const next = new Set(prev);
+                next.add(commentKey);
+                return next;
+              });
+            }
+          }
+        }
+      });
     }, (err) => {
       console.error("Error in unsubscribeTasks notification watch:", err);
     });
@@ -533,7 +557,7 @@ export default function NotificationManager() {
   const addHistoricalNotification = (
     title: string, 
     body: string, 
-    type: 'soon' | 'overdue' | 'returned' | 'approval', 
+    type: 'soon' | 'overdue' | 'returned' | 'approval' | 'comment', 
     taskId?: string, 
     link?: string,
     docId?: string,
@@ -555,7 +579,7 @@ export default function NotificationManager() {
     setPermission(result);
   };
 
-  const sendNotification = (title: string, body: string, type: 'soon' | 'overdue' | 'returned' | 'approval') => {
+  const sendNotification = (title: string, body: string, type: 'soon' | 'overdue' | 'returned' | 'approval' | 'comment') => {
     if (typeof Notification === 'undefined' || permission !== 'granted') return;
 
     try {
@@ -717,9 +741,9 @@ export default function NotificationManager() {
                         <div className="flex items-start gap-4">
                           <div className={cn(
                             "mt-0.5 p-2.5 rounded-xl shrink-0",
-                            n.type === 'overdue' ? "bg-red-50 text-red-600" : n.type === 'returned' || n.type === 'approval' ? "bg-indigo-50 text-indigo-600" : "bg-amber-50 text-amber-600"
+                            n.type === 'overdue' ? "bg-red-50 text-red-600" : n.type === 'returned' || n.type === 'approval' ? "bg-indigo-50 text-indigo-600" : n.type === 'comment' ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"
                           )}>
-                            {n.type === 'overdue' ? <AlertTriangle size={18} /> : n.type === 'returned' ? <RefreshCcw size={18} /> : n.type === 'approval' ? <FileCheck size={18} /> : <Clock size={18} />}
+                            {n.type === 'overdue' ? <AlertTriangle size={18} /> : n.type === 'returned' ? <RefreshCcw size={18} /> : n.type === 'approval' ? <FileCheck size={18} /> : n.type === 'comment' ? <MessageCircle size={18} /> : <Clock size={18} />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
@@ -941,9 +965,11 @@ export default function NotificationManager() {
                             ? "bg-amber-50 text-amber-600" 
                             : n.type === 'approval' 
                               ? "bg-indigo-50 text-indigo-600" 
-                              : "bg-blue-50 text-blue-600"
+                              : n.type === 'comment'
+                                ? "bg-blue-50 text-blue-600"
+                                : "bg-blue-50 text-blue-600"
                       )}>
-                        {n.type === 'overdue' ? <AlertTriangle size={18} /> : n.type === 'returned' ? <RefreshCcw size={18} /> : n.type === 'approval' ? <FileCheck size={18} /> : <Clock size={18} />}
+                        {n.type === 'overdue' ? <AlertTriangle size={18} /> : n.type === 'returned' ? <RefreshCcw size={18} /> : n.type === 'approval' ? <FileCheck size={18} /> : n.type === 'comment' ? <MessageCircle size={18} /> : <Clock size={18} />}
                       </div>
 
                       <div className="flex-1 min-w-0 pr-4">

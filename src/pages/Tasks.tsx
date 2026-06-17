@@ -278,16 +278,26 @@ export default function Tasks() {
 
     try {
       const now = new Date().toISOString();
+      const userName = appUser?.fullName || currentUser.displayName || 'User';
+      
       await addDoc(collection(db, 'task_comments'), {
         taskId: editingTask.id,
         orderId: editingTask.orderId || '',
         userId: currentUser.uid,
-        userName: appUser?.fullName || currentUser.displayName || 'User',
+        userName,
         userAvatar: appUser?.avatar || '',
         text: newCommentText.trim(),
         attachments: commentAttachments,
         createdAt: now
       });
+      
+      // Update task to trigger notification for other users
+      await updateDoc(doc(db, 'tasks', editingTask.id), {
+        lastCommentAt: now,
+        lastCommentBy: currentUser.uid,
+        lastCommentByName: userName
+      });
+
       setNewCommentText('');
       setCommentAttachments([]);
     } catch (err) {

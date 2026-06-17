@@ -1053,16 +1053,26 @@ export default function OrderDetail() {
 
     try {
       const now = new Date().toISOString();
+      const userName = appUser?.fullName || user.displayName || 'User';
+
       await addDoc(collection(db, 'task_comments'), {
         taskId: selectedTask.id,
         orderId: id,
         userId: user.uid,
-        userName: appUser?.fullName || user.displayName || 'User',
+        userName,
         userAvatar: appUser?.avatar || '',
         text: newCommentText.trim(),
         attachments: commentAttachments,
         createdAt: now
       });
+
+      // Update task to trigger notification for other users
+      await updateDoc(doc(db, 'tasks', selectedTask.id), {
+        lastCommentAt: now,
+        lastCommentBy: user.uid,
+        lastCommentByName: userName
+      });
+
       setNewCommentText('');
       setCommentAttachments([]);
     } catch (err) {

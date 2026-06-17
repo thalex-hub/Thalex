@@ -1006,7 +1006,17 @@ export default function WarehouseManagement() {
                   {viewingOutboundTx.linkedOrderName && (
                     <div className="space-y-1 col-span-2 bg-blue-50/40 p-3 rounded-xl border border-blue-100/50">
                       <p className="text-[10px] font-black text-blue-600 uppercase tracking-wider font-mono">Đơn hàng liên kết</p>
-                      <p className="font-bold text-blue-900 uppercase mt-0.5">{viewingOutboundTx.linkedOrderName}</p>
+                      {(viewingOutboundTx.orderId || viewingOutboundTx.items?.[0]?.taskOrderId) ? (
+                        <Link 
+                           to={`/orders/${viewingOutboundTx.orderId || viewingOutboundTx.items?.[0]?.taskOrderId}`}
+                           onClick={() => setViewingOutboundTx(null)}
+                           className="font-bold text-blue-900 uppercase mt-0.5 hover:text-blue-700 hover:underline inline-flex items-center gap-1 group/link transition-colors"
+                        >
+                          {viewingOutboundTx.linkedOrderName}
+                        </Link>
+                      ) : (
+                         <p className="font-bold text-blue-900 uppercase mt-0.5">{viewingOutboundTx.linkedOrderName}</p>
+                      )}
                     </div>
                   )}
                   {viewingOutboundTx.taskName && (

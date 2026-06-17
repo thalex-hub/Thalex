@@ -2260,13 +2260,93 @@ export default function OrderDetail() {
              </div>
           </div>
 
+          {/* Outbound Stock Transactions associated with order */}
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/20 overflow-hidden mb-8">
+             <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-cyan-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-cyan-200">
+                    <Package size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-gray-900 tracking-tight">Thông tin Xuất kho</h3>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Các phiếu xuất kho liên kết</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-black text-cyan-600 bg-cyan-50 px-2 py-1 rounded-full uppercase tracking-widest">
+                    {stockTransactions.filter(tx => tx.type === 'outbound').length} Phiếu
+                  </span>
+                </div>
+             </div>
+             
+             <div className="p-6">
+                {stockTransactions.filter(tx => tx.type === 'outbound').length === 0 ? (
+                  <div className="py-6 text-center border border-dashed border-gray-100 rounded-[1.5rem] bg-gray-50/50">
+                    <Package className="mx-auto text-gray-300 mb-2" size={28} />
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-[10px]">Chưa có phiếu xuất kho liên kết</p>
+                  </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 gap-4">
+                     {stockTransactions.filter(tx => tx.type === 'outbound').map((tx, idx) => (
+                        <div key={tx.id || idx} onClick={() => setViewingTx(tx)} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:border-cyan-400 hover:shadow-md hover:scale-[1.01] transition-all cursor-pointer group/card space-y-3 relative active:scale-[0.99]">
+                           <div className="flex justify-between items-start">
+                              <div>
+                                 <div className="flex items-center gap-2">
+                                    <p className="text-sm font-black text-gray-950">Phiếu xuất #{tx.id?.slice(0, 8).toUpperCase()}</p>
+                                    <span className={cn(
+                                       "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border",
+                                       tx.status === 'completed' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                                       tx.status === 'pending' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                                       "bg-red-50 text-red-600 border-red-100"
+                                    )}>
+                                       {tx.status === 'completed' ? 'Đã hoàn thành' : tx.status === 'pending' ? 'Chờ duyệt' : 'Đã huỷ'}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 font-bold mt-1">Từ kho: <span className="text-gray-600">{tx.warehouseName}</span></p>
+                               </div>
+                               <div className="text-right text-[9px] text-gray-400 font-black uppercase font-mono bg-gray-50 px-2 py-1 rounded-lg">
+                                  {tx.transactionDate ? format(new Date(tx.transactionDate), 'dd/MM/yyyy') : 'N/A'}
+                               </div>
+                            </div>
+                            
+                            <div className="border-t border-gray-50 pt-3 flex flex-wrap gap-2">
+                               {tx.items && tx.items.map((item: any, itemIdx: number) => (
+                                  <div key={itemIdx} className="inline-flex items-center gap-1.5 px-2 py-1 bg-cyan-50 border border-cyan-100/50 rounded-lg text-[10px]">
+                                     <span className="font-bold text-gray-800">{item.productName}</span>
+                                     <span className="font-black text-cyan-600">x{item.quantity} {item.unit}</span>
+                                  </div>
+                               ))}
+                            </div>
+
+                            <div className="pt-3 border-t border-gray-50 flex items-center justify-between text-[10px]">
+                              <span className="text-cyan-600 font-black group-hover/card:underline flex items-center gap-1.5">
+                                <Eye size={12} /> Bấm để xem chi tiết
+                              </span>
+                              {tx.status === 'pending' && (isAdmin || isManager) && (
+                                <span className="text-emerald-600 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded animate-pulse">
+                                  <CheckSquare size={11} /> Chờ bạn duyệt
+                                </span>
+                              )}
+                            </div>
+                        </div>
+                     ))}
+                  </div>
+                )}
+             </div>
+          </div>
+
           {/* Financial Requests associated with order */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-             <div className="p-6 border-b border-gray-50 flex items-center justify-between bg-indigo-50/10">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                   <DollarSign size={20} className="text-indigo-600" />
-                   Các đề xuất chi phí liên quan
-                </h3>
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/20 overflow-hidden mb-8">
+             <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                    <DollarSign size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-gray-900 tracking-tight">Chi phí liên quan</h3>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Các đề xuất chi phí</p>
+                  </div>
+                </div>
              </div>
              
              <div className="divide-y divide-gray-50">

@@ -142,6 +142,7 @@ export default function StockTransactions() {
     return new Error(`Lỗi hệ thống: ${errInfo.error} (Path: ${path})`);
   };
 
+  const [historyTab, setHistoryTab] = React.useState<'inbound' | 'outbound' | 'transfer'>('outbound');
   const [transactions, setTransactions] = React.useState<StockTransaction[]>([]);
   const [editingTransaction, setEditingTransaction] = React.useState<StockTransaction | null>(null);
   const [products, setProducts] = React.useState<Product[]>([]);
@@ -794,20 +795,59 @@ export default function StockTransactions() {
         )}
       </div>
 
+      {/* Segmented Tab Switcher */}
+      <div className="flex border-b border-gray-100 gap-2 mb-4">
+        <button
+          onClick={() => setHistoryTab('outbound')}
+          className={cn(
+            "pb-4 px-6 text-xs font-black uppercase tracking-wider border-b-2 transition-all duration-200",
+            historyTab === 'outbound' 
+              ? "border-blue-600 text-blue-600" 
+              : "border-transparent text-gray-400 hover:text-gray-600"
+          )}
+        >
+          📤 Lịch sử Xuất Kho
+        </button>
+        <button
+          onClick={() => setHistoryTab('inbound')}
+          className={cn(
+            "pb-4 px-6 text-xs font-black uppercase tracking-wider border-b-2 transition-all duration-200",
+            historyTab === 'inbound' 
+              ? "border-blue-600 text-blue-600" 
+              : "border-transparent text-gray-400 hover:text-gray-600"
+          )}
+        >
+          📥 Lịch sử Nhập Kho
+        </button>
+        <button
+          onClick={() => setHistoryTab('transfer')}
+          className={cn(
+            "pb-4 px-6 text-xs font-black uppercase tracking-wider border-b-2 transition-all duration-200",
+            historyTab === 'transfer' 
+              ? "border-blue-600 text-blue-600" 
+              : "border-transparent text-gray-400 hover:text-gray-600"
+          )}
+        >
+          🔄 Lịch sử Điều Chuyển
+        </button>
+      </div>
+
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[1000px]">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Giao dịch</th>
-                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Ngày nhập kho</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  {historyTab === 'inbound' ? 'Ngày nhập kho' : historyTab === 'outbound' ? 'Ngày xuất kho' : 'Ngày điều chuyển'}
+                </th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Kho thực hiện</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Trạng thái</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {transactions.map(tx => (
+              {transactions.filter(tx => tx.type === historyTab).map(tx => (
                 <tr 
                   key={tx.id} 
                   onClick={() => setDetailsTx(tx)} 

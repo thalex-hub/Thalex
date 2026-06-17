@@ -79,6 +79,7 @@ export default function WarehouseManagement() {
   const [viewingOutboundTx, setViewingOutboundTx] = React.useState<any | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchDate, setSearchDate] = React.useState('');
   const [selectedWarehouse, setSelectedWarehouse] = React.useState('all');
   const [showWarehouseModal, setShowWarehouseModal] = React.useState(false);
   const [selectedProductDetails, setSelectedProductDetails] = React.useState<string | null>(null);
@@ -336,10 +337,18 @@ export default function WarehouseManagement() {
       // 1. Show matching serialized items
       productStockItems.filter(si => selectedWarehouse === 'all' || si.warehouseId === selectedWarehouse)
         .forEach(si => {
+          let matchesDate = true;
+          if (searchDate && si.entryDate) {
+            const siDate = format(new Date(si.entryDate), 'yyyy-MM-dd');
+            if (siDate !== searchDate) matchesDate = false;
+          }
+          
           if (
-            product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            si.sn.toLowerCase().includes(searchTerm.toLowerCase())
+            matchesDate && (
+              product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+              product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              si.sn.toLowerCase().includes(searchTerm.toLowerCase())
+            )
           ) {
             results.push({
               id: si.id,
@@ -362,9 +371,17 @@ export default function WarehouseManagement() {
           const leftOverQty = (i.quantity || 0) - serializedInWhCount;
           if (leftOverQty <= 0) return;
 
+          let matchesDate = true;
+          if (searchDate && i.lastUpdated) {
+            const iDate = format(new Date(i.lastUpdated), 'yyyy-MM-dd');
+            if (iDate !== searchDate) matchesDate = false;
+          }
+
           if (
-            product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            product.code.toLowerCase().includes(searchTerm.toLowerCase())
+            matchesDate && (
+              product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+              product.code.toLowerCase().includes(searchTerm.toLowerCase())
+            )
           ) {
             results.push({
               id: `${i.id}_unserialized`,
@@ -379,7 +396,7 @@ export default function WarehouseManagement() {
     });
 
     return results;
-  }, [products, stockItems, inventory, warehouses, selectedWarehouse, searchTerm]);
+  }, [products, stockItems, inventory, warehouses, selectedWarehouse, searchTerm, searchDate]);
 
   if (loading) return <div className="p-8 text-center">Đang tải...</div>;
 
@@ -454,11 +471,16 @@ export default function WarehouseManagement() {
             ...item
           }));
         }).filter((item: any) => {
+          let matchesDate = true;
+          if (searchDate && item.transactionDate) {
+            const itemDate = format(new Date(item.transactionDate), 'yyyy-MM-dd');
+            if (itemDate !== searchDate) matchesDate = false;
+          }
           const matchesSearch = (item.productName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                                 (item.productCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                                 (item.sn && item.sn.toLowerCase().includes(searchTerm.toLowerCase()));
           const matchesWarehouse = selectedWarehouse === 'all' || item.warehouseId === selectedWarehouse;
-          return matchesSearch && matchesWarehouse;
+          return matchesSearch && matchesWarehouse && matchesDate;
         });
 
         return (
@@ -526,7 +548,24 @@ export default function WarehouseManagement() {
                 />
               </div>
               <div className="flex items-center gap-3">
-                <Filter className="text-gray-400" size={18} />
+                <div className="relative">
+                  <input
+                    type="date"
+                    className="bg-gray-50 border-none rounded-xl text-sm px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-100 text-gray-600"
+                    value={searchDate}
+                    onChange={e => setSearchDate(e.target.value)}
+                    title={activeTab === 'instock' ? "Tìm theo ngày nhập kho" : "Tìm theo ngày xuất kho"}
+                  />
+                  {searchDate && (
+                    <button 
+                      onClick={() => setSearchDate('')}
+                      className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <Filter className="text-gray-400 shrink-0" size={18} />
                 <select 
                   className="bg-gray-50 border-none rounded-xl text-sm px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-100"
                   value={selectedWarehouse}

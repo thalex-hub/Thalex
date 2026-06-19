@@ -8,6 +8,7 @@ import { Task } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/authContext';
+import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
 export default function NotificationManager() {
   const navigate = useNavigate();
@@ -478,16 +479,12 @@ export default function NotificationManager() {
 
         // Check overdue (notify both)
         if (isBefore(dueDate, now)) {
-          // Opportunistically update status in Firestore if not already overdue
-          if (task.status !== 'overdue') {
-            try {
-              await updateDoc(doc(db, 'tasks', taskId), { status: 'overdue' });
-            } catch (e) {
-              console.warn('Failed to update task to overdue:', e);
-            }
-          }
-
           if (!newNotified.has(`${taskId}_overdue`)) {
+            // Synchronously mark as notified in memory before doing any async network operations or awaiting
+            newNotified.add(`${taskId}_overdue`);
+            notifiedTasksRef.current = newNotified;
+            changed = true;
+
             const title = 'Công việc quá hạn!';
             const body = isAssignee 
               ? `Công việc "${task.name}" của bạn đã quá hạn.` 
@@ -495,8 +492,13 @@ export default function NotificationManager() {
             
             sendNotification(title, body, 'overdue');
             addHistoricalNotification(title, body, 'overdue', taskId);
-            newNotified.add(`${taskId}_overdue`);
-            changed = true;
+
+            // Opportunistically update status in Firestore asynchronously if not already marked as overdue
+            if (task.status !== 'overdue') {
+              updateDoc(doc(db, 'tasks', taskId), { status: 'overdue' }).catch((e) => {
+                handleFirestoreError(e, OperationType.UPDATE, `tasks/${taskId}`);
+              });
+            }
           }
         } 
         // Check due VERY soon (1 hour) - only assignee

@@ -487,14 +487,22 @@ export default function Dashboard() {
     const overdueTasksCount = tasksForYear.filter(t => {
       if (t.status === 'completed') return false;
       const due = t.dueDate ? toDate(t.dueDate) : null;
-      const isPast = due ? due < now : false;
+      let isPast = false;
+      if (due) {
+        const dueEnd = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 23, 59, 59, 999);
+        isPast = dueEnd < now;
+      }
       return t.status === 'overdue' || t.status === 'late' || isPast;
     }).length;
 
     const newTasksCount = tasksForYear.filter(t => {
       if (t.status === 'completed') return false;
       const due = t.dueDate ? toDate(t.dueDate) : null;
-      const isPast = due ? due < now : false;
+      let isPast = false;
+      if (due) {
+        const dueEnd = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 23, 59, 59, 999);
+        isPast = dueEnd < now;
+      }
       if (isPast) return false;
       return t.status === 'new' || t.status === 'todo' || t.status === 'assigned';
     }).length;
@@ -502,7 +510,11 @@ export default function Dashboard() {
     const inProgressTasksCount = tasksForYear.filter(t => {
       if (t.status === 'completed') return false;
       const due = t.dueDate ? toDate(t.dueDate) : null;
-      const isPast = due ? due < now : false;
+      let isPast = false;
+      if (due) {
+        const dueEnd = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 23, 59, 59, 999);
+        isPast = dueEnd < now;
+      }
       if (isPast) return false;
       const isNew = t.status === 'new' || t.status === 'todo' || t.status === 'assigned';
       return !isNew;

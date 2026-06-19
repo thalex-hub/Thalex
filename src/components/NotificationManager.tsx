@@ -469,7 +469,18 @@ export default function NotificationManager() {
 
       for (const task of tasks) {
         if (!task.dueDate) continue;
-        const dueDate = parseISO(task.dueDate);
+        
+        let dueDate: Date;
+        if (task.dueDate.includes('T')) {
+          const d = new Date(task.dueDate);
+          dueDate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+        } else {
+          const parts = task.dueDate.split('-');
+          dueDate = parts.length === 3 
+            ? new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 23, 59, 59, 999)
+            : new Date(task.dueDate);
+        }
+
         const taskId = task.id;
         const isAssignee = task.assigneeId === currentUser?.uid;
         const isAssigner = task.assignerId === currentUser?.uid;

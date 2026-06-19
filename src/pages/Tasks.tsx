@@ -858,7 +858,12 @@ export default function Tasks() {
       const completedCount = periodTasks.filter(t => t.status === 'completed').length;
       const inProgressCount = periodTasks.filter(t => t.status === 'in_progress' || t.status === 'assigned').length;
       const overdueCount = periodTasks.filter(t => {
-        const isPast = new Date(t.dueDate) < now;
+        let isPast = false;
+        if (t.dueDate) {
+          const due = new Date(t.dueDate);
+          const dueEnd = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 23, 59, 59, 999);
+          isPast = dueEnd < now;
+        }
         return t.status !== 'completed' && isPast;
       }).length;
 
@@ -899,13 +904,21 @@ export default function Tasks() {
       // Detailed Table
       doc.text('Chi tiet cong viec:', 14, (doc as any).lastAutoTable.finalY + 15);
       
-      const detailedData = periodTasks.map(t => [
-        t.name,
-        format(new Date(t.dueDate), 'dd/MM/yyyy'),
-        t.status === 'completed' ? 'Hoan thanh' : (new Date(t.dueDate) < now ? 'Qua han' : 'Dang lam'),
-        formatPercent(t.progress),
-        t.priority === 'high' ? 'Cao' : (t.priority === 'medium' ? 'Trung binh' : 'Thap')
-      ]);
+      const detailedData = periodTasks.map(t => {
+        let isPast = false;
+        if (t.dueDate) {
+          const due = new Date(t.dueDate);
+          const dueEnd = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 23, 59, 59, 999);
+          isPast = dueEnd < now;
+        }
+        return [
+          t.name,
+          format(new Date(t.dueDate), 'dd/MM/yyyy'),
+          t.status === 'completed' ? 'Hoan thanh' : (isPast ? 'Qua han' : 'Dang lam'),
+          formatPercent(t.progress),
+          t.priority === 'high' ? 'Cao' : (t.priority === 'medium' ? 'Trung binh' : 'Thap')
+        ];
+      });
 
       (doc as any).autoTable({
         startY: (doc as any).lastAutoTable.finalY + 20,
@@ -925,7 +938,12 @@ export default function Tasks() {
   };
 
   const overdueCount = tasks.filter(t => {
-    const isPast = t.dueDate ? new Date(t.dueDate) < new Date() : false;
+    let isPast = false;
+    if (t.dueDate) {
+      const due = new Date(t.dueDate);
+      const dueEnd = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 23, 59, 59, 999);
+      isPast = dueEnd < new Date();
+    }
     return t.status !== 'completed' && (t.status === 'overdue' || isPast);
   }).length;
 
@@ -1176,9 +1194,17 @@ export default function Tasks() {
                               <UserCheck size={10} /> Được giao
                             </span>
                           )}
-                          {task.status === 'overdue' && (
-                             <span className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-bold uppercase">Trễ hạn</span>
-                          )}
+                          {(() => {
+                            let isPast = false;
+                            if (task.dueDate && task.status !== 'completed') {
+                              const due = new Date(task.dueDate);
+                              const dueEnd = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 23, 59, 59, 999);
+                              isPast = dueEnd < new Date();
+                            }
+                            return (task.status === 'overdue' || isPast) ? (
+                              <span className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-bold uppercase">Trễ hạn</span>
+                            ) : null;
+                          })()}
                         </div>
                         <div className="flex flex-col gap-1">
                           <p className="text-xs text-gray-400 font-medium flex items-center gap-2">

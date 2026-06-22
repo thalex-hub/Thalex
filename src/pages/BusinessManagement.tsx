@@ -1,5 +1,5 @@
 import React from 'react';
-import { db, storage } from '../lib/firebase';
+import { auth, db, storage } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, setDoc, getDoc, getDocs, where, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 

@@ -54,6 +54,7 @@ export default function BusinessManagement() {
   const [sendingEmailId, setSendingEmailId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [editingUser, setEditingUser] = React.useState<AppUser | null>(null);
+  const [newPasswordForEdit, setNewPasswordForEdit] = React.useState('');
   const [showAddUserModal, setShowAddUserModal] = React.useState(false);
   const [showDeptModal, setShowDeptModal] = React.useState(false);
   const [editingDept, setEditingDept] = React.useState<any>(null);
@@ -610,12 +611,26 @@ export default function BusinessManagement() {
           [currentYear]: Number(editingUser.baseSalary) || 0
         };
 
-        await updateDoc(doc(db, 'users', editingUser.uid), {
+        const updateData: any = {
            ...editingUser,
            yearlyBaseSalaries: updatedYearlyBaseSalaries,
            updatedAt: new Date().toISOString()
-        });
+        };
+
+        if (newPasswordForEdit.trim()) {
+           updateData.tempPassword = newPasswordForEdit.trim();
+           updateData.needsPasswordChange = true;
+           updateData.accountStatus = 'pending';
+        }
+
+        await updateDoc(doc(db, 'users', editingUser.uid), updateData);
         await logActivity('Update User Profile', 'Business', editingUser.uid);
+        
+        if (newPasswordForEdit.trim()) {
+           alert('Đã cập nhật mật khẩu mới! Tài khoản đã được chuyển về trạng thái Chờ kích hoạt để áp dụng mật khẩu này cho lần đăng nhập tiếp theo.');
+        }
+
+        setNewPasswordForEdit('');
         setEditingUser(null);
       } catch (error) {
          handleFirestoreError(error, OperationType.UPDATE, `users/${editingUser.uid}`);
@@ -1608,6 +1623,42 @@ export default function BusinessManagement() {
                         <option value="active">Hoạt động</option>
                         <option value="locked">Khóa</option>
                       </select>
+                    </div>
+                    <div className="col-span-1 md:col-span-2 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex flex-col gap-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Mật khẩu (Tạo lại)</label>
+                          <p className="text-[10px] text-blue-500 max-w-sm">
+                            {editingUser.accountStatus === 'pending' 
+                              ? "Cập nhật mật khẩu tạm thời cho nhân viên mới."
+                              : "Với nhân viên đã kích hoạt, hệ thống khuyến khích gửi Email khôi phục mật khẩu để bảo mật."}
+                          </p>
+                        </div>
+                        {editingUser.accountStatus !== 'pending' && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const { sendPasswordResetEmail } = await import('firebase/auth');
+                                await sendPasswordResetEmail(auth, editingUser.email);
+                                alert(`Đã gửi liên kết khôi phục mật khẩu đến: ${editingUser.email}`);
+                              } catch (err: any) {
+                                alert(`Lỗi: ${err.message}`);
+                              }
+                            }}
+                            className="bg-white border border-blue-200 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                          >
+                            Gửi Link Khôi Phục
+                          </button>
+                        )}
+                      </div>
+                      <input 
+                        type="text"
+                        placeholder={editingUser.accountStatus === 'pending' ? "Nhập mật khẩu mới..." : "Bắt buộc đổi mật khẩu tạm..."}
+                        className="w-full bg-white border border-blue-200 focus:border-blue-400 rounded-xl px-4 py-3 outline-none transition-all font-medium text-blue-700 placeholder-blue-300"
+                        value={newPasswordForEdit}
+                        onChange={e => setNewPasswordForEdit(e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Trạng thái công việc</label>

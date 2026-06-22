@@ -120,8 +120,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const filteredMenuItems = menuItems.filter(item => {
     const i = item as any;
     
-    // Always allow the User Guide for everyone
-    if (i.path === '/guide') return true;
+    // Always allow the User Guide and Payroll for everyone
+    if (i.path === '/guide' || i.path === '/payroll') return true;
 
     // Direct root exception or build dynamic key like menu_business, menu_salary_settings
     let permId = 'menu_dashboard';

@@ -100,12 +100,21 @@ export default function Payroll() {
             where('status', 'in', ['approved', 'paid'])
           );
 
+      const isSuperUser = isDirector || isAccountant || isHR || isManager;
+      const advancesQ = isSuperUser 
+        ? query(collection(db, 'advance_requests'))
+        : query(collection(db, 'advance_requests'), where('userId', '==', user.uid));
+        
+      const reimbQ = isSuperUser 
+        ? query(collection(db, 'reimbursement_requests'))
+        : query(collection(db, 'reimbursement_requests'), where('userId', '==', user.uid));
+
       const [ordersSnap, deptsSnap, paymentsSnap, advanceSnap, reimbSnap] = await Promise.all([
         getDocs(ordersQ),
         getDocs(collection(db, 'departments')),
         getDocs(paymentsQ),
-        getDocs(collection(db, 'advance_requests')),
-        getDocs(collection(db, 'reimbursement_requests'))
+        getDocs(advancesQ),
+        getDocs(reimbQ)
       ]);
       
       setOrders(ordersSnap.docs.map(d => ({ id: d.id, ...d.data() })));

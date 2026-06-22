@@ -475,8 +475,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                           return;
                         }
                       }
-                      setAppUser(null);
-                      setLoading(false);
+                      
+                      // Fallback: search by email to heal disconnected accounts
+                      import('firebase/firestore').then(({ query, collection, where, getDocs }) => {
+                        const q = query(collection(db, 'users'), where('email', '==', u.email));
+                        getDocs(q).then(qSnap => {
+                          if (!qSnap.empty) {
+                            const oldDoc = qSnap.docs[0];
+                            const data = oldDoc.data() as AppUser;
+                            if (oldDoc.id === u.uid) {
+                              // The document is already migrated/assigned to the correct UID. 
+                              // onSnapshot will pick this up. Do nothing.
+                              return;
+                            }
+                            if (data.accountStatus !== 'locked') {
+                              const linkedData = { ...data, uid: u.uid };
+                              setDoc(userRef, linkedData).then(() => {
+                                deleteDoc(oldDoc.ref).catch(() => {});
+                                setAppUser(linkedData as AppUser);
+                                setLoading(false);
+                              }).catch(() => {
+                                setAppUser(null);
+                                setLoading(false);
+                              });
+                              return;
+                            }
+                          }
+                          
+                          // Check if the current userDoc existance has changed while we were doing async work
+                          getDoc(userRef).then(currentDocSnap => {
+                            if (!currentDocSnap.exists()) {
+                              setAppUser(null);
+                            }
+                            setLoading(false);
+                          }).catch(() => {
+                            setAppUser(null);
+                            setLoading(false);
+                          });
+                        }).catch(() => {
+                          setAppUser(null);
+                          setLoading(false);
+                        });
+                      });
                     }).catch(() => {
                       setAppUser(null);
                       setLoading(false);

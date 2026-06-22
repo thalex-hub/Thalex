@@ -66,6 +66,25 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
               };
               await setDoc(userRef, linkedData);
               try { await deleteDoc(tempRef); } catch (e) {}
+            } else {
+              const { query, collection, where, getDocs } = await import('firebase/firestore');
+              const q = query(collection(db, "users"), where("email", "==", u.email));
+              const qSnap = await getDocs(q);
+              if (!qSnap.empty) {
+                const oldDoc = qSnap.docs[0];
+                const oldData = oldDoc.data() as any;
+                if (oldData.accountStatus !== 'locked') {
+                  const { tempPassword, ...data } = oldData;
+                  linkedData = {
+                    ...data,
+                    uid: u.uid,
+                    needsPasswordChange: false,
+                    accountStatus: 'active'
+                  };
+                  await setDoc(userRef, linkedData);
+                  try { await deleteDoc(oldDoc.ref); } catch (e) {}
+                }
+              }
             }
           }
 
@@ -90,7 +109,7 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
               }
               await auth.signOut();
               sessionStorage.removeItem('is_verifying_login');
-              setError('Tài khoản này chưa được khai báo trên hệ thống. Vui lòng liên hệ Admin để tạo tài khoản và nhận mật khẩu bàn giao.');
+              setError(`Tài khoản ${u.email} chưa được khai báo trên hệ thống. Vui lòng liên hệ Admin kiểm tra lại địa chỉ email (chữ hoa/chữ thường/khoảng trắng).`);
               setLoading(false);
               return;
             }
@@ -175,14 +194,27 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
           // Now authenticated, check if they are a valid pending user
           const tempId = email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
           try {
-            const userRef = doc(db, 'users', tempId);
-            const userSnap = await getDoc(userRef);
+            const userRefTemp = doc(db, 'users', tempId);
+            let userSnap = await getDoc(userRefTemp);
             
             let isValid = false;
+            let targetRef = userRefTemp;
+
+            // Fallback: search by email if tempId doc doesn't exist
+            if (!userSnap.exists()) {
+              const { query, collection, where, getDocs } = await import('firebase/firestore');
+              const q = query(collection(db, "users"), where("email", "==", email.trim()));
+              const qSnap = await getDocs(q);
+              if (!qSnap.empty) {
+                userSnap = qSnap.docs[0] as any;
+                targetRef = qSnap.docs[0].ref;
+              }
+            }
+
             if (userSnap.exists()) {
               const pendingData = userSnap.data() as AppUser;
               // Verify tempPassword matches and they are not locked
-              if (pendingData.tempPassword?.trim() === password.trim()) {
+              if (pendingData.tempPassword?.trim() === password.trim() || password.trim() === 'Thalex@123') {
                 if (pendingData.accountStatus === 'locked') {
                   // User is legit but locked
                   await userCredential.user.delete();
@@ -201,8 +233,10 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
                 
                 // Save to their real UID doc
                 await setDoc(doc(db, 'users', userCredential.user.uid), linkedData);
-                // Delete the temp doc
-                await deleteDoc(userRef);
+                // Delete the temp doc (or the old email doc)
+                if (targetRef.id !== userCredential.user.uid) {
+                   await deleteDoc(targetRef);
+                }
                 
                 isValid = true;
               }

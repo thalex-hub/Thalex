@@ -1643,7 +1643,11 @@ export default function BusinessManagement() {
                                 await sendPasswordResetEmail(auth, editingUser.email);
                                 alert(`Đã gửi liên kết khôi phục mật khẩu đến: ${editingUser.email}`);
                               } catch (err: any) {
-                                alert(`Lỗi: ${err.message}`);
+                                if (err.code === 'auth/user-not-found') {
+                                  alert(`Tài khoản này chưa được kích hoạt qua hệ thống xác thực. Vui lòng cập nhật mật khẩu tạm thời ở ô bên dưới và bảo nhân viên đăng nhập lại.`);
+                                } else {
+                                  alert(`Lỗi: ${err.message}`);
+                                }
                               }
                             }}
                             className="bg-white border border-blue-200 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition-all shadow-sm"

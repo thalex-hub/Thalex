@@ -449,6 +449,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setDoc(userRef, newUser).catch(err => console.error("Self-heal create failed", err));
                 setAppUser(newUser);
               } else {
+                if (u.email) {
+                  const tempId = u.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+                  if (tempId !== u.uid) {
+                    getDoc(doc(db, 'users', tempId)).then(tempSnap => {
+                      if (tempSnap.exists()) {
+                        const pendingData = tempSnap.data() as any;
+                        if (pendingData.accountStatus !== 'locked') {
+                          const { tempPassword: _, ...data } = pendingData;
+                          const linkedData = {
+                            ...data,
+                            uid: u.uid,
+                            needsPasswordChange: data.needsPasswordChange ?? false,
+                            accountStatus: 'active'
+                          };
+                          setDoc(userRef, linkedData).then(() => {
+                            deleteDoc(doc(db, 'users', tempId)).catch(() => {});
+                            // State will also update from the next snapshot trigger
+                            setAppUser(linkedData as AppUser);
+                            setLoading(false);
+                          }).catch(() => {
+                            setAppUser(null);
+                            setLoading(false);
+                          });
+                          return;
+                        }
+                      }
+                      setAppUser(null);
+                      setLoading(false);
+                    }).catch(() => {
+                      setAppUser(null);
+                      setLoading(false);
+                    });
+                    return;
+                  }
+                }
                 setAppUser(null);
               }
             }

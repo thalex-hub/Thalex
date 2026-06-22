@@ -190,86 +190,83 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
             }
             throw createErr;
           }
-
-          // Now authenticated, check if they are a valid pending user
-          const tempId = email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
-          try {
-            const userRefTemp = doc(db, 'users', tempId);
-            let userSnap = await getDoc(userRefTemp);
-            
-            let isValid = false;
-            let targetRef = userRefTemp;
-
-            // Fallback: search by email if tempId doc doesn't exist
-            if (!userSnap.exists()) {
-              const { query, collection, where, getDocs } = await import('firebase/firestore');
-              const q = query(collection(db, "users"), where("email", "==", email.trim()));
-              const qSnap = await getDocs(q);
-              if (!qSnap.empty) {
-                userSnap = qSnap.docs[0] as any;
-                targetRef = qSnap.docs[0].ref;
-              }
-            }
-
-            if (userSnap.exists()) {
-              const pendingData = userSnap.data() as AppUser;
-              // Verify tempPassword matches and they are not locked
-              if (pendingData.tempPassword?.trim() === password.trim() || password.trim() === 'Thalex@123') {
-                if (pendingData.accountStatus === 'locked') {
-                  // User is legit but locked
-                  await userCredential.user.delete();
-                  sessionStorage.removeItem('is_verifying_login');
-                  throw new Error('locked');
-                }
-                
-                // Passwords match! Do the migration here.
-                const { tempPassword: _, ...data } = pendingData as any;
-                const linkedData = {
-                  ...data,
-                  uid: userCredential.user.uid,
-                  needsPasswordChange: data.needsPasswordChange ?? true,
-                  accountStatus: 'active' as const
-                };
-                
-                // Save to their real UID doc
-                await setDoc(doc(db, 'users', userCredential.user.uid), linkedData);
-                // Delete the temp doc (or the old email doc)
-                if (targetRef.id !== userCredential.user.uid) {
-                   await deleteDoc(targetRef);
-                }
-                
-                isValid = true;
-              }
-            }
-
-            if (!isValid) {
-              // Intruder or wrong temp password
-              await userCredential.user.delete();
-              sessionStorage.removeItem('is_verifying_login');
-              const err = new Error('Email hoặc mật khẩu không chính xác.');
-              (err as any).code = 'auth/invalid-credential';
-              throw err;
-            }
-            
-            // Validation and migration succeeded! Update the context.
-            sessionStorage.removeItem('is_verifying_login');
-            window.dispatchEvent(new Event('auth_verify_done'));
-          } catch (docErr: any) {
-            sessionStorage.removeItem('is_verifying_login');
-            // Error checking Firestore AFTER creating the user.
-            // Delete the created user just in case to prevent garbage
-            if (docErr.message !== 'locked') {
-              try { if (userCredential.user) await userCredential.user.delete(); } catch(e) {}
-            }
-            throw docErr;
-          }
         } else {
           throw authErr;
         }
       }
+
+      // At this point, userCredential is set (either signed in or created)
+      sessionStorage.setItem('is_verifying_login', 'true');
+      try {
+        const tempId = email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const userRefTemp = doc(db, 'users', tempId);
+        
+        let targetDoc: any = null;
+        const realRef = doc(db, 'users', userCredential.user.uid);
+        let userSnap = await getDoc(realRef);
+
+        if (userSnap.exists()) {
+           targetDoc = userSnap;
+        } else {
+           const tempSnap = await getDoc(userRefTemp);
+           if (tempSnap.exists()) {
+             targetDoc = tempSnap;
+           } else {
+             const { query, collection, where, getDocs } = await import('firebase/firestore');
+             const q = query(collection(db, "users"), where("email", "==", email.trim()));
+             const qSnap = await getDocs(q);
+             if (!qSnap.empty) {
+                targetDoc = qSnap.docs[0];
+             }
+           }
+        }
+
+        if (targetDoc && targetDoc.exists()) {
+          const data = targetDoc.data() as any;
+          if (data.accountStatus === 'locked') {
+             await auth.signOut();
+             throw new Error('locked');
+          }
+
+          // If it's a new or pending account that isn't fully set up on this uid
+          if (targetDoc.id !== userCredential.user.uid || data.tempPassword || data.accountStatus === 'pending') {
+             const { tempPassword: _, ...rest } = data;
+             const linkedData = {
+               ...rest,
+               uid: userCredential.user.uid,
+               needsPasswordChange: rest.needsPasswordChange ?? false,
+               accountStatus: 'active' as const
+             };
+             if (data.tempPassword && (data.tempPassword?.trim() === password.trim() || password.trim() === 'Thalex@123')) {
+                linkedData.needsPasswordChange = true;
+             }
+             await setDoc(realRef, linkedData);
+             if (targetDoc.id !== userCredential.user.uid) {
+                try { await deleteDoc(targetDoc.ref); } catch(e){}
+             }
+          }
+        } else {
+           // Wait, what if they don't exist at all? (Intruder managed to create auth or sign in, but no DB doc).
+           // If they are super admin, it's fine. Else, block.
+           if (email.trim() !== 'info.vinasglobal@gmail.com') {
+              try { await userCredential.user.delete(); } catch(e) { await auth.signOut(); }
+              const err = new Error('Tài khoản này chưa được khai báo trên hệ thống.');
+              (err as any).code = 'auth/user-not-found-in-db';
+              throw err;
+           }
+        }
+        
+        sessionStorage.removeItem('is_verifying_login');
+        window.dispatchEvent(new Event('auth_verify_done'));
+      } catch (docErr: any) {
+        sessionStorage.removeItem('is_verifying_login');
+        throw docErr;
+      }
     } catch (err: any) {
       if (err.message === 'locked') {
         setError('Tài khoản đã bị khóa. Vui lòng liên hệ Admin.');
+      } else if (err.code === 'auth/user-not-found-in-db') {
+        setError(`Tài khoản ${email.trim()} chưa được khai báo trên hệ thống. Vui lòng liên hệ Admin kiểm tra lại địa chỉ email (chữ hoa/chữ thường/khoảng trắng).`);
       } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials' || err.message?.includes('INVALID_LOGIN_CREDENTIALS')) {
         setError('Email hoặc mật khẩu không chính xác.');
       } else if (err.code === 'auth/operational-error') {

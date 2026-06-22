@@ -112,7 +112,8 @@ function AppContent() {
   }
 
   if (!appUser) {
-    return <LoginPage initialError={`Tài khoản ${user.email} (UID: ${user.uid}) chưa được khai báo hoặc không tồn tại trên hệ thống. Vui lòng liên hệ Admin.`} />;
+    auth.signOut();
+    return <LoginPage initialError={`Tài khoản ${user.email} (UID: ${user.uid}) chưa được khai báo hoặc đã bị xoá. Vui lòng đăng nhập lại hoặc liên hệ Admin.`} />;
   }
 
   if (appUser.accountStatus === 'locked') {

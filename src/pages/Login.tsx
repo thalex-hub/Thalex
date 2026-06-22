@@ -184,7 +184,7 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
             // If email-already-in-use, it means they DO exist in Auth, but they typed the wrong password 
             // (since signInWithEmailAndPassword failed earlier).
             if (createErr.code === 'auth/email-already-in-use') {
-              const err = new Error('Email hoặc mật khẩu không chính xác.');
+              const err = new Error('Tài khoản đã được bảo mật. Nếu Mật khẩu không đúng, vui lòng bấm Quên mật khẩu.');
               (err as any).code = 'auth/invalid-credential';
               throw err;
             }
@@ -268,7 +268,7 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
       } else if (err.code === 'auth/user-not-found-in-db') {
         setError(`Tài khoản ${email.trim()} chưa được khai báo trên hệ thống. Vui lòng liên hệ Admin kiểm tra lại địa chỉ email (chữ hoa/chữ thường/khoảng trắng).`);
       } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials' || err.message?.includes('INVALID_LOGIN_CREDENTIALS')) {
-        setError('Email hoặc mật khẩu không chính xác.');
+        setError('Mật khẩu của bạn không chính xác. Nếu hệ thống báo sai liên tục, vui lòng sử dụng chức năng QUÊN MẬT KHẨU bên dưới để đặt lại mật khẩu của bạn.');
       } else if (err.code === 'auth/operational-error') {
         setError('Vui lòng kích hoạt Email/Password Provider trong Firebase Console.');
       } else if (err.code === 'auth/too-many-requests') {
@@ -386,6 +386,35 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                  >
                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                 </button>
+              </div>
+              <div className="flex justify-end mt-2">
+                 <button 
+                   type="button" 
+                   onClick={async () => {
+                     if (!email.trim() || !email.includes('@')) {
+                       setError('Vui lòng nhập định dạng email hợp lệ vào ô phía trên, sau đó bấm Quên mật khẩu.');
+                       return;
+                     }
+                     setLoading(true);
+                     setError('');
+                     try {
+                        const { sendPasswordResetEmail } = await import('firebase/auth');
+                        await sendPasswordResetEmail(auth, email.trim());
+                        alert(`Đã gửi liên kết khôi phục mật khẩu tới email ${email.trim()}. Vui lòng kiểm tra hộp thư (hoặc thư mục Spam).`);
+                     } catch (err: any) {
+                        if (err.code === 'auth/user-not-found') {
+                           setError('Tài khoản này chưa từng được đăng nhập hoặc chưa được kích hoạt thành công trên hệ thống.');
+                        } else {
+                           setError('Lỗi gửi email khôi phục: ' + err.message);
+                        }
+                     } finally {
+                        setLoading(false);
+                     }
+                   }}
+                   className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline px-1"
+                 >
+                   Quên mật khẩu?
                  </button>
               </div>
            </div>

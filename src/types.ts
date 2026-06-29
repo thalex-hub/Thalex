@@ -90,6 +90,7 @@ export interface Task {
   parentId?: string;
   followers?: string[];
   createdAt?: string;
+  updatedAt?: string;
   completedAt?: string;
 }
 

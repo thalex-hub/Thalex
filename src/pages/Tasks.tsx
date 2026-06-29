@@ -1341,21 +1341,21 @@ export default function Tasks() {
                             <p className="text-xs text-gray-400 font-medium">
                               Tiến độ: {formatPercent(task.progress)}
                             </p>
-                            {task.status === 'completed' && task.completedAt && (
+                            {task.status === 'completed' && (task.completedAt || task.updatedAt) && (
                               <>
                                 <span className="text-xs text-gray-300">•</span>
                                 <p className="text-xs font-medium flex items-center gap-1">
-                                  <span>Thực tế: {format(new Date(task.completedAt), 'dd/MM/yyyy')}</span>
+                                  <span>Thực tế: {format(new Date(task.completedAt || task.updatedAt || Date.now()), 'dd/MM/yyyy')}</span>
                                   {(() => {
                                     const due = new Date(task.dueDate || Date.now());
-                                    const completed = new Date(task.completedAt);
+                                    const completed = new Date(task.completedAt || task.updatedAt || Date.now());
                                     
                                     // Reset hours to compare only dates
                                     due.setHours(0, 0, 0, 0);
                                     completed.setHours(0, 0, 0, 0);
                                     
                                     const diffTime = completed.getTime() - due.getTime();
-                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
                                     
                                     if (diffDays < 0) {
                                       return <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded-full">(Sớm {Math.abs(diffDays)} ngày)</span>;
@@ -1673,15 +1673,15 @@ export default function Tasks() {
                                                />
                                             </div>
                                          </div>
-                                         {task.status === 'completed' && task.completedAt && (
+                                         {task.status === 'completed' && (task.completedAt || task.updatedAt) && (
                                            <div className="flex items-center gap-1 text-[10px] font-bold">
-                                             <span className="text-gray-400 uppercase">Thực tế: {format(new Date(task.completedAt), 'dd/MM')}</span>
+                                             <span className="text-gray-400 uppercase">Thực tế: {format(new Date(task.completedAt || task.updatedAt || Date.now()), 'dd/MM')}</span>
                                              {(() => {
                                                 const due = new Date(task.dueDate || Date.now());
-                                                const completed = new Date(task.completedAt);
+                                                const completed = new Date(task.completedAt || task.updatedAt || Date.now());
                                                 due.setHours(0, 0, 0, 0);
                                                 completed.setHours(0, 0, 0, 0);
-                                                const diffDays = Math.ceil((completed.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+                                                const diffDays = Math.round((completed.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
                                                 
                                                 if (diffDays < 0) return <span className="text-green-600 bg-green-50 px-1 py-0.5 rounded-sm">(Sớm {Math.abs(diffDays)}d)</span>;
                                                 if (diffDays > 0) return <span className="text-red-600 bg-red-50 px-1 py-0.5 rounded-sm">(Trễ {diffDays}d)</span>;
@@ -2105,6 +2105,24 @@ export default function Tasks() {
                                       value={editingTask.dueDate}
                                       onChange={e => setEditingTask({...editingTask, dueDate: e.target.value})}
                                     />
+                                    {editingTask.status === 'completed' && (editingTask.completedAt || editingTask.updatedAt) && (
+                                      <div className="mt-2 flex items-center gap-2">
+                                        <p className="text-[10px] font-bold text-gray-500">
+                                          Thực tế: {format(new Date(editingTask.completedAt || editingTask.updatedAt || Date.now()), 'dd/MM/yyyy')}
+                                        </p>
+                                        {(() => {
+                                          const due = new Date(editingTask.dueDate || Date.now());
+                                          const completed = new Date(editingTask.completedAt || editingTask.updatedAt || Date.now());
+                                          due.setHours(0, 0, 0, 0);
+                                          completed.setHours(0, 0, 0, 0);
+                                          const diffDays = Math.round((completed.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+                                          
+                                          if (diffDays < 0) return <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded-full">(Sớm {Math.abs(diffDays)} ngày)</span>;
+                                          if (diffDays > 0) return <span className="text-[10px] text-red-600 font-bold bg-red-50 px-1.5 py-0.5 rounded-full">(Trễ {diffDays} ngày)</span>;
+                                          return <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded-full">(Đúng hạn)</span>;
+                                        })()}
+                                      </div>
+                                    )}
                                   </div>
                                   <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Độ ưu tiên</label>

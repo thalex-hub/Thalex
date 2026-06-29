@@ -201,23 +201,30 @@ export default function Tasks() {
     if (canSeeAll) {
        tasksQ = query(collection(db, 'tasks'));
     } else {
-       const email = currentUser.email || appUser?.email;
-       const tempId = email ? email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : null;
+       // Get all possible IDs for the current user
+       const userIds = new Set<string>();
+       if (currentUser?.uid) userIds.add(currentUser.uid);
+       if (appUser?.uid) userIds.add(appUser.uid);
        
-       const orConditions = [
-         where('assigneeId', '==', currentUser.uid),
-         where('assignerId', '==', currentUser.uid),
-         where('responsibleUserId', '==', currentUser.uid),
-         where('followers', 'array-contains', currentUser.uid)
-       ];
-       
-       if (tempId) {
-         orConditions.push(
-           where('assigneeId', '==', tempId),
-           where('assignerId', '==', tempId),
-           where('responsibleUserId', '==', tempId)
-         );
+       const email = currentUser?.email || appUser?.email;
+       if (email) {
+         userIds.add(email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_'));
        }
+       
+       const idsArray = Array.from(userIds);
+
+       const orConditions: any[] = [];
+       idsArray.forEach(id => {
+         orConditions.push(
+           where('assigneeId', '==', id),
+           where('assignerId', '==', id),
+           where('responsibleUserId', '==', id)
+         );
+       });
+       
+       orConditions.push(
+         where('followers', 'array-contains-any', idsArray)
+       );
 
        tasksQ = query(
          collection(db, 'tasks'),
@@ -461,15 +468,32 @@ export default function Tasks() {
     const items = [...(editingTask.checklist || [])];
     items[index].completed = !items[index].completed;
     
+    // Calculate new progress based on checklist
+    const completedCount = items.filter(i => i.completed).length;
+    const newProgress = Math.round((completedCount / items.length) * 100);
+    
+    let newStatus = editingTask.status;
+    if (newProgress === 100 && newStatus !== 'completed') {
+      newStatus = 'completed';
+    } else if (newProgress < 100 && newStatus === 'completed') {
+      newStatus = 'in_progress';
+    }
+    
     // Update local state first
-    const updatedTask = { ...editingTask, checklist: items };
+    const updatedTask = { ...editingTask, checklist: items, progress: newProgress, status: newStatus };
     setEditingTask(updatedTask);
 
     try {
       await updateDoc(doc(db, 'tasks', editingTask.id), {
         checklist: items,
+        progress: newProgress,
+        status: newStatus,
         updatedAt: new Date().toISOString()
       });
+      
+      if (newStatus === 'completed' && editingTask.orderId) {
+        await checkAndCompleteOrder(editingTask.orderId, editingTask.parentId);
+      }
     } catch (err) {
       console.error("Error updating checklist:", err);
     }
@@ -673,6 +697,13 @@ export default function Tasks() {
         const completedCount = editingTask.checklist.filter(i => i.completed).length;
         progress = Math.round((completedCount / editingTask.checklist.length) * 100);
       }
+      
+      let newStatus = editingTask.status;
+      if (progress === 100 && newStatus !== 'completed') {
+        newStatus = 'completed';
+      } else if (progress < 100 && newStatus === 'completed') {
+        newStatus = 'in_progress';
+      }
 
       await updateDoc(doc(db, 'tasks', editingTask.id), {
         name: editingTask.name,
@@ -685,10 +716,15 @@ export default function Tasks() {
         checklist: editingTask.checklist || [],
         attachments: editingTask.attachments || [],
         progress,
+        status: newStatus,
         parentId: editingTask.parentId || '',
         followers: editingTask.followers || [],
         updatedAt: new Date().toISOString()
       });
+      
+      if (newStatus === 'completed' && editingTask.orderId) {
+        await checkAndCompleteOrder(editingTask.orderId, editingTask.parentId);
+      }
 
       await logActivity('Update Task', 'Tasks', editingTask.id, { taskName: editingTask.name });
 
@@ -2168,8 +2204,23 @@ export default function Tasks() {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const updated = (editingTask.checklist || []).filter((_, i) => i !== index);
-                                      setEditingTask({...editingTask, checklist: updated});
-                                      updateDoc(doc(db, 'tasks', editingTask.id), { checklist: updated });
+                                      
+                                      const completedCount = updated.filter(i => i.completed).length;
+                                      const newProgress = updated.length > 0 ? Math.round((completedCount / updated.length) * 100) : 0;
+                                      
+                                      let newStatus = editingTask.status;
+                                      if (newProgress === 100 && newStatus !== 'completed') {
+                                        newStatus = 'completed';
+                                      } else if (newProgress < 100 && newStatus === 'completed') {
+                                        newStatus = 'in_progress';
+                                      }
+                                      
+                                      setEditingTask({...editingTask, checklist: updated, progress: newProgress, status: newStatus});
+                                      updateDoc(doc(db, 'tasks', editingTask.id), { checklist: updated, progress: newProgress, status: newStatus });
+                                      
+                                      if (newStatus === 'completed' && editingTask.orderId) {
+                                        checkAndCompleteOrder(editingTask.orderId, editingTask.parentId);
+                                      }
                                     }}
                                     className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                                   >
@@ -2194,8 +2245,24 @@ export default function Tasks() {
                                    if (newChecklistItem.trim()) {
                                      const newItem = { id: Math.random().toString(36).substr(2, 9), text: newChecklistItem.trim(), completed: false };
                                      const updated = [...(editingTask.checklist || []), newItem];
-                                     setEditingTask({...editingTask, checklist: updated});
-                                     await updateDoc(doc(db, 'tasks', editingTask.id), { checklist: updated });
+                                     
+                                     const completedCount = updated.filter(i => i.completed).length;
+                                     const newProgress = Math.round((completedCount / updated.length) * 100);
+                                     
+                                     let newStatus = editingTask.status;
+                                     if (newProgress === 100 && newStatus !== 'completed') {
+                                       newStatus = 'completed';
+                                     } else if (newProgress < 100 && newStatus === 'completed') {
+                                       newStatus = 'in_progress';
+                                     }
+                                     
+                                     setEditingTask({...editingTask, checklist: updated, progress: newProgress, status: newStatus});
+                                     await updateDoc(doc(db, 'tasks', editingTask.id), { checklist: updated, progress: newProgress, status: newStatus });
+                                     
+                                     if (newStatus === 'completed' && editingTask.orderId) {
+                                       await checkAndCompleteOrder(editingTask.orderId, editingTask.parentId);
+                                     }
+                                     
                                      setNewChecklistItem('');
                                    }
                                  }
@@ -2207,8 +2274,24 @@ export default function Tasks() {
                                  if (newChecklistItem.trim()) {
                                    const newItem = { id: Math.random().toString(36).substr(2, 9), text: newChecklistItem.trim(), completed: false };
                                    const updated = [...(editingTask.checklist || []), newItem];
-                                   setEditingTask({...editingTask, checklist: updated});
-                                   await updateDoc(doc(db, 'tasks', editingTask.id), { checklist: updated });
+                                   
+                                   const completedCount = updated.filter(i => i.completed).length;
+                                   const newProgress = Math.round((completedCount / updated.length) * 100);
+                                   
+                                   let newStatus = editingTask.status;
+                                   if (newProgress === 100 && newStatus !== 'completed') {
+                                     newStatus = 'completed';
+                                   } else if (newProgress < 100 && newStatus === 'completed') {
+                                     newStatus = 'in_progress';
+                                   }
+                                   
+                                   setEditingTask({...editingTask, checklist: updated, progress: newProgress, status: newStatus});
+                                   await updateDoc(doc(db, 'tasks', editingTask.id), { checklist: updated, progress: newProgress, status: newStatus });
+                                   
+                                   if (newStatus === 'completed' && editingTask.orderId) {
+                                     await checkAndCompleteOrder(editingTask.orderId, editingTask.parentId);
+                                   }
+                                   
                                    setNewChecklistItem('');
                                  }
                                }}

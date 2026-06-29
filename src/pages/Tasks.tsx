@@ -1,13 +1,14 @@
 import React from 'react';
-import { db, auth } from '../lib/firebase';
+import { db, auth, storage } from '../lib/firebase';
 import { collection, addDoc, query, where, getDocs, getDoc, onSnapshot, doc, updateDoc, deleteDoc, orderBy, or } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Plus, ListFilter, CheckCircle, Clock, AlertCircle, ClipboardList, FileDown, BarChart3, Calendar, Trash2, ShieldCheck, CornerUpLeft, LayoutDashboard, List as ListIcon, User, UserCheck, Edit3, CheckSquare, Square, PlusCircle, ChevronRight, GitMerge, Paperclip, FileText, XCircle, FileSpreadsheet, Search, UserPlus, MessageSquare, MessageCircle, Send, Download } from 'lucide-react';
 import { DragDropContext, Droppable as DroppableBase, Draggable as DraggableBase } from '@hello-pangea/dnd';
 import { logActivity } from '../services/activityLogger';
 const DroppableComponent = DroppableBase as any;
 const DraggableComponent = DraggableBase as any;
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, subDays } from 'date-fns';
-import { cn, formatPercent, getApiUrl, downloadFile } from '../lib/utils';
+import { cn, formatPercent, getApiUrl, downloadFile, withTimeout } from '../lib/utils';
 import { Task, AppUser } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -46,6 +47,7 @@ export default function Tasks() {
   const [newSubtaskChecklistItem, setNewSubtaskChecklistItem] = React.useState('');
   const [showReportModal, setShowReportModal] = React.useState(false);
   const [taskToDelete, setTaskToDelete] = React.useState<Task | null>(null);
+  const [isUploading, setIsUploading] = React.useState(false);
   const [newTask, setNewTask] = React.useState({ 
     name: '', 
     description: '', 
@@ -307,26 +309,33 @@ export default function Tasks() {
 
   const handleCommentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
+      setIsUploading(true);
       const files = Array.from(e.target.files);
       const newFiles = await Promise.all(
         files.map(async (f: any) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              resolve({
-                name: f.name,
-                type: f.type,
-                size: f.size,
-                lastModified: f.lastModified,
-                uploadDate: new Date().toISOString(),
-                url: reader.result
-              });
+          try {
+            const safeName = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+            const fileRef = ref(storage, `tasks/${Date.now()}_${safeName}`);
+            await withTimeout(uploadBytes(fileRef, f), 25000);
+            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
+            return {
+              name: f.name,
+              type: f.type,
+              size: f.size,
+              lastModified: f.lastModified,
+              uploadDate: new Date().toISOString(),
+              url: downloadUrl
             };
-            reader.readAsDataURL(f);
-          });
+          } catch (uploadErr) {
+            console.error("Lỗi tải tệp lên Storage:", uploadErr);
+            alert(`Không thể tải lên tệp: ${f.name}`);
+            return null;
+          }
         })
       );
-      setCommentAttachments(prev => [...prev, ...newFiles as any[]]);
+      const validFiles = newFiles.filter(Boolean) as any[];
+      setCommentAttachments(prev => [...prev, ...validFiles]);
+      setIsUploading(false);
     }
   };
 
@@ -397,29 +406,36 @@ export default function Tasks() {
 
   const handleSubtaskFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
+      setIsUploading(true);
       const files = Array.from(e.target.files);
       const newFiles = await Promise.all(
         files.map(async (f: any) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              resolve({
-                name: f.name,
-                type: f.type,
-                size: f.size,
-                lastModified: f.lastModified,
-                uploadDate: new Date().toISOString(),
-                url: reader.result
-              });
+          try {
+            const safeName = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+            const fileRef = ref(storage, `tasks/${Date.now()}_${safeName}`);
+            await withTimeout(uploadBytes(fileRef, f), 25000);
+            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
+            return {
+              name: f.name,
+              type: f.type,
+              size: f.size,
+              lastModified: f.lastModified,
+              uploadDate: new Date().toISOString(),
+              url: downloadUrl
             };
-            reader.readAsDataURL(f);
-          });
+          } catch (uploadErr) {
+            console.error("Lỗi tải tệp lên Storage:", uploadErr);
+            alert(`Không thể tải lên tệp: ${f.name}`);
+            return null;
+          }
         })
       );
+      const validFiles = newFiles.filter(Boolean) as any[];
       setSubtaskForm(prev => ({
         ...prev,
-        attachments: [...prev.attachments, ...newFiles as any[]]
+        attachments: [...prev.attachments, ...validFiles]
       }));
+      setIsUploading(false);
     }
   };
 
@@ -474,37 +490,45 @@ export default function Tasks() {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
     if (e.target.files) {
+      setIsUploading(true);
       const files = Array.from(e.target.files);
       const newFiles = await Promise.all(
         files.map(async (f: any) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              resolve({
-                name: f.name,
-                type: f.type,
-                size: f.size,
-                lastModified: f.lastModified,
-                uploadDate: new Date().toISOString(),
-                url: reader.result
-              });
+          try {
+            const safeName = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+            const fileRef = ref(storage, `tasks/${Date.now()}_${safeName}`);
+            await withTimeout(uploadBytes(fileRef, f), 25000);
+            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
+            return {
+              name: f.name,
+              type: f.type,
+              size: f.size,
+              lastModified: f.lastModified,
+              uploadDate: new Date().toISOString(),
+              url: downloadUrl
             };
-            reader.readAsDataURL(f);
-          });
+          } catch (uploadErr) {
+            console.error("Lỗi tải tệp lên Storage:", uploadErr);
+            alert(`Không thể tải lên tệp: ${f.name}`);
+            return null;
+          }
         })
       );
       
+      const validFiles = newFiles.filter(Boolean) as any[];
+
       if (isEdit && editingTask) {
         setEditingTask({
           ...editingTask,
-          attachments: [...(editingTask.attachments || []), ...newFiles as any[]]
+          attachments: [...(editingTask.attachments || []), ...validFiles]
         });
       } else {
         setNewTask(prev => ({
           ...prev,
-          attachments: [...prev.attachments, ...newFiles as any[]]
+          attachments: [...prev.attachments, ...validFiles]
         }));
       }
+      setIsUploading(false);
     }
   };
 
@@ -1838,9 +1862,10 @@ export default function Tasks() {
                    </button>
                    <button 
                     type="submit"
-                    className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                    disabled={isUploading}
+                    className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                    >
-                     Tạo việc mới
+                     {isUploading ? 'Đang tải tệp lên...' : 'Tạo việc mới'}
                    </button>
                 </div>
               </form>
@@ -2071,8 +2096,8 @@ export default function Tasks() {
                       </div>
 
                       <div className="flex gap-3 pt-4 border-t border-gray-50">
-                        <button type="submit" className="w-full bg-blue-600 text-white px-4 py-4 rounded-2xl font-black shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all text-xs uppercase tracking-widest">
-                          Cập nhật công việc
+                        <button type="submit" disabled={isUploading} className="w-full bg-blue-600 text-white px-4 py-4 rounded-2xl font-black shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all text-xs uppercase tracking-widest disabled:opacity-50">
+                          {isUploading ? 'Đang tải tệp lên...' : 'Cập nhật công việc'}
                         </button>
                       </div>
                     </form>
@@ -2410,9 +2435,10 @@ export default function Tasks() {
                                      </button>
                                      <button 
                                       type="submit"
-                                      className="flex-[2] bg-purple-600 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-purple-100 hover:bg-purple-700 transition-all"
+                                      disabled={isUploading}
+                                      className="flex-[2] bg-purple-600 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-purple-100 hover:bg-purple-700 transition-all disabled:opacity-50"
                                      >
-                                       Tạo công việc
+                                       {isUploading ? 'Đang tải tệp lên...' : 'Tạo công việc'}
                                      </button>
                                   </div>
                                 </div>
@@ -2632,7 +2658,8 @@ export default function Tasks() {
                           />
                           <button 
                             type="submit"
-                            className="w-12 h-12 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center shrink-0"
+                            disabled={isUploading}
+                            className="w-12 h-12 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center shrink-0 disabled:opacity-50 disabled:bg-gray-400"
                           >
                             <Send size={20} className="ml-0.5" />
                           </button>

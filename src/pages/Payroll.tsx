@@ -23,7 +23,7 @@ export default function Payroll() {
   const [allAdvanceRequests, setAllAdvanceRequests] = React.useState<any[]>([]);
   const [allReimbursements, setAllReimbursements] = React.useState<any[]>([]);
   const [departments, setDepartments] = React.useState<any[]>([]);
-  const canSeeSummary = isDirector || isAccountant;
+  const canSeeSummary = isDirector || isAccountant || canViewSalaries;
 
   const getUserStatusInMonth = (u: any, monthKey: string) => {
     if (u?.startDate) {
@@ -81,12 +81,12 @@ export default function Payroll() {
       const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
       const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
       
-      const canSeeAllOrders = isDirector || isAccountant || isHR || isManager;
+      const canSeeAllOrders = isDirector || isAccountant || isHR || isManager || canViewSalaries;
       const ordersQ = canSeeAllOrders
         ? query(collection(db, 'orders'))
         : query(collection(db, 'orders'), or(where('responsibleUserId', '==', user.uid), where('followers', 'array-contains', user.uid)));
 
-      const canSeeAllPayments = isDirector || isAccountant || isHR || isManager;
+      const canSeeAllPayments = isDirector || isAccountant || isHR || isManager || canViewSalaries;
       const paymentsQ = canSeeAllPayments
         ? query(
             collection(db, 'payment_requests'),
@@ -100,7 +100,7 @@ export default function Payroll() {
             where('status', 'in', ['approved', 'paid'])
           );
 
-      const isSuperUser = isDirector || isAccountant || isHR || isManager;
+      const isSuperUser = isDirector || isAccountant || isHR || isManager || canViewSalaries;
       const advancesQ = isSuperUser 
         ? query(collection(db, 'advance_requests'))
         : query(collection(db, 'advance_requests'), where('userId', '==', user.uid));

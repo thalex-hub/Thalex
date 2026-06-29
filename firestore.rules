@@ -134,19 +134,19 @@ service cloud.firestore {
     }
 
     function isManager() { 
-      return isDirector() || (existsUserDoc() && isManagerRole(getUserRole())); 
+      return isDirector() || (existsUserDoc() && (isManagerRole(getUserRole()) || hasPermission('approve_leave_requests') || hasPermission('manage_tasks'))); 
     }
     
     function isAccountant() { 
-      return isDirector() || (existsUserDoc() && isAccountantRole(getUserRole())); 
+      return isDirector() || (existsUserDoc() && (isAccountantRole(getUserRole()) || hasPermission('manage_cashflow'))); 
     }
     
     function isHR() { 
-      return isDirector() || (existsUserDoc() && isHRRole(getUserRole())); 
+      return isDirector() || (existsUserDoc() && (isHRRole(getUserRole()) || hasPermission('manage_users'))); 
     }
     
     function isFinanceStaff() { 
-      return isDirector() || (existsUserDoc() && isFinanceStaffRole(getUserRole()));
+      return isDirector() || isAccountant() || (existsUserDoc() && (isFinanceStaffRole(getUserRole()) || hasPermission('manage_cashflow') || hasPermission('view_cashflow')));
     }
 
     // --- Entity Specific Rules ---
@@ -167,9 +167,9 @@ service cloud.firestore {
 
     // Attendance
     match /attendance/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing());
+      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || hasPermission('view_attendance') || hasPermission('menu_attendance_view') || hasPermission('view_salaries');
       allow create: if isSignedIn();
-      allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing());
+      allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || hasPermission('manage_attendance') || hasPermission('menu_attendance_edit');
       allow delete: if isDirector() || isHR();
     }
 
@@ -228,7 +228,7 @@ service cloud.firestore {
     // Advance, Payment, Reimbursement Requests
     match /advance_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
-                   hasPermission('view_advances') || hasPermission('menu_proposals_view') ||
+                   hasPermission('view_advances') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
                    (isSignedIn() && request.auth.uid in existing().get('followers', []));
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
@@ -239,7 +239,7 @@ service cloud.firestore {
     
     match /payment_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
-                   hasPermission('view_payment_requests') || hasPermission('menu_proposals_view') ||
+                   hasPermission('view_payment_requests') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
                    (isSignedIn() && request.auth.uid in existing().get('followers', []));
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
@@ -250,7 +250,7 @@ service cloud.firestore {
 
     match /reimbursement_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
-                   hasPermission('view_reimbursements') || hasPermission('menu_proposals_view') ||
+                   hasPermission('view_reimbursements') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
                    (isSignedIn() && request.auth.uid in existing().get('followers', []));
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
@@ -273,7 +273,7 @@ service cloud.firestore {
     // Orders
     match /orders/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || 
-                   hasPermission('view_orders') || hasPermission('menu_orders_view') || hasPermission('menu_orders') ||
+                   hasPermission('view_orders') || hasPermission('menu_orders_view') || hasPermission('menu_orders') || hasPermission('view_salaries') ||
                    (isSignedIn() && (
                      existing().get('responsibleUserId', '') == request.auth.uid || 
                      existing().get('responsibleUserId', '') == request.auth.token.email.lower().replace('[^a-z0-9]', '_') ||

@@ -195,11 +195,18 @@ export default function Tasks() {
     if (!canSeeUsers && appUser) {
       setUsers([{ uid: currentUser.uid, ...appUser }]);
     }
-    let tasksQ;
+    let unsubTasks: () => void;
     const canSeeAll = isAdmin || isDirector;
     
     if (canSeeAll) {
-       tasksQ = query(collection(db, 'tasks'));
+       const tasksQ = query(collection(db, 'tasks'));
+       unsubTasks = onSnapshot(tasksQ, (snap) => {
+         let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)).filter(t => !t.orderId);
+         data.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+         setTasks(data);
+       }, (err) => {
+         handleFirestoreError(err, OperationType.GET, 'tasks', false);
+       });
     } else {
        // Get all possible IDs for the current user
        const userIds = new Set<string>();
@@ -212,33 +219,53 @@ export default function Tasks() {
        }
        
        const idsArray = Array.from(userIds);
-
-       const orConditions: any[] = [];
-       idsArray.forEach(id => {
-         orConditions.push(
-           where('assigneeId', '==', id),
-           where('assignerId', '==', id),
-           where('responsibleUserId', '==', id)
-         );
-       });
        
-       orConditions.push(
-         where('followers', 'array-contains-any', idsArray)
-       );
+       if (idsArray.length === 0) {
+         setTasks([]);
+         unsubTasks = () => {};
+       } else {
+         const tasksMap = new Map<string, Task>();
+         const unsubs: (() => void)[] = [];
+         let initialLoads = 0;
+         const totalQueries = 4;
+         
+         const updateTasks = () => {
+           let data = Array.from(tasksMap.values()).filter(t => !t.orderId);
+           data.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+           setTasks(data);
+         };
 
-       tasksQ = query(
-         collection(db, 'tasks'),
-         or(...orConditions)
-       );
+         const handleSnap = (snap: any) => {
+           // We don't clear map, we just update existing or add new.
+           // Actually, onSnapshot sends docChanges! It's better to process docChanges to handle removals.
+           snap.docChanges().forEach((change: any) => {
+             if (change.type === 'removed') {
+               tasksMap.delete(change.doc.id);
+             } else {
+               tasksMap.set(change.doc.id, { id: change.doc.id, ...change.doc.data() } as Task);
+             }
+           });
+           initialLoads++;
+           if (initialLoads >= totalQueries) {
+             updateTasks();
+           }
+         };
+         
+         const errHandler = (err: any) => handleFirestoreError(err, OperationType.GET, 'tasks', false);
+
+         const q1 = query(collection(db, 'tasks'), where('assigneeId', 'in', idsArray));
+         const q2 = query(collection(db, 'tasks'), where('assignerId', 'in', idsArray));
+         const q3 = query(collection(db, 'tasks'), where('responsibleUserId', 'in', idsArray));
+         const q4 = query(collection(db, 'tasks'), where('followers', 'array-contains-any', idsArray));
+         
+         unsubs.push(onSnapshot(q1, handleSnap, errHandler));
+         unsubs.push(onSnapshot(q2, handleSnap, errHandler));
+         unsubs.push(onSnapshot(q3, handleSnap, errHandler));
+         unsubs.push(onSnapshot(q4, handleSnap, errHandler));
+         
+         unsubTasks = () => unsubs.forEach(fn => fn());
+       }
     }
-    
-    const unsubTasks = onSnapshot(tasksQ, (snap) => {
-      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)).filter(t => !t.orderId);
-      data.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
-      setTasks(data);
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'tasks', false);
-    });
 
     return () => {
       unsubUsers();
@@ -691,20 +718,6 @@ export default function Tasks() {
     const assignee = users.find(u => u.uid === editingTask.assigneeId);
 
     try {
-      // Calculate progress based on checklist if checklist exists
-      let progress = editingTask.progress;
-      if (editingTask.checklist && editingTask.checklist.length > 0) {
-        const completedCount = editingTask.checklist.filter(i => i.completed).length;
-        progress = Math.round((completedCount / editingTask.checklist.length) * 100);
-      }
-      
-      let newStatus = editingTask.status;
-      if (progress === 100 && newStatus !== 'completed') {
-        newStatus = 'completed';
-      } else if (progress < 100 && newStatus === 'completed') {
-        newStatus = 'in_progress';
-      }
-
       await updateDoc(doc(db, 'tasks', editingTask.id), {
         name: editingTask.name,
         description: editingTask.description,
@@ -715,16 +728,12 @@ export default function Tasks() {
         assigneeAvatar: assignee?.avatar || editingTask.assigneeAvatar,
         checklist: editingTask.checklist || [],
         attachments: editingTask.attachments || [],
-        progress,
-        status: newStatus,
+        progress: editingTask.progress || 0,
+        status: editingTask.status,
         parentId: editingTask.parentId || '',
         followers: editingTask.followers || [],
         updatedAt: new Date().toISOString()
       });
-      
-      if (newStatus === 'completed' && editingTask.orderId) {
-        await checkAndCompleteOrder(editingTask.orderId, editingTask.parentId);
-      }
 
       await logActivity('Update Task', 'Tasks', editingTask.id, { taskName: editingTask.name });
 
@@ -835,10 +844,16 @@ export default function Tasks() {
        newProgress = 100;
     }
 
+    let newChecklist = task.checklist || [];
+    if (newStatus === 'completed') {
+       newChecklist = newChecklist.map(item => ({ ...item, completed: true }));
+    }
+
     try {
       await updateDoc(doc(db, 'tasks', task.id), {
         status: newStatus,
         progress: newProgress,
+        checklist: newChecklist,
         updatedAt: new Date().toISOString()
       });
 
@@ -905,10 +920,16 @@ export default function Tasks() {
     else if (newStatus === 'in_progress') newProgress = 50;
     else newProgress = 10;
 
+    let newChecklist = task.checklist || [];
+    if (newStatus === 'completed') {
+       newChecklist = newChecklist.map(item => ({ ...item, completed: true }));
+    }
+
     try {
       await updateDoc(doc(db, 'tasks', task.id), {
         status: newStatus,
         progress: newProgress,
+        checklist: newChecklist,
         updatedAt: new Date().toISOString()
       });
 

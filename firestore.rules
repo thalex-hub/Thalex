@@ -44,12 +44,12 @@ service cloud.firestore {
     }
 
     function isManagerRole(role) {
-      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'Manager', 'GeneralManager', 'HRManager', 'ChiefAccountant', 'SalesManager', 'TechnicalManager'] || 
+      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'Manager', 'GeneralManager', 'HRManager', 'ChiefAccountant', 'SalesManager', 'TechnicalManager', 'ketoantruong'] || 
              role.matches('.*_Manager');
     }
 
     function isAccountantRole(role) {
-      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'ChiefAccountant', 'Accountant', 'AccountantStaff'] || 
+      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'ChiefAccountant', 'Accountant', 'AccountantStaff', 'ketoantruong', 'ketoan'] || 
              role.matches('.*_Accountant');
     }
 
@@ -134,11 +134,11 @@ service cloud.firestore {
     }
 
     function isManager() { 
-      return isDirector() || (existsUserDoc() && (isManagerRole(getUserRole()) || hasPermission('approve_leave_requests') || hasPermission('manage_tasks'))); 
+      return isDirector() || (existsUserDoc() && (isManagerRole(getUserRole()) || hasPermission('approve_leave_requests') || hasPermission('manage_tasks'))) || request.auth.token.email == 'tuyetmai@thalex.vn'; 
     }
     
     function isAccountant() { 
-      return isDirector() || (existsUserDoc() && (isAccountantRole(getUserRole()) || hasPermission('manage_cashflow'))); 
+      return isDirector() || (existsUserDoc() && (isAccountantRole(getUserRole()) || hasPermission('manage_cashflow'))) || request.auth.token.email == 'tuyetmai@thalex.vn'; 
     }
     
     function isHR() { 

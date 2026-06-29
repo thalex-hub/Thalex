@@ -663,12 +663,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Director has top administrative authority or isDirector role directly
   const isDirector = isSuperAdmin || role === 'Director' || role === 'ViceDirector';
   
-  const isManager = role === 'Manager' || role === 'GeneralManager' || role === 'HRManager' || role === 'ChiefAccountant' || role === 'SalesManager' || role === 'TechnicalManager' || role.endsWith('_Manager') || hasPermission('approve_leave_requests');
-  const isAccountant = role === 'Accountant' || role === 'ChiefAccountant' || role === 'AccountantStaff' || role.endsWith('_Accountant') || hasPermission('manage_cashflow');
+  const isManager = role === 'Manager' || role === 'GeneralManager' || role === 'HRManager' || role === 'ChiefAccountant' || role === 'SalesManager' || role === 'TechnicalManager' || role.endsWith('_Manager') || role === 'ketoantruong' || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn';
+  const isAccountant = role === 'Accountant' || role === 'ChiefAccountant' || role === 'AccountantStaff' || role.endsWith('_Accountant') || role === 'ketoantruong' || role === 'ketoan' || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn';
   const isHR = role === 'HR' || role === 'HRManager' || role === 'HRStaff' || role.endsWith('_HR') || hasPermission('manage_users');
   const isGeneral = role === 'GeneralManager' || role === 'GeneralStaff' || appUser?.departmentId === 'phong-tong-hop' || role.includes('General') || (appUser?.departmentName || '').toLowerCase().includes('tổng hợp');
   
-  const canViewSalaries = isSuperAdmin || isDirector || hasPermission('view_salaries') || hasPermission('manage_users') || hasPermission('view_financial_reports');
+  const canViewSalaries = isSuperAdmin || isDirector || hasPermission('view_salaries') || hasPermission('manage_users') || hasPermission('view_financial_reports') || user?.email === 'tuyetmai@thalex.vn';
   const canEditSalaries = isSuperAdmin || isDirector || hasPermission('manage_salaries') || hasPermission('manage_users');
   const isFinanceStaff = isSuperAdmin || isDirector || isAccountant || hasPermission('manage_cashflow') || hasPermission('view_cashflow');
   const isLeader = isAdmin || isManager || isHR || hasPermission('approve_leave_requests');

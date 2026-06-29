@@ -164,7 +164,7 @@ export default function Payroll() {
 
   React.useEffect(() => {
     fetchMonthData();
-  }, [currentMonth, user, activeTab, appUser, isDirector, isAccountant, isHR, isManager]);
+  }, [currentMonth, user, activeTab, appUser, isDirector, isAccountant, isHR, isManager, canViewSalaries]);
 
   const calculateUserStats = React.useCallback((targetUser: any, attendance: any[]) => {
     const userAdvances = allAdvanceRequests.filter(r => r.userId === targetUser.uid);

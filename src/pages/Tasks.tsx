@@ -518,10 +518,21 @@ export default function Tasks() {
       const validFiles = newFiles.filter(Boolean) as any[];
 
       if (isEdit && editingTask) {
+        const updatedAttachments = [...(editingTask.attachments || []), ...validFiles];
         setEditingTask({
           ...editingTask,
-          attachments: [...(editingTask.attachments || []), ...validFiles]
+          attachments: updatedAttachments
         });
+        try {
+          await updateDoc(doc(db, 'tasks', editingTask.id), {
+            attachments: updatedAttachments,
+            updatedAt: new Date().toISOString()
+          });
+          logActivity(`Tải lên tài liệu: ${validFiles.map(f => f.name).join(', ')}`, 'tasks', editingTask.id);
+        } catch (err) {
+          console.error("Error saving attachments to DB:", err);
+          alert("Lỗi khi lưu tài liệu đính kèm vào cơ sở dữ liệu.");
+        }
       } else {
         setNewTask(prev => ({
           ...prev,
@@ -532,12 +543,26 @@ export default function Tasks() {
     }
   };
 
-  const removeFile = (index: number, isEdit: boolean = false) => {
+  const removeFile = async (index: number, isEdit: boolean = false) => {
     if (isEdit && editingTask) {
+      const removedFile = editingTask.attachments?.[index];
+      const updatedAttachments = (editingTask.attachments || []).filter((_, i) => i !== index);
       setEditingTask({
         ...editingTask,
-        attachments: (editingTask.attachments || []).filter((_, i) => i !== index)
+        attachments: updatedAttachments
       });
+      try {
+        await updateDoc(doc(db, 'tasks', editingTask.id), {
+          attachments: updatedAttachments,
+          updatedAt: new Date().toISOString()
+        });
+        if (removedFile) {
+          logActivity(`Xóa tài liệu: ${removedFile.name}`, 'tasks', editingTask.id);
+        }
+      } catch (err) {
+        console.error("Error removing attachment from DB:", err);
+        alert("Lỗi khi xóa tài liệu đính kèm khỏi cơ sở dữ liệu.");
+      }
     } else {
       setNewTask(prev => ({
         ...prev,

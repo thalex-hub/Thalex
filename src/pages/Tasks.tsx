@@ -511,12 +511,19 @@ export default function Tasks() {
     setEditingTask(updatedTask);
 
     try {
-      await updateDoc(doc(db, 'tasks', editingTask.id), {
+      const updateData: any = {
         checklist: items,
         progress: newProgress,
         status: newStatus,
         updatedAt: new Date().toISOString()
-      });
+      };
+      if (newStatus === 'completed' && editingTask.status !== 'completed') {
+        updateData.completedAt = new Date().toISOString();
+      } else if (newStatus !== 'completed' && editingTask.status === 'completed') {
+        updateData.completedAt = null;
+      }
+
+      await updateDoc(doc(db, 'tasks', editingTask.id), updateData);
       
       if (newStatus === 'completed' && editingTask.orderId) {
         await checkAndCompleteOrder(editingTask.orderId, editingTask.parentId);
@@ -850,12 +857,18 @@ export default function Tasks() {
     }
 
     try {
-      await updateDoc(doc(db, 'tasks', task.id), {
+      const updateData: any = {
         status: newStatus,
         progress: newProgress,
         checklist: newChecklist,
         updatedAt: new Date().toISOString()
-      });
+      };
+      if (newStatus === 'completed' && task.status !== 'completed') {
+        updateData.completedAt = new Date().toISOString();
+      } else if (newStatus !== 'completed' && task.status === 'completed') {
+        updateData.completedAt = null;
+      }
+      await updateDoc(doc(db, 'tasks', task.id), updateData);
 
       if (newStatus === 'completed' && task.orderId) {
         await checkAndCompleteOrder(task.orderId, task.parentId);
@@ -926,12 +939,18 @@ export default function Tasks() {
     }
 
     try {
-      await updateDoc(doc(db, 'tasks', task.id), {
+      const updateData: any = {
         status: newStatus,
         progress: newProgress,
         checklist: newChecklist,
         updatedAt: new Date().toISOString()
-      });
+      };
+      if (newStatus === 'completed' && task.status !== 'completed') {
+        updateData.completedAt = new Date().toISOString();
+      } else if (newStatus !== 'completed' && task.status === 'completed') {
+        updateData.completedAt = null;
+      }
+      await updateDoc(doc(db, 'tasks', task.id), updateData);
 
       if (newStatus === 'completed' && task.orderId) {
         await checkAndCompleteOrder(task.orderId, task.parentId);
@@ -1313,12 +1332,43 @@ export default function Tasks() {
                           })()}
                         </div>
                         <div className="flex flex-col gap-1">
-                          <p className="text-xs text-gray-400 font-medium flex items-center gap-2">
-                            <Clock size={12} />
-                            Hạn: {format(new Date(task.dueDate || Date.now()), 'dd/MM/yyyy')}
-                            <span className="mx-1">•</span>
-                            Tiến độ: {formatPercent(task.progress)}
-                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs text-gray-400 font-medium flex items-center gap-1">
+                              <Clock size={12} />
+                              Hạn: {format(new Date(task.dueDate || Date.now()), 'dd/MM/yyyy')}
+                            </p>
+                            <span className="text-xs text-gray-300">•</span>
+                            <p className="text-xs text-gray-400 font-medium">
+                              Tiến độ: {formatPercent(task.progress)}
+                            </p>
+                            {task.status === 'completed' && task.completedAt && (
+                              <>
+                                <span className="text-xs text-gray-300">•</span>
+                                <p className="text-xs font-medium flex items-center gap-1">
+                                  <span>Thực tế: {format(new Date(task.completedAt), 'dd/MM/yyyy')}</span>
+                                  {(() => {
+                                    const due = new Date(task.dueDate || Date.now());
+                                    const completed = new Date(task.completedAt);
+                                    
+                                    // Reset hours to compare only dates
+                                    due.setHours(0, 0, 0, 0);
+                                    completed.setHours(0, 0, 0, 0);
+                                    
+                                    const diffTime = completed.getTime() - due.getTime();
+                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                    
+                                    if (diffDays < 0) {
+                                      return <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded-full">(Sớm {Math.abs(diffDays)} ngày)</span>;
+                                    } else if (diffDays > 0) {
+                                      return <span className="text-[10px] text-red-600 font-bold bg-red-50 px-1.5 py-0.5 rounded-full">(Trễ {diffDays} ngày)</span>;
+                                    } else {
+                                      return <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded-full">(Đúng hạn)</span>;
+                                    }
+                                  })()}
+                                </p>
+                              </>
+                            )}
+                          </div>
                           
                           {task.attachments && task.attachments.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-1">
@@ -1610,17 +1660,35 @@ export default function Tasks() {
                                           </div>
                                        </div>
                                        
-                                       <div className="flex items-center justify-between mt-4">
-                                          <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-bold uppercase">
-                                             <Clock size={10} />
-                                             {format(new Date(task.dueDate), 'dd/MM')}
-                                          </div>
-                                          <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                             <div 
-                                               className="h-full bg-blue-500 rounded-full" 
-                                               style={{ width: `${task.progress}%` }} 
-                                             />
-                                          </div>
+                                       <div className="flex flex-col gap-2 mt-4">
+                                         <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-bold uppercase">
+                                               <Clock size={10} />
+                                               {format(new Date(task.dueDate), 'dd/MM')}
+                                            </div>
+                                            <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                               <div 
+                                                 className="h-full bg-blue-500 rounded-full" 
+                                                 style={{ width: `${task.progress}%` }} 
+                                               />
+                                            </div>
+                                         </div>
+                                         {task.status === 'completed' && task.completedAt && (
+                                           <div className="flex items-center gap-1 text-[10px] font-bold">
+                                             <span className="text-gray-400 uppercase">Thực tế: {format(new Date(task.completedAt), 'dd/MM')}</span>
+                                             {(() => {
+                                                const due = new Date(task.dueDate || Date.now());
+                                                const completed = new Date(task.completedAt);
+                                                due.setHours(0, 0, 0, 0);
+                                                completed.setHours(0, 0, 0, 0);
+                                                const diffDays = Math.ceil((completed.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+                                                
+                                                if (diffDays < 0) return <span className="text-green-600 bg-green-50 px-1 py-0.5 rounded-sm">(Sớm {Math.abs(diffDays)}d)</span>;
+                                                if (diffDays > 0) return <span className="text-red-600 bg-red-50 px-1 py-0.5 rounded-sm">(Trễ {diffDays}d)</span>;
+                                                return <span className="text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm">(Đúng hạn)</span>;
+                                             })()}
+                                           </div>
+                                         )}
                                        </div>
                                     </div>
                                   )}
@@ -2236,8 +2304,14 @@ export default function Tasks() {
                                         newStatus = 'in_progress';
                                       }
                                       
-                                      setEditingTask({...editingTask, checklist: updated, progress: newProgress, status: newStatus});
-                                      updateDoc(doc(db, 'tasks', editingTask.id), { checklist: updated, progress: newProgress, status: newStatus });
+                                      const updateData: any = { checklist: updated, progress: newProgress, status: newStatus };
+                                      if (newStatus === 'completed' && editingTask.status !== 'completed') {
+                                        updateData.completedAt = new Date().toISOString();
+                                      } else if (newStatus !== 'completed' && editingTask.status === 'completed') {
+                                        updateData.completedAt = null;
+                                      }
+                                      setEditingTask({...editingTask, ...updateData});
+                                      updateDoc(doc(db, 'tasks', editingTask.id), updateData);
                                       
                                       if (newStatus === 'completed' && editingTask.orderId) {
                                         checkAndCompleteOrder(editingTask.orderId, editingTask.parentId);
@@ -2277,8 +2351,14 @@ export default function Tasks() {
                                        newStatus = 'in_progress';
                                      }
                                      
-                                     setEditingTask({...editingTask, checklist: updated, progress: newProgress, status: newStatus});
-                                     await updateDoc(doc(db, 'tasks', editingTask.id), { checklist: updated, progress: newProgress, status: newStatus });
+                                     const updateData: any = { checklist: updated, progress: newProgress, status: newStatus };
+                                     if (newStatus === 'completed' && editingTask.status !== 'completed') {
+                                       updateData.completedAt = new Date().toISOString();
+                                     } else if (newStatus !== 'completed' && editingTask.status === 'completed') {
+                                       updateData.completedAt = null;
+                                     }
+                                     setEditingTask({...editingTask, ...updateData});
+                                     await updateDoc(doc(db, 'tasks', editingTask.id), updateData);
                                      
                                      if (newStatus === 'completed' && editingTask.orderId) {
                                        await checkAndCompleteOrder(editingTask.orderId, editingTask.parentId);
@@ -2306,8 +2386,14 @@ export default function Tasks() {
                                      newStatus = 'in_progress';
                                    }
                                    
-                                   setEditingTask({...editingTask, checklist: updated, progress: newProgress, status: newStatus});
-                                   await updateDoc(doc(db, 'tasks', editingTask.id), { checklist: updated, progress: newProgress, status: newStatus });
+                                   const updateData: any = { checklist: updated, progress: newProgress, status: newStatus };
+                                   if (newStatus === 'completed' && editingTask.status !== 'completed') {
+                                     updateData.completedAt = new Date().toISOString();
+                                   } else if (newStatus !== 'completed' && editingTask.status === 'completed') {
+                                     updateData.completedAt = null;
+                                   }
+                                   setEditingTask({...editingTask, ...updateData});
+                                   await updateDoc(doc(db, 'tasks', editingTask.id), updateData);
                                    
                                    if (newStatus === 'completed' && editingTask.orderId) {
                                      await checkAndCompleteOrder(editingTask.orderId, editingTask.parentId);

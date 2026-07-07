@@ -385,6 +385,7 @@ export default function BusinessManagement() {
       
       const userData = {
         uid: tempId,
+        legacyId: tempId,
         email: newUser.email.trim().toLowerCase(),
         fullName: newUser.fullName,
         roleId: newUser.roleId,

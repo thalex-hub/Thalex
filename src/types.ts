@@ -20,6 +20,7 @@ export type UserRole =
 
 export interface AppUser {
   uid: string;
+  legacyId?: string;
   employeeCode?: string;
   fullName: string;
   email: string;

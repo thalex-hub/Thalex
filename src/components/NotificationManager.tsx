@@ -398,7 +398,7 @@ export default function NotificationManager() {
         qApprovals.forEach((qApproval, idx) => {
           activeIdsMap.set(idx, new Set());
           const unsub = onSnapshot(qApproval, (snapshot) => {
-            const currentActive = new Set(snapshot.docs.map(doc => doc.id));
+            const currentActive = new Set<string>(snapshot.docs.map(doc => doc.id));
             activeIdsMap.set(idx, currentActive);
             
             // Combine all active IDs across all queries for this collection

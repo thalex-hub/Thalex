@@ -411,20 +411,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Use onSnapshot for real-time updates
           unsubscribeDoc = onSnapshot(userRef, (snapshot) => {
             if (snapshot.exists()) {
-              const data = snapshot.data() as AppUser;
-              if (u.email === 'info.vinasglobal@gmail.com' && (data.accountStatus !== 'active' || data.roleId !== 'SuperAdmin')) {
+              const data = snapshot.data() as any;
+              const email = u.email || data.email || '';
+              const expectedLegacyId = email ? email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
+              
+              if (u.email === 'info.vinasglobal@gmail.com' && (data.accountStatus !== 'active' || data.roleId !== 'SuperAdmin' || !data.legacyId)) {
                 const refreshed = {
                   ...data,
                   accountStatus: 'active' as const,
                   roleId: 'SuperAdmin' as const,
+                  legacyId: expectedLegacyId,
                 };
                 setDoc(userRef, refreshed).catch(err => console.error("Self-heal write failed", err));
                 setAppUser(refreshed);
                 localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(refreshed));
-              } else if (data.accountStatus === 'pending') {
+              } else if (data.accountStatus === 'pending' || !data.legacyId) {
                 const refreshed = {
                   ...data,
                   accountStatus: 'active' as const,
+                  legacyId: expectedLegacyId,
                 };
                 setDoc(userRef, refreshed).catch(err => console.error("Self-heal write failed", err));
                 setAppUser(refreshed);
@@ -436,7 +441,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else {
               // User document not found. If superadmin, self-heal immediately!
               if (u.email === 'info.vinasglobal@gmail.com') {
-                const newUser: AppUser = {
+                const expectedLegacyId = u.email ? u.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
+                const newUser = {
                   uid: u.uid,
                   fullName: 'Super Admin',
                   email: u.email,
@@ -444,10 +450,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   roleId: 'SuperAdmin',
                   workStatus: 'official',
                   accountStatus: 'active',
+                  legacyId: expectedLegacyId,
                   createdAt: new Date().toISOString(),
                 };
                 setDoc(userRef, newUser).catch(err => console.error("Self-heal create failed", err));
-                setAppUser(newUser);
+                setAppUser(newUser as any);
               } else {
                 if (u.email) {
                   const tempId = u.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
@@ -460,6 +467,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                           const linkedData = {
                             ...data,
                             uid: u.uid,
+                            legacyId: tempId,
                             needsPasswordChange: data.needsPasswordChange ?? false,
                             accountStatus: 'active'
                           };

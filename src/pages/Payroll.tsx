@@ -82,9 +82,20 @@ export default function Payroll() {
       const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
       
       const canSeeAllOrders = isDirector || isAccountant || isHR || isManager || canViewSalaries;
-      const ordersQ = canSeeAllOrders
-        ? query(collection(db, 'orders'))
-        : query(collection(db, 'orders'), or(where('responsibleUserId', '==', user.uid), where('followers', 'array-contains', user.uid)));
+      let ordersData: any[] = [];
+      if (canSeeAllOrders) {
+        const snap = await getDocs(query(collection(db, 'orders')));
+        ordersData = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+      } else {
+        const [snap1, snap2] = await Promise.all([
+          getDocs(query(collection(db, 'orders'), where('responsibleUserId', '==', user.uid))),
+          getDocs(query(collection(db, 'orders'), where('followers', 'array-contains', user.uid)))
+        ]);
+        const map = new Map();
+        snap1.docs.forEach((d: any) => map.set(d.id, { id: d.id, ...d.data() }));
+        snap2.docs.forEach((d: any) => map.set(d.id, { id: d.id, ...d.data() }));
+        ordersData = Array.from(map.values());
+      }
 
       const canSeeAllPayments = isDirector || isAccountant || isHR || isManager || canViewSalaries;
       const paymentsQ = canSeeAllPayments
@@ -109,15 +120,14 @@ export default function Payroll() {
         ? query(collection(db, 'reimbursement_requests'))
         : query(collection(db, 'reimbursement_requests'), where('userId', '==', user.uid));
 
-      const [ordersSnap, deptsSnap, paymentsSnap, advanceSnap, reimbSnap] = await Promise.all([
-        getDocs(ordersQ),
+      const [deptsSnap, paymentsSnap, advanceSnap, reimbSnap] = await Promise.all([
         getDocs(collection(db, 'departments')),
         getDocs(paymentsQ),
         getDocs(advancesQ),
         getDocs(reimbQ)
       ]);
       
-      setOrders(ordersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setOrders(ordersData);
       setDepartments(deptsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPaymentRequests(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setAllAdvanceRequests(advanceSnap.docs.map(d => ({ id: d.id, ...d.data() })));

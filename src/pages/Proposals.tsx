@@ -79,53 +79,53 @@ export default function ProposalsOverview() {
     const proposalSubsets: Record<string, any[]> = {};
 
     collections.forEach((colName) => {
-      let q;
-      
       const showAllThisType = isAdmin || isDirector || 
                              (isHR && colName === 'leave_requests') || 
                              (isAccountant && ['payment_requests', 'advance_requests', 'reimbursement_requests', 'order_proposals'].includes(colName));
 
-      if (showAllThisType) {
-         q = query(collection(db, colName), limit(500));
-      } else if (isManager) {
-         const field = colName === 'order_proposals' ? 'createdBy' : 'userId';
-         q = query(
-           collection(db, colName),
-           or(
-             where(field, '==', user.uid),
-             where('departmentId', '==', appUser?.departmentId || 'none'),
-             where('followers', 'array-contains', user.uid)
-           ),
-           limit(500)
-         );
-      } else {
-         const field = colName === 'order_proposals' ? 'createdBy' : 'userId';
-         q = query(
-           collection(db, colName), 
-           or(
-             where(field, '==', user.uid),
-             where('followers', 'array-contains', user.uid)
-           ),
-           limit(500)
-         );
-      }
-      
-      const unsub = onSnapshot(q, (snap) => {
-        const data = snap.docs.map(doc => ({ 
-          id: doc.id, 
-          ...doc.data(), 
+      const processSnapshots = (docsLists: any[][]) => {
+        const map = new Map();
+        docsLists.flat().forEach(doc => map.set(doc.id, doc));
+        const data = Array.from(map.values()).map(doc => ({
+          ...doc,
           colRef: colName,
           typeLabel: getProposalLabel(colName),
           link: getProposalLink(colName)
         }));
-        
         proposalSubsets[colName] = data;
         const combined = Object.values(proposalSubsets).flat();
         setAllRecentProposals([...combined]);
-      }, (err) => {
-        handleFirestoreError(err, OperationType.GET, colName, false);
-      });
-      unsubscribes.push(unsub);
+      };
+
+      if (showAllThisType) {
+         const q = query(collection(db, colName), limit(500));
+         const unsub = onSnapshot(q, (snap) => {
+           processSnapshots([snap.docs.map(d => ({ id: d.id, ...d.data() }))]);
+         }, (err) => handleFirestoreError(err, OperationType.GET, colName, false));
+         unsubscribes.push(unsub);
+      } else if (isManager) {
+         const field = colName === 'order_proposals' ? 'createdBy' : 'userId';
+         let l1: any[] = []; let l2: any[] = []; let l3: any[] = [];
+         const q1 = query(collection(db, colName), where(field, '==', user.uid), limit(500));
+         const q2 = query(collection(db, colName), where('departmentId', '==', appUser?.departmentId || 'none'), limit(500));
+         const q3 = query(collection(db, colName), where('followers', 'array-contains', user.uid), limit(500));
+         
+         const unsub1 = onSnapshot(q1, snap => { l1 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2, l3]); }, err => console.error(err));
+         const unsub2 = onSnapshot(q2, snap => { l2 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2, l3]); }, err => console.error(err));
+         const unsub3 = onSnapshot(q3, snap => { l3 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2, l3]); }, err => console.error(err));
+         
+         unsubscribes.push(() => { unsub1(); unsub2(); unsub3(); });
+      } else {
+         const field = colName === 'order_proposals' ? 'createdBy' : 'userId';
+         let l1: any[] = []; let l2: any[] = [];
+         const q1 = query(collection(db, colName), where(field, '==', user.uid), limit(500));
+         const q2 = query(collection(db, colName), where('followers', 'array-contains', user.uid), limit(500));
+         
+         const unsub1 = onSnapshot(q1, snap => { l1 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2]); }, err => console.error(err));
+         const unsub2 = onSnapshot(q2, snap => { l2 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2]); }, err => console.error(err));
+         
+         unsubscribes.push(() => { unsub1(); unsub2(); });
+      }
     });
 
     return () => unsubscribes.forEach(u => u());

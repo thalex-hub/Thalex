@@ -204,17 +204,7 @@ export default function Orders() {
     if (!user) return;
     setLoading(true);
 
-    const baseQuery = canSeeAll
-      ? collection(db, "orders")
-      : query(
-          collection(db, "orders"),
-          or(
-            where("responsibleUserId", "==", user.uid),
-            where("followers", "array-contains", user.uid),
-          ),
-        );
-
-    const unsub = onSnapshot(baseQuery, (snap) => {
+    const processOrders = (ordersList: any[]) => {
       let invoicedRevenue = 0;
       let invoicedCount = 0;
       let totalRevenue = 0;
@@ -224,10 +214,7 @@ export default function Orders() {
       let totalBudgetedCosts = 0;
       let totalNetProfit = 0;
 
-      const loadedOrders = snap.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as any),
-      })).sort((a, b) => {
+      const loadedOrders = [...ordersList].sort((a, b) => {
         const valA = a.startDate || a.createdAt;
         const valB = b.startDate || b.createdAt;
         const dateA = valA ? new Date(valA).getTime() : 0;
@@ -235,8 +222,7 @@ export default function Orders() {
         return dateB - dateA;
       });
 
-      snap.docs.forEach((doc) => {
-        const o = doc.data();
+      ordersList.forEach((o) => {
         if (o.status === "cancelled" || o.status === "rejected") return;
         
         const basePrice =
@@ -284,12 +270,47 @@ export default function Orders() {
 
       setOrders(loadedOrders);
       setLoading(false);
-    }, (error) => {
-      console.error("Error fetching orders real-time:", error);
-      setLoading(false);
-    });
+    };
 
-    return () => unsub();
+    let cleanup = () => {};
+
+    if (canSeeAll) {
+      const unsub = onSnapshot(collection(db, "orders"), (snap) => {
+        const list = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+        processOrders(list);
+      }, (error) => {
+        console.error("Error fetching orders real-time:", error);
+        setLoading(false);
+      });
+      cleanup = unsub;
+    } else {
+      let list1: any[] = [];
+      let list2: any[] = [];
+
+      const combine = () => {
+        const map = new Map();
+        list1.forEach(i => map.set(i.id, i));
+        list2.forEach(i => map.set(i.id, i));
+        processOrders(Array.from(map.values()));
+      };
+
+      const q1 = query(collection(db, "orders"), where("responsibleUserId", "==", user.uid));
+      const q2 = query(collection(db, "orders"), where("followers", "array-contains", user.uid));
+
+      const unsub1 = onSnapshot(q1, (snap) => {
+        list1 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+        combine();
+      }, (err) => console.error("Error fetching created orders:", err));
+
+      const unsub2 = onSnapshot(q2, (snap) => {
+        list2 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+        combine();
+      }, (err) => console.error("Error fetching followed orders:", err));
+
+      cleanup = () => { unsub1(); unsub2(); };
+    }
+
+    return () => cleanup();
   }, [user, canSeeAll]);
 
   const fetchOrders = async (direction?: "next" | "prev") => {

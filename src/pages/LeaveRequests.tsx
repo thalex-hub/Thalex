@@ -57,29 +57,42 @@ export default function LeaveRequests() {
       });
     }
     
-    // For regular users, see their own.
-    // For managers, see department requests or all if admin.
-    let q;
-    if (isAdmin || isDirector) {
-      q = query(collection(db, 'leave_requests'));
-    } else if (isManager) {
-      // Sees their own + department requests
-      q = query(
-        collection(db, 'leave_requests'), 
-        or(
-          where('userId', '==', auth.currentUser?.uid),
-          where('departmentId', '==', appUser?.departmentId || 'none')
-        )
-      );
-    } else {
-      q = query(collection(db, 'leave_requests'), where('userId', '==', auth.currentUser?.uid));
-    }
-      
-    return onSnapshot(q, (snap) => {
-      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const processSnapshots = (docsLists: any[][]) => {
+      const map = new Map();
+      docsLists.flat().forEach(doc => map.set(doc.id, doc));
+      const data = Array.from(map.values());
       data.sort((a: any, b: any) => new Date(b.startDate || b.createdAt).getTime() - new Date(a.startDate || a.createdAt).getTime());
       setRequests(data);
-    });
+    };
+
+    if (isAdmin || isDirector) {
+      const q = query(collection(db, 'leave_requests'));
+      return onSnapshot(q, (snap) => {
+        processSnapshots([snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))]);
+      });
+    } else if (isManager) {
+      let l1: any[] = [];
+      let l2: any[] = [];
+      
+      const q1 = query(collection(db, 'leave_requests'), where('userId', '==', auth.currentUser?.uid));
+      const q2 = query(collection(db, 'leave_requests'), where('departmentId', '==', appUser?.departmentId || 'none'));
+      
+      const unsub1 = onSnapshot(q1, snap => {
+        l1 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        processSnapshots([l1, l2]);
+      });
+      const unsub2 = onSnapshot(q2, snap => {
+        l2 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        processSnapshots([l1, l2]);
+      });
+      
+      return () => { unsub1(); unsub2(); };
+    } else {
+      const q = query(collection(db, 'leave_requests'), where('userId', '==', auth.currentUser?.uid));
+      return onSnapshot(q, (snap) => {
+        processSnapshots([snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))]);
+      });
+    }
   }, [isAdmin, appUser]);
 
   const currentUserForStats = allUsers.find(u => u.id === selectedUserForStats) || (selectedUserForStats === auth.currentUser?.uid ? appUser : null);

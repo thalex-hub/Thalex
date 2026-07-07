@@ -270,44 +270,56 @@ export default function NotificationManager() {
     if (!currentUser || !isLoaded) return;
 
     // Listen strictly to tasks where I am actually involved
-    const q = query(
-      collection(db, 'tasks'),
-      or(
-        where('assigneeId', '==', currentUser.uid),
-        where('assignerId', '==', currentUser.uid),
-        where('responsibleUserId', '==', currentUser.uid),
-        where('followers', 'array-contains', currentUser.uid)
-      )
-    );
+    const q1 = query(collection(db, 'tasks'), where('assigneeId', '==', currentUser.uid));
+    const q2 = query(collection(db, 'tasks'), where('assignerId', '==', currentUser.uid));
+    const q3 = query(collection(db, 'tasks'), where('responsibleUserId', '==', currentUser.uid));
+    const q4 = query(collection(db, 'tasks'), where('followers', 'array-contains', currentUser.uid));
 
-    const unsubscribeTasks = onSnapshot(q, (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
-
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'modified') {
-          const taskData = change.doc.data() as any;
-          if (taskData.lastCommentAt && taskData.lastCommentBy && taskData.lastCommentBy !== currentUser.uid) {
-            const commentKey = `${change.doc.id}_${taskData.lastCommentAt}`;
+    let tasksMap = new Map();
+    const handleTasksSnap = (changeType: 'added'|'modified'|'removed', doc: any) => {
+      // Process task notifications
+      const taskData = doc.data() as any;
+      if (changeType === 'modified') {
+        if (taskData.lastCommentAt && taskData.lastCommentBy && taskData.lastCommentBy !== currentUser.uid) {
+          const commentKey = `${doc.id}_${taskData.lastCommentAt}`;
+          
+          if (!notifiedComments.has(commentKey)) {
+            const title = `Bình luận mới: ${taskData.title}`;
+            const body = `${taskData.lastCommentByName || 'Ai đó'} vừa bình luận trong công việc này.`;
+            sendNotification(title, body, 'comment');
+            addHistoricalNotification(title, body, 'comment', doc.id);
             
-            // Only notify if we haven't already notified about this exact comment
-            if (!notifiedComments.has(commentKey)) {
-              const title = `Bình luận mới: ${taskData.title}`;
-              const body = `${taskData.lastCommentByName || 'Ai đó'} vừa bình luận trong công việc này.`;
-              sendNotification(title, body, 'comment');
-              addHistoricalNotification(title, body, 'comment', change.doc.id);
-              
-              setNotifiedComments(prev => {
-                const next = new Set(prev);
-                next.add(commentKey);
-                return next;
-              });
-            }
+            setNotifiedComments(prev => {
+              const next = new Set(prev);
+              next.add(commentKey);
+              return next;
+            });
           }
         }
-      });
-    }, (err) => {
-      console.error("Error in unsubscribeTasks notification watch:", err);
-    });
+      }
+    };
+
+    const processTasksList = () => {
+        setTasks(Array.from(tasksMap.values()));
+    }
+
+    const taskSnapHandler = (snapshot: any) => {
+        snapshot.docChanges().forEach((change: any) => {
+            if (change.type === 'removed') {
+                tasksMap.delete(change.doc.id);
+            } else {
+                tasksMap.set(change.doc.id, { id: change.doc.id, ...change.doc.data() });
+            }
+            handleTasksSnap(change.type, change.doc);
+        });
+        processTasksList();
+    };
+
+    const unsubT1 = onSnapshot(q1, taskSnapHandler, (err) => console.error(err));
+    const unsubT2 = onSnapshot(q2, taskSnapHandler, (err) => console.error(err));
+    const unsubT3 = onSnapshot(q3, taskSnapHandler, (err) => console.error(err));
+    const unsubT4 = onSnapshot(q4, taskSnapHandler, (err) => console.error(err));
+    const unsubscribeTasks = () => { unsubT1(); unsubT2(); unsubT3(); unsubT4(); };
 
     // Listen to MY leave requests that are returned
     const qLeave = query(
@@ -367,77 +379,83 @@ export default function NotificationManager() {
                                (isHR && colName === 'leave_requests') || 
                                ((isAccountant || isFinanceStaff) && ['payment_requests', 'advance_requests', 'reimbursement_requests', 'order_proposals'].includes(colName));
 
-        let qApproval;
+        let qApprovals: any[] = [];
         if (showAllThisType) {
-          qApproval = query(collection(db, colName));
+          qApprovals = [query(collection(db, colName))];
         } else if (isManager) {
           const field = colName === 'order_proposals' ? 'createdBy' : 'userId';
-          qApproval = query(
-            collection(db, colName),
-            or(
-              where(field, '==', currentUser.uid),
-              where('departmentId', '==', appUser?.departmentId || 'none'),
-              where('followers', 'array-contains', currentUser.uid)
-            )
-          );
+          qApprovals = [
+            query(collection(db, colName), where(field, '==', currentUser.uid)),
+            query(collection(db, colName), where('departmentId', '==', appUser?.departmentId || 'none')),
+            query(collection(db, colName), where('followers', 'array-contains', currentUser.uid))
+          ];
         } else {
-          // Normal staff don't have approval capabilities for other users' proposals
           return;
         }
 
-        const unsub = onSnapshot(qApproval, (snapshot) => {
-          const activeIds = new Set(snapshot.docs.map(doc => doc.id));
-          
-          setNotifications(prev => {
-            // Remove notifications for this collection that are no longer in the snapshot
-            const filtered = prev.filter(n => {
-              if (n.type === 'approval' && n.colName === colName && n.docId) {
-                if (!activeIds.has(n.docId)) return false;
-              }
-              return true;
+        const activeIdsMap = new Map<number, Set<string>>();
+
+        qApprovals.forEach((qApproval, idx) => {
+          activeIdsMap.set(idx, new Set());
+          const unsub = onSnapshot(qApproval, (snapshot) => {
+            const currentActive = new Set(snapshot.docs.map(doc => doc.id));
+            activeIdsMap.set(idx, currentActive);
+            
+            // Combine all active IDs across all queries for this collection
+            const allActiveIds = new Set<string>();
+            activeIdsMap.forEach(ids => {
+              ids.forEach(id => allActiveIds.add(id));
             });
-            return filtered;
-          });
-
-          snapshot.docChanges().forEach((change) => {
-            const id = change.doc.id;
-            if (change.type === 'added' || change.type === 'modified') {
-              const data = change.doc.data();
-              
-              if (checkNeedsAction(colName, data)) {
-                const uniqueKey = `${colName}_${id}_${data.status || 'pending'}`;
-
-                if (!notifiedApprovalsRef.current.has(uniqueKey)) {
-                  let title = `Phê duyệt mới: ${col.label}`;
-                  const subject = data.name || data.reason || data.purpose || 'Yêu cầu mới';
-                  let body = `Yêu cầu "${subject}" từ ${data.userName || data.fullName || 'nhân viên'}. Đang chờ bạn phê duyệt.`;
-                  let path = col.path;
-
-                  // Custom title/body/path for disbursement tasks (status === 'approved')
-                  if (data.status === 'approved') {
-                    title = `Chi tiền/Giải ngân: ${col.label}`;
-                    body = `Yêu cầu "${subject}" từ ${data.userName || data.fullName || 'nhân viên'} đã được duyệt. Vui lòng thực hiện chi tiền.`;
-                    path = '/disbursements';
-                  }
-                  
-                  sendNotification(title, body, 'approval');
-                  addHistoricalNotification(title, body, 'approval', undefined, path, id, colName);
-
-                  notifiedApprovalsRef.current.add(uniqueKey);
-                  setNotifiedApprovals(new Set(notifiedApprovalsRef.current));
+            
+            setNotifications(prev => {
+              const filtered = prev.filter(n => {
+                if (n.type === 'approval' && n.colName === colName && n.docId) {
+                  if (!allActiveIds.has(n.docId)) return false;
                 }
-              } else {
+                return true;
+              });
+              return filtered;
+            });
+
+            snapshot.docChanges().forEach((change) => {
+              const id = change.doc.id;
+              if (change.type === 'added' || change.type === 'modified') {
+                const data = change.doc.data();
+                
+                if (checkNeedsAction(colName, data)) {
+                  const uniqueKey = `${colName}_${id}_${data.status || 'pending'}`;
+
+                  if (!notifiedApprovalsRef.current.has(uniqueKey)) {
+                    let title = `Phê duyệt mới: ${col.label}`;
+                    const subject = data.name || data.reason || data.purpose || 'Yêu cầu mới';
+                    let body = `Yêu cầu "${subject}" từ ${data.userName || data.fullName || 'nhân viên'}. Đang chờ bạn phê duyệt.`;
+                    let path = col.path;
+
+                    if (data.status === 'approved') {
+                      title = `Chi tiền/Giải ngân: ${col.label}`;
+                      body = `Yêu cầu "${subject}" từ ${data.userName || data.fullName || 'nhân viên'} đã được duyệt. Vui lòng thực hiện chi tiền.`;
+                      path = '/disbursements';
+                    }
+                    
+                    sendNotification(title, body, 'approval');
+                    addHistoricalNotification(title, body, 'approval', undefined, path, id, colName);
+
+                    notifiedApprovalsRef.current.add(uniqueKey);
+                    setNotifiedApprovals(new Set(notifiedApprovalsRef.current));
+                  }
+                } else {
+                  setNotifications(prev => prev.filter(n => !shouldRemoveNotification(n, id, colName, data)));
+                }
+              } else if (change.type === 'removed') {
+                const data = change.doc.data();
                 setNotifications(prev => prev.filter(n => !shouldRemoveNotification(n, id, colName, data)));
               }
-            } else if (change.type === 'removed') {
-              const data = change.doc.data();
-              setNotifications(prev => prev.filter(n => !shouldRemoveNotification(n, id, colName, data)));
-            }
+            });
+          }, (err) => {
+            console.error(`Error in approval notification watch for ${colName}:`, err);
           });
-        }, (err) => {
-          console.error(`Error in approval notification watch for ${colName}:`, err);
+          unsubs.push(unsub);
         });
-        unsubs.push(unsub);
       });
     }
 

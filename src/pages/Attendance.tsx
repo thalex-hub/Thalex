@@ -125,12 +125,23 @@ export default function Attendance() {
     try {
       // Fetch orders and departments first for salary calculation
       const canSeeAllOrders = isAdmin || isDirector || isManager || isAccountant || isHR;
-      const ordersQ = canSeeAllOrders 
-        ? query(collection(db, 'orders'))
-        : query(collection(db, 'orders'), or(where('responsibleUserId', '==', user.uid), where('followers', 'array-contains', user.uid)));
+      
+      let ordersData: any[] = [];
+      if (canSeeAllOrders) {
+        const snap = await getDocs(query(collection(db, 'orders')));
+        ordersData = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+      } else {
+        const [snap1, snap2] = await Promise.all([
+          getDocs(query(collection(db, 'orders'), where('responsibleUserId', '==', user.uid))),
+          getDocs(query(collection(db, 'orders'), where('followers', 'array-contains', user.uid)))
+        ]);
+        const map = new Map();
+        snap1.docs.forEach((d: any) => map.set(d.id, { id: d.id, ...d.data() }));
+        snap2.docs.forEach((d: any) => map.set(d.id, { id: d.id, ...d.data() }));
+        ordersData = Array.from(map.values());
+      }
 
-      const [ordersSnap, deptsSnap, paymentsSnap] = await Promise.all([
-        getDocs(ordersQ),
+      const [deptsSnap, paymentsSnap] = await Promise.all([
         getDocs(collection(db, 'departments')),
         getDocs(query(
           collection(db, 'payment_requests'), 
@@ -139,7 +150,7 @@ export default function Attendance() {
           where('status', 'in', ['approved', 'paid'])
         ))
       ]);
-      setOrders(ordersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setOrders(ordersData);
       setDepartments(deptsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPaymentRequests(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 

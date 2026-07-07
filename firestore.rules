@@ -20,14 +20,15 @@ service cloud.firestore {
     
     // Identity integrity
     function isOwner(data) { 
-      return isSignedIn() && (
-        (data.get('userId', '') == request.auth.uid) || 
-        (data.get('createdBy', '') == request.auth.uid) ||
-        (data.get('assignedTo', '') == request.auth.uid) ||
-        (data.get('uid', '') == request.auth.uid) ||
-        (request.auth.token.get('email', '').lower() != '' && data.get('email', '').lower() == request.auth.token.get('email', '').lower()) ||
-        (request.auth.token.get('email', '').lower() != '' && data.get('userEmail', '').lower() == request.auth.token.get('email', '').lower())
-      ); 
+       return isSignedIn() && (
+        ('userId' in data && data.userId == request.auth.uid) || 
+        ('createdBy' in data && data.createdBy == request.auth.uid) ||
+        ('assignedTo' in data && data.assignedTo == request.auth.uid) ||
+        ('uid' in data && data.uid == request.auth.uid) ||
+        ('employeeId' in data && data.employeeId == request.auth.uid) ||
+        ('email' in data && 'email' in request.auth.token && data.email.lower() == request.auth.token.email.lower()) ||
+        ('userEmail' in data && 'email' in request.auth.token && data.userEmail.lower() == request.auth.token.email.lower())
+      );
     }
 
     // Role check helpers
@@ -180,14 +181,14 @@ service cloud.firestore {
         let tempId = request.auth.token.email.lower().replace('[^a-z0-9]', '_');
         return isSignedIn() && (
           isTaskLeader() || 
-          existing().get('assigneeId', '') == request.auth.uid || 
-          existing().get('assigneeId', '') == tempId ||
-          existing().get('assignerId', '') == request.auth.uid ||
-          existing().get('assignerId', '') == tempId ||
-          existing().get('responsibleUserId', '') == request.auth.uid ||
-          existing().get('responsibleUserId', '') == tempId ||
-          request.auth.uid in existing().get('followers', []) ||
-          tempId in existing().get('followers', [])
+          ('assigneeId' in resource.data && resource.data.assigneeId == request.auth.uid) || 
+          ('assigneeId' in resource.data && resource.data.assigneeId == tempId) ||
+          ('assignerId' in resource.data && resource.data.assignerId == request.auth.uid) ||
+          ('assignerId' in resource.data && resource.data.assignerId == tempId) ||
+          ('responsibleUserId' in resource.data && resource.data.responsibleUserId == request.auth.uid) ||
+          ('responsibleUserId' in resource.data && resource.data.responsibleUserId == tempId ||
+          ('followers' in resource.data && request.auth.uid in resource.data.followers) ||
+          ('followers' in resource.data && tempId in resource.data.followers)
         );
       }
       
@@ -217,11 +218,11 @@ service cloud.firestore {
     match /leave_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_leave_requests') || hasPermission('menu_proposals_view') ||
-                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+                   (isSignedIn() && ('followers' in resource.data && request.auth.uid in resource.data.followers));
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isManager() || isOwner(existing()) || 
                    hasPermission('approve_leave_requests') ||
-                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+                   (isSignedIn() && ('followers' in resource.data && request.auth.uid in resource.data.followers));
       allow delete: if isDirector() || isHR() || isOwner(existing());
     }
 
@@ -229,33 +230,33 @@ service cloud.firestore {
     match /advance_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_advances') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
-                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+                   (isSignedIn() && ('followers' in resource.data && request.auth.uid in resource.data.followers));
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_advances') || hasPermission('disburse_advances') ||
-                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+                   (isSignedIn() && ('followers' in resource.data && request.auth.uid in resource.data.followers));
       allow delete: if isDirector() || isFinanceStaff() || isOwner(existing());
     }
     
     match /payment_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_payment_requests') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
-                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+                   (isSignedIn() && ('followers' in resource.data && request.auth.uid in resource.data.followers));
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_payment_requests') || hasPermission('disburse_payment_requests') ||
-                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+                   (isSignedIn() && ('followers' in resource.data && request.auth.uid in resource.data.followers));
       allow delete: if isDirector() || isFinanceStaff() || isOwner(existing());
     }
 
     match /reimbursement_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_reimbursements') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
-                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+                   (isSignedIn() && ('followers' in resource.data && request.auth.uid in resource.data.followers));
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_reimbursements') || hasPermission('disburse_reimbursements') ||
-                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+                   (isSignedIn() && ('followers' in resource.data && request.auth.uid in resource.data.followers));
       allow delete: if isDirector() || isFinanceStaff() || isOwner(existing());
     }
 
@@ -263,7 +264,7 @@ service cloud.firestore {
     match /order_proposals/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_orders') || hasPermission('menu_orders_view') ||
-                   (isSignedIn() && request.auth.uid in existing().get('followers', []));
+                   (isSignedIn() && ('followers' in resource.data && request.auth.uid in resource.data.followers));
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_orders') || hasPermission('menu_orders_edit');
@@ -275,19 +276,19 @@ service cloud.firestore {
       allow read: if isDirector() || isHR() || isFinanceStaff() || 
                    hasPermission('view_orders') || hasPermission('menu_orders_view') || hasPermission('menu_orders') || hasPermission('view_salaries') ||
                    (isSignedIn() && (
-                     existing().get('responsibleUserId', '') == request.auth.uid || 
-                     existing().get('responsibleUserId', '') == request.auth.token.email.lower().replace('[^a-z0-9]', '_') ||
-                     request.auth.uid in existing().get('followers', []) ||
-                     request.auth.token.email.lower().replace('[^a-z0-9]', '_') in existing().get('followers', []) ||
-                     existing().get('customerId', '') == request.auth.uid
+                     ('responsibleUserId' in resource.data && resource.data.responsibleUserId == request.auth.uid) || 
+                     ('responsibleUserId' in resource.data && resource.data.responsibleUserId == request.auth.token.email.lower().replace('[^a-z0-9]', '_')) ||
+                     ('followers' in resource.data && request.auth.uid in resource.data.followers) ||
+                     ('followers' in resource.data && request.auth.token.email.lower().replace('[^a-z0-9]', '_') in resource.data.followers) ||
+                     ('customerId' in resource.data && resource.data.customerId == request.auth.uid)
                    ));
       allow create: if isDirector() || isHR() || isFinanceStaff() || hasPermission('create_orders') || hasPermission('menu_orders_edit');
-      allow update: if isDirector() || isHR() || isFinanceStaff() || hasPermission('edit_orders') || hasPermission('menu_orders_edit') || 
-                   (isSignedIn() && (
-                     existing().get('responsibleUserId', '') == request.auth.uid || 
-                     existing().get('responsibleUserId', '') == request.auth.token.email.lower().replace('[^a-z0-9]', '_') ||
-                     request.auth.uid in existing().get('followers', []) ||
-                     request.auth.token.email.lower().replace('[^a-z0-9]', '_') in existing().get('followers', [])
+      allow update: if isDirector() || isHR() || isFinanceStaff() || hasPermission('edit_orders') || hasPermission('menu_orders_edit') ||
+                    (isSignedIn() && (
+                     ('responsibleUserId' in resource.data && resource.data.responsibleUserId == request.auth.uid) || 
+                     ('responsibleUserId' in resource.data && resource.data.responsibleUserId == request.auth.token.email.lower().replace('[^a-z0-9]', '_')) ||
+                     ('followers' in resource.data && request.auth.uid in resource.data.followers) ||
+                     ('followers' in resource.data && request.auth.token.email.lower().replace('[^a-z0-9]', '_') in resource.data.followers)
                    ));
       allow delete: if isDirector() || hasPermission('delete_orders');
       
@@ -295,7 +296,6 @@ service cloud.firestore {
         allow read, write: if isSignedIn();
       }
     }
-
     // Payments
     match /payments/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || hasPermission('view_cashflow') || hasPermission('manage_cashflow');

@@ -1,0 +1,11 @@
+    function isOwner(data) { 
+       return isSignedIn() && (
+        ('userId' in data && data.userId == request.auth.uid) || 
+        ('createdBy' in data && data.createdBy == request.auth.uid) ||
+        ('assignedTo' in data && data.assignedTo == request.auth.uid) ||
+        ('uid' in data && data.uid == request.auth.uid) ||
+        ('employeeId' in data && data.employeeId == request.auth.uid) ||
+        ('email' in data && 'email' in request.auth.token && data.email.lower() == request.auth.token.email.lower()) ||
+        ('userEmail' in data && 'email' in request.auth.token && data.userEmail.lower() == request.auth.token.email.lower())
+      );
+    }

@@ -19,11 +19,14 @@ service cloud.firestore {
     function isValidId(id) { return id is string && id.size() <= 128; }
     
     // Identity integrity
-    function isOwner(data) { 
-       return isSignedIn() && (
+    function isOwner(data) {
+        return isSignedIn() && (
         ('userId' in data && data.userId == request.auth.uid) || 
         ('createdBy' in data && data.createdBy == request.auth.uid) ||
         ('assignedTo' in data && data.assignedTo == request.auth.uid) ||
+        ('assigneeId' in data && (data.assigneeId == request.auth.uid || ('email' in request.auth.token && data.assigneeId == request.auth.token.email) || ('email' in request.auth.token && data.assigneeId == request.auth.token.email.replace('@', '_').replace('.', '_')))) ||
+        ('assignerId' in data && data.assignerId == request.auth.uid) ||
+        ('responsibleUserId' in data && data.responsibleUserId == request.auth.uid) ||
         ('uid' in data && data.uid == request.auth.uid) ||
         ('employeeId' in data && data.employeeId == request.auth.uid) ||
         ('email' in data && 'email' in request.auth.token && data.email.lower() == request.auth.token.email.lower()) ||
@@ -260,7 +263,8 @@ service cloud.firestore {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_reimbursements') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
                    (isSignedIn() && (request.auth.uid in resource.data.get('followers', []))) ||
-                   (isSignedIn() && resource.data.userId == request.auth.uid);
+                   (isSignedIn() && resource.data.userId == request.auth.uid) ||
+                   (isSignedIn() && resource.data.advanceOwnerId == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_reimbursements') || hasPermission('disburse_reimbursements') ||

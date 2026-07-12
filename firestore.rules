@@ -222,7 +222,8 @@ service cloud.firestore {
     match /leave_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_leave_requests') || hasPermission('menu_proposals_view') ||
-                   (isSignedIn() && (request.auth.uid in resource.data.get('followers', [])));
+                   (isSignedIn() && (request.auth.uid in resource.data.get('followers', []))) ||
+                   (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isManager() || isOwner(existing()) || 
                    hasPermission('approve_leave_requests') ||
@@ -234,7 +235,8 @@ service cloud.firestore {
     match /advance_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_advances') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
-                   (isSignedIn() && (request.auth.uid in resource.data.get('followers', [])));
+                   (isSignedIn() && (request.auth.uid in resource.data.get('followers', []))) ||
+                   (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_advances') || hasPermission('disburse_advances') ||
@@ -245,7 +247,8 @@ service cloud.firestore {
     match /payment_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_payment_requests') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
-                   (isSignedIn() && (request.auth.uid in resource.data.get('followers', [])));
+                   (isSignedIn() && (request.auth.uid in resource.data.get('followers', []))) ||
+                   (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_payment_requests') || hasPermission('disburse_payment_requests') ||
@@ -256,7 +259,8 @@ service cloud.firestore {
     match /reimbursement_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_reimbursements') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
-                   (isSignedIn() && (request.auth.uid in resource.data.get('followers', [])));
+                   (isSignedIn() && (request.auth.uid in resource.data.get('followers', []))) ||
+                   (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_reimbursements') || hasPermission('disburse_reimbursements') ||
@@ -268,7 +272,8 @@ service cloud.firestore {
     match /order_proposals/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_orders') || hasPermission('menu_orders_view') ||
-                   (isSignedIn() && (request.auth.uid in resource.data.get('followers', [])));
+                   (isSignedIn() && (request.auth.uid in resource.data.get('followers', []))) ||
+                   (isSignedIn() && resource.data.createdBy == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_orders') || hasPermission('menu_orders_edit');

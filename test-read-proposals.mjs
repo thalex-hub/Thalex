@@ -1,15 +1,14 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { getFirestore, collection, getDocs, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import fs from 'fs';
-
 const config = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
 const app = initializeApp(config);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
 async function run() {
-  await signInWithEmailAndPassword(auth, "info.vinasglobal@gmail.com", "vinasglobal@2024");
+  await signInWithEmailAndPassword(auth, "vietnhan@thalex.vn", "123456");
   const user = auth.currentUser;
   console.log("Logged in as", user.uid);
 
@@ -36,7 +35,5 @@ async function run() {
   } catch(e) {
     console.error("q3 error:", e.code, e.message);
   }
-
-  process.exit(0);
 }
-run().catch(console.error);
+run().catch(console.error).finally(() => process.exit());

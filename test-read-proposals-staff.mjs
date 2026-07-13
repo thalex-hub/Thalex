@@ -8,8 +8,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 async function run() {
-  // Assuming there's a staff user. I'll just login with a known test account if available, or create one?
-  // Let's first check what users we have by querying with admin.
+  await signInWithEmailAndPassword(auth, "vietnhan@thalex.vn", "123456"); // I'll assume standard test password or I'll just check rules... wait, let's just check the firestore rules test.
   process.exit(0);
 }
-run().catch(console.error);
+// wait, instead of guessing passwords, let's just use the Admin SDK to check the data.

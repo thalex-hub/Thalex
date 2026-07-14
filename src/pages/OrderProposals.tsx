@@ -52,6 +52,8 @@ export default function OrderProposals() {
   const [businessPlanFile, setBusinessPlanFile] = React.useState<File | null>(null);
 
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
+  const [rejectingProposal, setRejectingProposal] = React.useState<any>(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = React.useState('');
   const [customers, setCustomers] = React.useState<any[]>([]);
   const [showGuide, setShowGuide] = React.useState(true);
   const { appUser, isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user, isSuperAdmin, hasPermission } = useAuth();
@@ -516,15 +518,18 @@ export default function OrderProposals() {
     setShowAddModal(true);
   };
 
-  const handleApprove = async (id: string, status: 'approved' | 'rejected' | 'pending_director', proposal: any) => {
+  const handleApprove = async (id: string, status: 'approved' | 'rejected' | 'pending_director', proposal: any, providedReason?: string) => {
     try {
-      let rejectionReason = '';
-      if (status === 'rejected') {
-        rejectionReason = window.prompt("Vui lòng nhập lý do từ chối (bắt buộc):") || '';
-        if (!rejectionReason.trim()) {
-          alert("Bạn phải nhập lý do khi từ chối!");
-          return;
-        }
+      let rejectionReason = providedReason || '';
+      if (status === 'rejected' && !providedReason) {
+        setRejectingProposal(proposal);
+        setRejectionReasonInput('');
+        return;
+      }
+      
+      if (status === 'rejected' && !rejectionReason.trim()) {
+        alert("Bạn phải nhập lý do khi từ chối!");
+        return;
       }
 
       const newHistoryItem: any = {
@@ -1996,6 +2001,67 @@ export default function OrderProposals() {
                      </button>
                   </div>
                </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {rejectingProposal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => setRejectingProposal(null)} 
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 overflow-hidden"
+            >
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+                  <XCircle size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Lý do từ chối</h3>
+                <p className="text-gray-500 text-sm mb-4">
+                  Vui lòng cung cấp lý do bạn từ chối đề xuất đơn hàng này.
+                </p>
+                <textarea
+                  value={rejectionReasonInput}
+                  onChange={(e) => setRejectionReasonInput(e.target.value)}
+                  placeholder="Nhập lý do từ chối tại đây..."
+                  className="w-full h-32 px-4 py-3 rounded-2xl border-2 border-gray-100 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all outline-none resize-none text-sm"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setRejectingProposal(null)} 
+                  className="flex-1 py-3 border border-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors uppercase tracking-wider text-xs"
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="button" 
+                  onClick={async () => {
+                    const prop = rejectingProposal;
+                    const reason = rejectionReasonInput;
+                    if (!reason.trim()) {
+                      alert("Bạn phải nhập lý do khi từ chối!");
+                      return;
+                    }
+                    setRejectingProposal(null);
+                    await handleApprove(prop.id, 'rejected', prop, reason);
+                  }} 
+                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-colors uppercase tracking-wider text-xs"
+                >
+                  Xác nhận Từ chối
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

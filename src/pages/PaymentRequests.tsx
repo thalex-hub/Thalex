@@ -55,6 +55,8 @@ export default function PaymentRequests() {
   const [editingRequestId, setEditingRequestId] = React.useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = React.useState<any>(null);
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
+  const [rejectingRequest, setRejectingRequest] = React.useState<{ req: any, action: 'reject_director' | 'return_finance' } | null>(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = React.useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -397,7 +399,7 @@ export default function PaymentRequests() {
     }
   };
 
-  const handleApprove = async (id: string, action: 'approve_finance' | 'return_finance' | 'approve_director' | 'reject_director' | 'disburse', note?: string) => {
+  const handleApprove = async (id: string, action: 'approve_finance' | 'return_finance' | 'approve_director' | 'reject_director' | 'disburse', providedReason?: string) => {
     try {
       const request = requests.find(r => r.id === id);
       if (!request) {
@@ -408,13 +410,17 @@ export default function PaymentRequests() {
       const docRef = doc(db, 'payment_requests', id);
       let nextStatus = '';
       let approvalLevel = '';
-      let rejectionReason = '';
+      let rejectionReason = providedReason || '';
 
       if (action === 'approve_finance') {
         nextStatus = 'pending_director';
         approvalLevel = 'Director';
       } else if (action === 'return_finance' || action === 'reject_director') {
-        rejectionReason = window.prompt("Vui lòng nhập lý do từ chối/hoàn lại (bắt buộc):") || '';
+        if (!providedReason) {
+          setRejectingRequest({ req: request, action: action as 'reject_director' | 'return_finance' });
+          setRejectionReasonInput('');
+          return;
+        }
         if (!rejectionReason.trim()) {
           alert("Bạn phải nhập lý do!");
           return;
@@ -1465,6 +1471,68 @@ export default function PaymentRequests() {
                   className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-colors uppercase tracking-wider text-xs"
                 >
                   Xác nhận Xóa
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {rejectingRequest && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => setRejectingRequest(null)} 
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 overflow-hidden"
+            >
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+                  <XCircle size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Lý do từ chối/trả lại</h3>
+                <p className="text-gray-500 text-sm mb-4">
+                  Vui lòng cung cấp lý do bạn từ chối hoặc yêu cầu bổ sung cho đề xuất thanh toán này.
+                </p>
+                <textarea
+                  value={rejectionReasonInput}
+                  onChange={(e) => setRejectionReasonInput(e.target.value)}
+                  placeholder="Nhập lý do tại đây..."
+                  className="w-full h-32 px-4 py-3 rounded-2xl border-2 border-gray-100 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all outline-none resize-none text-sm"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setRejectingRequest(null)} 
+                  className="flex-1 py-3 border border-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors uppercase tracking-wider text-xs"
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="button" 
+                  onClick={async () => {
+                    const data = rejectingRequest;
+                    const reason = rejectionReasonInput;
+                    if (!reason.trim()) {
+                      alert("Bạn phải nhập lý do!");
+                      return;
+                    }
+                    setRejectingRequest(null);
+                    await handleApprove(data.req.id, data.action, reason);
+                  }} 
+                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-colors uppercase tracking-wider text-xs"
+                >
+                  Xác nhận
                 </button>
               </div>
             </motion.div>

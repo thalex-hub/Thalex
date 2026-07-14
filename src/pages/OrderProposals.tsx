@@ -54,7 +54,11 @@ export default function OrderProposals() {
   const [showGuide, setShowGuide] = React.useState(true);
   const { appUser, isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user, isSuperAdmin } = useAuth();
   const location = useLocation();
-  const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR;
+  const hasViewOrdersPerm = appUser?.permissions?.includes('view_orders') || 
+                            appUser?.permissions?.includes('menu_orders_view') || 
+                            ['SalesManager', 'SalesStaff', 'ChiefAccountant', 'AccountantStaff', 'Accountant', 'TechnicalManager', 'TechnicalStaff', 'GeneralStaff', 'Staff'].includes(appUser?.roleId || '');
+
+  const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR || hasViewOrdersPerm;
 
   const [activeTab, setActiveTab] = React.useState<'pending' | 'approved' | 'cancelled'>('pending');
   const [searchTerm, setSearchTerm] = React.useState('');

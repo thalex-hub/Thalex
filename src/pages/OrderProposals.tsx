@@ -11,6 +11,8 @@ import { useAuth } from '../lib/authContext';
 import { exportToExcel } from '../lib/excel';
 import { sendProposalEmailNotification } from '../lib/proposalEmail';
 
+import { handleFirestoreError, OperationType } from "../lib/firestoreUtils";
+
 export default function OrderProposals() {
   const [proposals, setProposals] = React.useState<any[]>([]);
   const [showAddModal, setShowAddModal] = React.useState(false);
@@ -203,19 +205,23 @@ export default function OrderProposals() {
       unsubProposals = onSnapshot(q, (snap) => {
         setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       }, (err) => {
-        console.error("Error loading order proposals in OrderProposals:", err);
+        handleFirestoreError(err, OperationType.LIST, 'order_proposals');
         setProposals([]);
       });
     } else {
       // For non-admin/non-manager roles, split the compound OR + ORDER BY query to avoid composite index requirement.
       // This solves the blank page loading issue by executing independent simple queries and sorting in memory.
       let listCreated: any[] = [];
+      let listLegacyCreated: any[] = [];
       let listFollowed: any[] = [];
+      let listLegacyFollowed: any[] = [];
 
       const combineAndSortProposals = () => {
         const mergedMap = new Map();
         listCreated.forEach(item => mergedMap.set(item.id, item));
+        listLegacyCreated.forEach(item => mergedMap.set(item.id, item));
         listFollowed.forEach(item => mergedMap.set(item.id, item));
+        listLegacyFollowed.forEach(item => mergedMap.set(item.id, item));
         const mergedList = Array.from(mergedMap.values());
         mergedList.sort((a, b) => {
           const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -231,20 +237,36 @@ export default function OrderProposals() {
       const unsub1 = onSnapshot(q1, (snap) => {
         listCreated = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         combineAndSortProposals();
-      }, (err) => {
-        console.error("Error loading created proposals in OrderProposals:", err);
-      });
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'order_proposals/createdBy'));
+
+      let unsubLegacy1 = () => {};
+      if (appUser?.legacyId) {
+        const qLegacy1 = query(collection(db, 'order_proposals'), where('createdBy', '==', appUser.legacyId));
+        unsubLegacy1 = onSnapshot(qLegacy1, (snap) => {
+          listLegacyCreated = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          combineAndSortProposals();
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'order_proposals/createdByLegacy'));
+      }
 
       const unsub2 = onSnapshot(q2, (snap) => {
         listFollowed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         combineAndSortProposals();
-      }, (err) => {
-        console.error("Error loading followed proposals in OrderProposals:", err);
-      });
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'order_proposals/followed'));
+
+      let unsubLegacy2 = () => {};
+      if (appUser?.legacyId) {
+        const qLegacy2 = query(collection(db, 'order_proposals'), where('followers', 'array-contains', appUser.legacyId));
+        unsubLegacy2 = onSnapshot(qLegacy2, (snap) => {
+          listLegacyFollowed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          combineAndSortProposals();
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'order_proposals/followedLegacy'));
+      }
 
       unsubProposals = () => {
         unsub1();
+        unsubLegacy1();
         unsub2();
+        unsubLegacy2();
       };
     }
 

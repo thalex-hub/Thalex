@@ -72,8 +72,8 @@ service cloud.firestore {
     }
 
     function isStaffRole(role) {
-      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'SalesStaff', 'AccountantStaff', 'TechnicalStaff', 'GeneralStaff', 'Staff'] || 
-             role.matches('.*_Staff');
+      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'SalesStaff', 'AccountantStaff', 'TechnicalStaff', 'GeneralStaff', 'Staff', 'HRStaff', 'HR'] || 
+             role.matches('.*_Staff') || role.matches('.*_HR');
     }
 
     // Read permission for user's role from role_permissions, falling back to standard defaults if the doc doesn't exist
@@ -83,8 +83,8 @@ service cloud.firestore {
          perm in get(/databases/$(database)/documents/role_permissions/$(getUserRole())).data.get('permissions', [])) ||
         // Fallback for orders
         ((perm == 'view_orders' || perm == 'menu_orders_view' || perm == 'menu_orders') && 
-          (getUserRole() in ['SalesManager', 'SalesStaff', 'ChiefAccountant', 'AccountantStaff', 'Accountant', 'TechnicalManager', 'TechnicalStaff', 'GeneralStaff', 'Staff'] || 
-           isManagerRole(getUserRole()) || isStaffRole(getUserRole()) || isAccountantRole(getUserRole()))) ||
+          (getUserRole() in ['SalesManager', 'SalesStaff', 'ChiefAccountant', 'AccountantStaff', 'Accountant', 'TechnicalManager', 'TechnicalStaff', 'GeneralStaff', 'Staff', 'HR', 'HRStaff', 'HRManager'] || 
+           isManagerRole(getUserRole()) || isStaffRole(getUserRole()) || isAccountantRole(getUserRole()) || isHRRole(getUserRole()))) ||
         (perm == 'approve_orders' && (getUserRole() == 'SalesManager' || isManagerRole(getUserRole()))) ||
         
         // Fallback for finance

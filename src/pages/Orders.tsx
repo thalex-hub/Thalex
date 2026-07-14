@@ -70,8 +70,8 @@ export default function Orders() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const PAGE_SIZE = 12;
 
-  const { user, isAdmin, isManager, isDirector, isFinanceStaff, hasPermission, isSuperAdmin } = useAuth();
-  const canSeeAll = isAdmin || isManager || isDirector || isFinanceStaff || hasPermission('view_orders') || hasPermission('menu_orders_view') || hasPermission('menu_orders');
+  const { user, appUser, isAdmin, isManager, isDirector, isFinanceStaff, isHR, hasPermission, isSuperAdmin } = useAuth();
+  const canSeeAll = isAdmin || isManager || isDirector || isFinanceStaff || isHR || hasPermission('view_orders') || hasPermission('menu_orders_view') || hasPermission('menu_orders');
 
   const [showFilterDropdown, setShowFilterDropdown] = React.useState(false);
   const [filterValue, setFilterValue] = React.useState<string>('all'); // all, under100m, 100mTo500m, above500m
@@ -279,18 +279,19 @@ export default function Orders() {
         const list = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
         processOrders(list);
       }, (error) => {
-        console.error("Error fetching orders real-time:", error);
+        handleFirestoreError(error, OperationType.LIST, "orders");
         setLoading(false);
       });
       cleanup = unsub;
     } else {
       let list1: any[] = [];
+      let listLegacy1: any[] = [];
       let list2: any[] = [];
+      let listLegacy2: any[] = [];
 
       const combine = () => {
         const map = new Map();
-        list1.forEach(i => map.set(i.id, i));
-        list2.forEach(i => map.set(i.id, i));
+        [...list1, ...listLegacy1, ...list2, ...listLegacy2].forEach(i => map.set(i.id, i));
         processOrders(Array.from(map.values()));
       };
 
@@ -300,14 +301,37 @@ export default function Orders() {
       const unsub1 = onSnapshot(q1, (snap) => {
         list1 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
         combine();
-      }, (err) => console.error("Error fetching created orders:", err));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/responsible_uid"));
+
+      let unsubLegacy1 = () => {};
+      if (appUser?.legacyId) {
+        const qLegacy1 = query(collection(db, "orders"), where("responsibleUserId", "==", appUser.legacyId));
+        unsubLegacy1 = onSnapshot(qLegacy1, (snap) => {
+          listLegacy1 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+          combine();
+        }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/responsible_legacy"));
+      }
 
       const unsub2 = onSnapshot(q2, (snap) => {
         list2 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
         combine();
-      }, (err) => console.error("Error fetching followed orders:", err));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/followers_uid"));
 
-      cleanup = () => { unsub1(); unsub2(); };
+      let unsubLegacy2 = () => {};
+      if (appUser?.legacyId) {
+        const qLegacy2 = query(collection(db, "orders"), where("followers", "array-contains", appUser.legacyId));
+        unsubLegacy2 = onSnapshot(qLegacy2, (snap) => {
+          listLegacy2 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+          combine();
+        }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/followers_legacy"));
+      }
+
+      cleanup = () => { 
+        unsub1(); 
+        unsubLegacy1();
+        unsub2(); 
+        unsubLegacy2();
+      };
     }
 
     return () => cleanup();

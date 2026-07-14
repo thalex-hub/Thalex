@@ -52,32 +52,38 @@ service cloud.firestore {
     }
 
     function isDirectorRole(role) {
-      return role in ['SuperAdmin', 'Director', 'ViceDirector'];
+      let r = role.lower();
+      return r in ['superadmin', 'director', 'vicedirector'];
     }
 
     function isManagerRole(role) {
-      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'Manager', 'GeneralManager', 'HRManager', 'ChiefAccountant', 'SalesManager', 'TechnicalManager', 'ketoantruong'] || 
-             role.matches('.*_Manager');
+      let r = role.lower();
+      return r in ['superadmin', 'director', 'vicedirector', 'manager', 'generalmanager', 'hrmanager', 'chiefaccountant', 'salesmanager', 'technicalmanager', 'ketoantruong'] || 
+             r.matches('.*_manager');
     }
 
     function isAccountantRole(role) {
-      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'ChiefAccountant', 'Accountant', 'AccountantStaff', 'ketoantruong', 'ketoan'] || 
-             role.matches('.*_Accountant');
+      let r = role.lower();
+      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'ketoantruong', 'ketoan'] || 
+             r.matches('.*_accountant');
     }
 
     function isHRRole(role) {
-      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'HRManager', 'HR', 'HRStaff', 'NhanSu', 'Nhân sự'] || 
-             role.matches('.*_HR') || role.matches('.*_NhanSu');
+      let r = role.lower();
+      return r in ['superadmin', 'director', 'vicedirector', 'hrmanager', 'hr', 'hrstaff', 'nhansu', 'nhân sự'] || 
+             r.matches('.*_hr') || r.matches('.*_nhansu');
     }
 
     function isFinanceStaffRole(role) {
-      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'ChiefAccountant', 'Accountant', 'AccountantStaff', 'GeneralManager', 'Manager'] || 
-             role.matches('.*_Accountant');
+      let r = role.lower();
+      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'generalmanager', 'manager'] || 
+             r.matches('.*_accountant');
     }
 
     function isStaffRole(role) {
-      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'SalesStaff', 'AccountantStaff', 'TechnicalStaff', 'GeneralStaff', 'Staff', 'HRStaff', 'HR', 'NhanSu', 'Nhân sự'] || 
-             role.matches('.*_Staff') || role.matches('.*_HR') || role.matches('.*_NhanSu');
+      let r = role.lower();
+      return r in ['superadmin', 'director', 'vicedirector', 'salesstaff', 'accountantstaff', 'technicalstaff', 'generalstaff', 'staff', 'hrstaff', 'hr', 'nhansu', 'nhân sự'] || 
+             r.matches('.*_staff') || r.matches('.*_hr') || r.matches('.*_nhansu');
     }
 
     // Read permission for user's role from role_permissions, falling back to standard defaults if the doc doesn't exist
@@ -87,7 +93,7 @@ service cloud.firestore {
          perm in get(/databases/$(database)/documents/role_permissions/$(getUserRole())).data.get('permissions', [])) ||
         // Fallback for orders
         ((perm == 'view_orders' || perm == 'menu_orders_view' || perm == 'menu_orders') && 
-          (getUserRole() in ['SalesManager', 'SalesStaff', 'ChiefAccountant', 'AccountantStaff', 'Accountant', 'TechnicalManager', 'TechnicalStaff', 'GeneralStaff', 'Staff', 'HR', 'HRStaff', 'HRManager', 'NhanSu', 'Nhân sự'] || 
+          (getUserRole().lower() in ['salesmanager', 'salesstaff', 'chiefaccountant', 'accountantstaff', 'accountant', 'technicalmanager', 'technicalstaff', 'generalstaff', 'staff', 'hr', 'hrstaff', 'hrmanager', 'nhansu', 'nhân sự'] || 
            isManagerRole(getUserRole()) || isStaffRole(getUserRole()) || isAccountantRole(getUserRole()) || isHRRole(getUserRole()))) ||
         (perm == 'approve_orders' && (getUserRole() == 'SalesManager' || isManagerRole(getUserRole()))) ||
         

@@ -140,6 +140,7 @@ const HR_MENUS = [
   'menu_payroll_view',
   'menu_tasks_view', 'menu_tasks_edit',
   'menu_proposals_view', 'menu_proposals_edit',
+  'menu_orders_view', 'menu_orders_edit',
   'menu_settings_view'
 ];
 
@@ -332,6 +333,21 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'view_users', 'manage_users', 'view_attendance', 'manage_attendance', 'approve_leave_requests', 'view_salaries', 'manage_salaries',
     'view_tasks', 'manage_tasks',
     'view_storage', 'manage_storage',
+    'view_orders',
+    ...HR_MENUS
+  ],
+  NhanSu: [
+    'view_users', 'manage_users', 'view_attendance', 'manage_attendance', 'approve_leave_requests', 'view_salaries', 'manage_salaries',
+    'view_tasks', 'manage_tasks',
+    'view_storage', 'manage_storage',
+    'view_orders',
+    ...HR_MENUS
+  ],
+  'Nhân sự': [
+    'view_users', 'manage_users', 'view_attendance', 'manage_attendance', 'approve_leave_requests', 'view_salaries', 'manage_salaries',
+    'view_tasks', 'manage_tasks',
+    'view_storage', 'manage_storage',
+    'view_orders',
     ...HR_MENUS
   ],
   Staff: [
@@ -623,18 +639,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [user]);
 
-  const role = appUser?.roleId || 'Staff';
-  
+  const role = (appUser?.roleId || 'Staff');
+  const roleLower = role.toLowerCase();
+
   const hasPermission = (permissionId: string): boolean => {
-    const isSuperUser = user?.email === 'info.vinasglobal@gmail.com' || role === 'SuperAdmin';
+    const isSuperUser = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || roleLower === 'superadmin' || roleLower === 'admin';
     if (isSuperUser) return true;
     
     const checkUserPermission = (permId: string): boolean => {
       if (rolePermissions[role]) {
         return rolePermissions[role].includes(permId);
       }
+      if (rolePermissions[roleLower]) {
+        return rolePermissions[roleLower].includes(permId);
+      }
       
-      const defaults = DEFAULT_ROLE_PERMISSIONS[role as UserRole];
+      const defaults = DEFAULT_ROLE_PERMISSIONS[role as UserRole] || DEFAULT_ROLE_PERMISSIONS[roleLower as UserRole];
       if (defaults) {
         return defaults.includes(permId);
       }
@@ -665,16 +685,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
-  const isSuperAdmin = user?.email === 'info.vinasglobal@gmail.com' || role === 'SuperAdmin';
+  const isSuperAdmin = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || roleLower === 'superadmin' || roleLower === 'admin';
   // Admin is SuperAdmin, Director, or anyone with manage_users
-  const isAdmin = isSuperAdmin || role === 'Director' || role === 'ViceDirector' || hasPermission('manage_users');
+  const isAdmin = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || hasPermission('manage_users');
   // Director has top administrative authority or isDirector role directly
-  const isDirector = isSuperAdmin || role === 'Director' || role === 'ViceDirector';
+  const isDirector = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector';
   
-  const isManager = role === 'Manager' || role === 'GeneralManager' || role === 'HRManager' || role === 'ChiefAccountant' || role === 'SalesManager' || role === 'TechnicalManager' || role.endsWith('_Manager') || role === 'ketoantruong' || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn';
-  const isAccountant = role === 'Accountant' || role === 'ChiefAccountant' || role === 'AccountantStaff' || role.endsWith('_Accountant') || role === 'ketoantruong' || role === 'ketoan' || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn';
-  const isHR = role === 'HR' || role === 'HRManager' || role === 'HRStaff' || role.endsWith('_HR') || hasPermission('manage_users');
-  const isGeneral = role === 'GeneralManager' || role === 'GeneralStaff' || appUser?.departmentId === 'phong-tong-hop' || role.includes('General') || (appUser?.departmentName || '').toLowerCase().includes('tổng hợp');
+  const isManager = roleLower === 'manager' || roleLower === 'generalmanager' || roleLower === 'hrmanager' || roleLower === 'chiefaccountant' || roleLower === 'salesmanager' || roleLower === 'technicalmanager' || roleLower.endsWith('_manager') || roleLower === 'ketoantruong' || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn';
+  const isAccountant = roleLower === 'accountant' || roleLower === 'chiefaccountant' || roleLower === 'accountantstaff' || roleLower.endsWith('_accountant') || roleLower === 'ketoantruong' || roleLower === 'ketoan' || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn';
+  const isHR = roleLower === 'hr' || roleLower === 'hrmanager' || roleLower === 'hrstaff' || roleLower === 'nhansu' || roleLower === 'nhân sự' || roleLower.endsWith('_hr') || roleLower.endsWith('_nhansu') || hasPermission('manage_users');
+  const isGeneral = roleLower === 'generalmanager' || roleLower === 'generalstaff' || appUser?.departmentId === 'phong-tong-hop' || roleLower.includes('general') || (appUser?.departmentName || '').toLowerCase().includes('tổng hợp');
   
   const canViewSalaries = isSuperAdmin || isDirector || hasPermission('view_salaries') || hasPermission('manage_users') || hasPermission('view_financial_reports') || user?.email === 'tuyetmai@thalex.vn';
   const canEditSalaries = isSuperAdmin || isDirector || hasPermission('manage_salaries') || hasPermission('manage_users');

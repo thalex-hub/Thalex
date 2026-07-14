@@ -79,6 +79,8 @@ service cloud.firestore {
     // Read permission for user's role from role_permissions, falling back to standard defaults if the doc doesn't exist
     function hasPermission(perm) {
       return isSignedIn() && existsUserDoc() && (
+        (exists(/databases/$(database)/documents/role_permissions/$(getUserRole())) && 
+         perm in get(/databases/$(database)/documents/role_permissions/$(getUserRole())).data.get('permissions', [])) ||
         // Fallback for orders
         ((perm == 'view_orders' || perm == 'menu_orders_view' || perm == 'menu_orders') && 
           (getUserRole() in ['SalesManager', 'SalesStaff', 'ChiefAccountant', 'AccountantStaff', 'Accountant', 'TechnicalManager', 'TechnicalStaff', 'GeneralStaff', 'Staff'] || 
@@ -135,8 +137,9 @@ service cloud.firestore {
 
     function isDirector() { 
       return isSignedIn() && (
-        request.auth.token.email.lower() == 'thangcd11@gmail.com'.lower() || 
-        request.auth.token.email.lower() == 'info.vinasglobal@gmail.com'.lower() || 
+        request.auth.uid == 'vnN51rJHpdgaHtEaeCf5gxJrqLu2' ||
+        ('email' in request.auth.token && request.auth.token.email.lower() == 'thangcd11@gmail.com'.lower()) || 
+        ('email' in request.auth.token && request.auth.token.email.lower() == 'info.vinasglobal@gmail.com'.lower()) || 
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (existsUserDoc() && isDirectorRole(getUserRole()))
       );

@@ -52,10 +52,10 @@ export default function OrderProposals() {
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
   const [customers, setCustomers] = React.useState<any[]>([]);
   const [showGuide, setShowGuide] = React.useState(true);
-  const { appUser, isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user, isSuperAdmin } = useAuth();
+  const { appUser, isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user, isSuperAdmin, hasPermission } = useAuth();
   const location = useLocation();
-  const hasViewOrdersPerm = appUser?.permissions?.includes('view_orders') || 
-                            appUser?.permissions?.includes('menu_orders_view');
+  const hasViewOrdersPerm = hasPermission('view_orders') || 
+                            hasPermission('menu_orders_view');
 
   const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR || hasViewOrdersPerm;
 

@@ -53,37 +53,37 @@ service cloud.firestore {
 
     function isDirectorRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector'];
+      return r in ['superadmin', 'director', 'vicedirector', 'tổng giám đốc', 'phó tổng giám đốc', 'giám đốc'];
     }
 
     function isManagerRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'manager', 'generalmanager', 'hrmanager', 'chiefaccountant', 'salesmanager', 'technicalmanager', 'ketoantruong'] || 
-             r.matches('.*_manager');
+      return r in ['superadmin', 'director', 'vicedirector', 'manager', 'generalmanager', 'hrmanager', 'chiefaccountant', 'salesmanager', 'technicalmanager', 'ketoantruong', 'trưởng phòng', 'quản lý'] || 
+             r.matches('.*_manager') || r.matches('.*trưởng phòng.*') || r.matches('.*quản lý.*');
     }
 
     function isAccountantRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'ketoantruong', 'ketoan'] || 
-             r.matches('.*_accountant');
+      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'ketoantruong', 'ketoan', 'kế toán', 'kế toán trưởng'] || 
+             r.matches('.*_accountant') || r.matches('.*kế toán.*');
     }
 
     function isHRRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'hrmanager', 'hr', 'hrstaff', 'nhansu', 'nhân sự'] || 
-             r.matches('.*_hr') || r.matches('.*_nhansu');
+      return r in ['superadmin', 'director', 'vicedirector', 'hrmanager', 'hr', 'hrstaff', 'nhansu', 'nhân sự', 'phòng nhân sự', 'nhân viên nhân sự'] || 
+             r.matches('.*_hr') || r.matches('.*_nhansu') || r.matches('.*nhân sự.*');
     }
 
     function isFinanceStaffRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'generalmanager', 'manager'] || 
-             r.matches('.*_accountant');
+      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'generalmanager', 'manager', 'kế toán'] || 
+             r.matches('.*_accountant') || r.matches('.*kế toán.*');
     }
 
     function isStaffRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'salesstaff', 'accountantstaff', 'technicalstaff', 'generalstaff', 'staff', 'hrstaff', 'hr', 'nhansu', 'nhân sự'] || 
-             r.matches('.*_staff') || r.matches('.*_hr') || r.matches('.*_nhansu');
+      return r in ['superadmin', 'director', 'vicedirector', 'salesstaff', 'accountantstaff', 'technicalstaff', 'generalstaff', 'staff', 'hrstaff', 'hr', 'nhansu', 'nhân sự', 'nhân viên'] || 
+             r.matches('.*_staff') || r.matches('.*_hr') || r.matches('.*_nhansu') || r.matches('.*nhân sự.*') || r.matches('.*nhân viên.*');
     }
 
     // Read permission for user's role from role_permissions, falling back to standard defaults if the doc doesn't exist
@@ -135,6 +135,7 @@ service cloud.firestore {
       return isSignedIn() && (
         request.auth.token.email.lower() == 'thangcd11@gmail.com'.lower() || 
         request.auth.token.email.lower() == 'info.vinasglobal@gmail.com'.lower() || 
+        request.auth.token.email.lower() == 'vietnhan@thalex.vn'.lower() || 
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (existsUserDoc() && (
           isDirectorRole(getUserRole()) || 
@@ -150,6 +151,7 @@ service cloud.firestore {
         request.auth.uid == 'vnN51rJHpdgaHtEaeCf5gxJrqLu2' ||
         ('email' in request.auth.token && request.auth.token.email.lower() == 'thangcd11@gmail.com'.lower()) || 
         ('email' in request.auth.token && request.auth.token.email.lower() == 'info.vinasglobal@gmail.com'.lower()) || 
+        ('email' in request.auth.token && request.auth.token.email.lower() == 'vietnhan@thalex.vn'.lower()) || 
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (existsUserDoc() && isDirectorRole(getUserRole()))
       );

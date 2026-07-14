@@ -208,12 +208,14 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'view_users', 'manage_users', 'manage_labor_contracts', 'view_attendance', 'manage_attendance', 'approve_leave_requests', 'view_salaries', 'manage_salaries',
     'view_tasks', 'manage_tasks',
     'view_storage', 'manage_storage',
+    'view_orders',
     ...HR_MENUS
   ],
   HRStaff: [
     'view_users', 'manage_labor_contracts', 'view_attendance', 'manage_attendance',
     'view_tasks',
     'view_storage',
+    'view_orders',
     ...HR_MENUS
   ],
   ChiefAccountant: [
@@ -330,6 +332,20 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     ...LEADING_ACCOUNTANT_MENUS
   ],
   HR: [
+    'view_users', 'manage_users', 'view_attendance', 'manage_attendance', 'approve_leave_requests', 'view_salaries', 'manage_salaries',
+    'view_tasks', 'manage_tasks',
+    'view_storage', 'manage_storage',
+    'view_orders',
+    ...HR_MENUS
+  ],
+  nhansu: [
+    'view_users', 'manage_users', 'view_attendance', 'manage_attendance', 'approve_leave_requests', 'view_salaries', 'manage_salaries',
+    'view_tasks', 'manage_tasks',
+    'view_storage', 'manage_storage',
+    'view_orders',
+    ...HR_MENUS
+  ],
+  'nhân sự': [
     'view_users', 'manage_users', 'view_attendance', 'manage_attendance', 'approve_leave_requests', 'view_salaries', 'manage_salaries',
     'view_tasks', 'manage_tasks',
     'view_storage', 'manage_storage',

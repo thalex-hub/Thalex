@@ -176,8 +176,11 @@ export default function OrderProposals() {
     warranty
   } = calculateFinancials(newProposal);
 
+  const [error, setError] = React.useState<string | null>(null);
+
   React.useEffect(() => {
     if (!user) return;
+    setError(null);
 
     const unsubCustomers = onSnapshot(collection(db, 'customers'), (snap) => {
       setCustomers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -204,8 +207,10 @@ export default function OrderProposals() {
       const q = query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'));
       unsubProposals = onSnapshot(q, (snap) => {
         setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setError(null);
       }, (err) => {
         handleFirestoreError(err, OperationType.LIST, 'order_proposals');
+        setError("Không có quyền xem dữ liệu hoặc lỗi kết nối.");
         setProposals([]);
       });
     } else {
@@ -237,7 +242,11 @@ export default function OrderProposals() {
       const unsub1 = onSnapshot(q1, (snap) => {
         listCreated = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         combineAndSortProposals();
-      }, (err) => handleFirestoreError(err, OperationType.LIST, 'order_proposals/createdBy'));
+        setError(null);
+      }, (err) => {
+        handleFirestoreError(err, OperationType.LIST, 'order_proposals/createdBy');
+        setError("Lỗi khi tải dữ liệu của bạn.");
+      });
 
       let unsubLegacy1 = () => {};
       if (appUser?.legacyId) {
@@ -905,7 +914,14 @@ export default function OrderProposals() {
         </div>
 
         <AnimatePresence initial={false}>
-          {showGuide && (
+          {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-3">
+          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+          <p className="text-sm font-medium">{error}</p>
+        </div>
+      )}
+
+      {showGuide && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}

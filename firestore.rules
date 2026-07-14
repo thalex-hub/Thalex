@@ -40,11 +40,15 @@ service cloud.firestore {
     }
 
     function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('roleId', 'Staff');
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('roleId', 'Staff')
+        : 'Staff';
     }
 
     function getUserLegacyId() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('legacyId', '');
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('legacyId', '')
+        : '';
     }
 
     function isDirectorRole(role) {
@@ -62,8 +66,8 @@ service cloud.firestore {
     }
 
     function isHRRole(role) {
-      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'HRManager', 'HR', 'HRStaff'] || 
-             role.matches('.*_HR');
+      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'HRManager', 'HR', 'HRStaff', 'NhanSu', 'Nhân sự'] || 
+             role.matches('.*_HR') || role.matches('.*_NhanSu');
     }
 
     function isFinanceStaffRole(role) {
@@ -72,18 +76,18 @@ service cloud.firestore {
     }
 
     function isStaffRole(role) {
-      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'SalesStaff', 'AccountantStaff', 'TechnicalStaff', 'GeneralStaff', 'Staff', 'HRStaff', 'HR'] || 
-             role.matches('.*_Staff') || role.matches('.*_HR');
+      return role in ['SuperAdmin', 'Director', 'ViceDirector', 'SalesStaff', 'AccountantStaff', 'TechnicalStaff', 'GeneralStaff', 'Staff', 'HRStaff', 'HR', 'NhanSu', 'Nhân sự'] || 
+             role.matches('.*_Staff') || role.matches('.*_HR') || role.matches('.*_NhanSu');
     }
 
     // Read permission for user's role from role_permissions, falling back to standard defaults if the doc doesn't exist
     function hasPermission(perm) {
-      return isSignedIn() && existsUserDoc() && (
-        (exists(/databases/$(database)/documents/role_permissions/$(getUserRole())) && 
+      return isSignedIn() && (
+        (existsUserDoc() && exists(/databases/$(database)/documents/role_permissions/$(getUserRole())) && 
          perm in get(/databases/$(database)/documents/role_permissions/$(getUserRole())).data.get('permissions', [])) ||
         // Fallback for orders
         ((perm == 'view_orders' || perm == 'menu_orders_view' || perm == 'menu_orders') && 
-          (getUserRole() in ['SalesManager', 'SalesStaff', 'ChiefAccountant', 'AccountantStaff', 'Accountant', 'TechnicalManager', 'TechnicalStaff', 'GeneralStaff', 'Staff', 'HR', 'HRStaff', 'HRManager'] || 
+          (getUserRole() in ['SalesManager', 'SalesStaff', 'ChiefAccountant', 'AccountantStaff', 'Accountant', 'TechnicalManager', 'TechnicalStaff', 'GeneralStaff', 'Staff', 'HR', 'HRStaff', 'HRManager', 'NhanSu', 'Nhân sự'] || 
            isManagerRole(getUserRole()) || isStaffRole(getUserRole()) || isAccountantRole(getUserRole()) || isHRRole(getUserRole()))) ||
         (perm == 'approve_orders' && (getUserRole() == 'SalesManager' || isManagerRole(getUserRole()))) ||
         

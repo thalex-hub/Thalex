@@ -4,7 +4,7 @@ import fs from "fs";
 
 const config = JSON.parse(fs.readFileSync("firebase-applet-config.json", "utf8"));
 const app = initializeApp(config);
-const db = getFirestore(app);
+const db = getFirestore(app, config.firestoreDatabaseId || "(default)");
 
 async function run() {
   const users = await getDocs(query(collection(db, "users"), where("email", "==", "vietnhan@thalex.vn")));

@@ -1,7 +1,8 @@
 import admin from 'firebase-admin';
 
 const app = admin.initializeApp({
-  projectId: "gen-lang-client-0900315510"
+  projectId: "gen-lang-client-0900315510",
+  credential: admin.credential.applicationDefault()
 });
 const db = admin.firestore(app);
 db.settings({ databaseId: "ai-studio-6bab7731-3b08-4fdc-8b7d-051f569a2dc7" });

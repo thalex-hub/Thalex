@@ -274,40 +274,24 @@ service cloud.firestore {
 
     // Order Proposals
     match /order_proposals/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
-                   hasPermission('view_orders') || hasPermission('menu_orders_view') ||
-                   (isSignedIn() && request.auth.uid in resource.data.followers) ||
-                   (isSignedIn() && resource.data.createdBy == request.auth.uid);
-      allow create: if isSignedIn();
-      allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
-                   hasPermission('approve_orders') || hasPermission('menu_orders_edit');
-      allow delete: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing());
-    }
-    
-    // Orders
-    match /orders/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || 
-                   hasPermission('view_orders') || hasPermission('menu_orders_view') || hasPermission('menu_orders') || hasPermission('view_salaries') ||
+      allow read: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() ||
+                    hasPermission('view_orders') || hasPermission('menu_orders_view') ||
                    (isSignedIn() && (
-                     (resource.data.responsibleUserId == request.auth.uid) || 
-                     (existsUserDoc() && resource.data.responsibleUserId == getUserLegacyId()) ||
-                     request.auth.uid in resource.data.followers ||
-                     (existsUserDoc() && getUserLegacyId() in resource.data.followers) ||
-                     (resource.data.customerId == request.auth.uid)
+                     (resource.data.get('createdBy', '') == request.auth.uid) || 
+                     (existsUserDoc() && resource.data.get('createdBy', '') == getUserLegacyId()) ||
+                     (request.auth.uid in resource.data.get('followers', [])) ||
+                     (existsUserDoc() && getUserLegacyId() in resource.data.get('followers', []))
                    ));
-      allow create: if isDirector() || isHR() || isFinanceStaff() || hasPermission('create_orders') || hasPermission('menu_orders_edit');
-      allow update: if isDirector() || isHR() || isFinanceStaff() || hasPermission('edit_orders') || hasPermission('menu_orders_edit') ||
-                    (isSignedIn() && (
-                     (resource.data.responsibleUserId == request.auth.uid) || 
-                     (existsUserDoc() && resource.data.responsibleUserId == getUserLegacyId()) ||
-                     request.auth.uid in resource.data.followers ||
-                     (existsUserDoc() && getUserLegacyId() in resource.data.followers)
-                    ));
-      allow delete: if isDirector() || hasPermission('delete_orders');
-      
-      match /comments/{commentId} {
-        allow read, write: if isSignedIn();
-      }
+      allow create: if isSignedIn();
+      allow update: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() ||
+                    hasPermission('approve_orders') || hasPermission('menu_orders_edit') ||
+                   (isSignedIn() && (
+                     (resource.data.get('createdBy', '') == request.auth.uid) || 
+                     (existsUserDoc() && resource.data.get('createdBy', '') == getUserLegacyId()) ||
+                     (request.auth.uid in resource.data.get('followers', [])) ||
+                     (existsUserDoc() && getUserLegacyId() in resource.data.get('followers', []))
+                   ));
+      allow delete: if isDirector() || isHR() || isFinanceStaff();
     }
     // Payments
     match /payments/{id} {

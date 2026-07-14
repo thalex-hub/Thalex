@@ -55,8 +55,7 @@ export default function OrderProposals() {
   const { appUser, isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user, isSuperAdmin } = useAuth();
   const location = useLocation();
   const hasViewOrdersPerm = appUser?.permissions?.includes('view_orders') || 
-                            appUser?.permissions?.includes('menu_orders_view') || 
-                            ['SalesManager', 'SalesStaff', 'ChiefAccountant', 'AccountantStaff', 'Accountant', 'TechnicalManager', 'TechnicalStaff', 'GeneralStaff', 'Staff'].includes(appUser?.roleId || '');
+                            appUser?.permissions?.includes('menu_orders_view');
 
   const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR || hasViewOrdersPerm;
 

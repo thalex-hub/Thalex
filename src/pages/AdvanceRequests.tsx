@@ -1151,27 +1151,47 @@ export default function AdvanceRequests() {
                    <>
                      <button
                        onClick={async () => {
-                         const note = prompt('Ghi chú (bắt buộc/tùy chọn):') || '';
-                         // Action 'approve_finance' in AdvanceRequests represents accountant verify/approve
                          await handleApprove(showDetailModal.id, 'approve_finance');
                          setShowDetailModal(null);
                          setSearchParams({});
                        }}
                        className="flex-1 flex items-center justify-center gap-2 py-4 bg-green-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-green-700 transition-colors shadow-lg"
                      >
-                       Thẩm định OK
+                       <CheckCircle size={16} /> Thẩm định OK
                      </button>
                      <button
                        onClick={async () => {
-                         if (window.confirm('Từ chối yêu cầu tạm ứng này?')) {
-                           await handleApprove(showDetailModal.id, 'reject');
-                           setShowDetailModal(null);
-                           setSearchParams({});
-                         }
+                         await handleApprove(showDetailModal.id, 'reject');
+                         setShowDetailModal(null);
+                         setSearchParams({});
                        }}
-                       className="flex-1 flex items-center justify-center gap-2 py-4 bg-red-650 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-colors shadow-lg"
+                       className="flex-1 flex items-center justify-center gap-2 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-colors shadow-lg"
                      >
-                       Từ chối
+                       <XCircle size={16} /> Từ chối
+                     </button>
+                   </>
+                 )}
+                 {canApprove && showDetailModal.status === 'pending_director' && (
+                   <>
+                     <button
+                       onClick={async () => {
+                         await handleApprove(showDetailModal.id, 'approve_director');
+                         setShowDetailModal(null);
+                         setSearchParams({});
+                       }}
+                       className="flex-1 flex items-center justify-center gap-2 py-4 bg-green-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-green-700 transition-colors shadow-lg"
+                     >
+                       <CheckCircle size={16} /> Phê duyệt
+                     </button>
+                     <button
+                       onClick={async () => {
+                         await handleApprove(showDetailModal.id, 'reject');
+                         setShowDetailModal(null);
+                         setSearchParams({});
+                       }}
+                       className="flex-1 flex items-center justify-center gap-2 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-colors shadow-lg"
+                     >
+                       <XCircle size={16} /> Từ chối
                      </button>
                    </>
                  )}
@@ -1297,68 +1317,6 @@ export default function AdvanceRequests() {
                   className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-colors uppercase tracking-wider text-xs"
                 >
                   Xác nhận Xóa
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {rejectingRequest && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }} 
-              onClick={() => setRejectingRequest(null)} 
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }} 
-              animate={{ opacity: 1, scale: 1 }} 
-              exit={{ opacity: 0, scale: 0.95 }} 
-              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 overflow-hidden"
-            >
-              <div className="flex flex-col items-center text-center mb-6">
-                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
-                  <XCircle size={32} />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Lý do từ chối</h3>
-                <p className="text-gray-500 text-sm mb-4">
-                  Vui lòng cung cấp lý do bạn từ chối yêu cầu tạm ứng này.
-                </p>
-                <textarea
-                  value={rejectionReasonInput}
-                  onChange={(e) => setRejectionReasonInput(e.target.value)}
-                  placeholder="Nhập lý do từ chối tại đây..."
-                  className="w-full h-32 px-4 py-3 rounded-2xl border-2 border-gray-100 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all outline-none resize-none text-sm"
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => setRejectingRequest(null)} 
-                  className="flex-1 py-3 border border-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors uppercase tracking-wider text-xs"
-                >
-                  Hủy bỏ
-                </button>
-                <button 
-                  type="button" 
-                  onClick={async () => {
-                    const req = rejectingRequest;
-                    const reason = rejectionReasonInput;
-                    if (!reason.trim()) {
-                      alert("Bạn phải nhập lý do khi từ chối!");
-                      return;
-                    }
-                    setRejectingRequest(null);
-                    await handleApprove(req.id, 'reject', reason);
-                  }} 
-                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-colors uppercase tracking-wider text-xs"
-                >
-                  Xác nhận Từ chối
                 </button>
               </div>
             </motion.div>

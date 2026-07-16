@@ -68,8 +68,14 @@ export default function ProposalsOverview() {
        if (p.colRef === 'leave_requests' && (p.status === 'pending' || !p.status) && p.approvalLevel === 'department' && p.departmentId === appUser?.departmentId) return true;
     }
     
+    // 4. HR Actionable items
+    if (isHR) {
+      if (p.colRef === 'leave_requests' && (p.status === 'pending' || !p.status)) return true;
+      if (p.colRef === 'order_proposals' && (p.status === 'pending' || !p.status)) return true;
+    }
+    
     return false;
-  }, [isAdmin, isDirector, isFinanceStaff, isAccountant, isManager, appUser]);
+  }, [isAdmin, isDirector, isFinanceStaff, isAccountant, isManager, isHR, appUser]);
 
   React.useEffect(() => {
     if (!user) return;
@@ -80,7 +86,7 @@ export default function ProposalsOverview() {
 
     collections.forEach((colName) => {
       const showAllThisType = isAdmin || isDirector || 
-                             (isHR && colName === 'leave_requests') || 
+                             (isHR && (colName === 'leave_requests' || colName === 'order_proposals')) || 
                              (isAccountant && ['payment_requests', 'advance_requests', 'reimbursement_requests', 'order_proposals'].includes(colName));
 
       const processSnapshots = (docsLists: any[][]) => {

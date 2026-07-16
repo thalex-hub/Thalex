@@ -69,7 +69,7 @@ interface Warehouse {
 }
 
 export default function WarehouseManagement() {
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, isHR, isAccountant } = useAuth();
   const [inventory, setInventory] = React.useState<InventoryItem[]>([]);
   const [stockItems, setStockItems] = React.useState<StockItem[]>([]);
   const [products, setProducts] = React.useState<Product[]>([]);
@@ -100,7 +100,7 @@ export default function WarehouseManagement() {
     // Basic bootstrap for warehouses if empty
     const bootstrapWarehouses = async () => {
       const snap = await getDocs(collection(db, 'warehouses'));
-      if (snap.empty && (isAdmin || isManager)) {
+      if (snap.empty && (isAdmin || isManager || isHR || isAccountant)) {
         await addDoc(collection(db, 'warehouses'), {
           name: 'Kho Chính',
           address: 'Hà Nội',
@@ -186,7 +186,7 @@ export default function WarehouseManagement() {
       unsubWarehouses();
       unsubTransactions();
     };
-  }, [isAdmin, isManager]);
+  }, [isAdmin, isManager, isHR, isAccountant]);
 
   const handleSaveWarehouse = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -426,7 +426,7 @@ export default function WarehouseManagement() {
             <History size={18} />
             Lịch sử giao dịch
           </Link>
-          {(isAdmin || isManager) && (
+          {(isAdmin || isManager || isHR || isAccountant) && (
             <>
               <button 
                 onClick={() => setShowWarehouseModal(true)}

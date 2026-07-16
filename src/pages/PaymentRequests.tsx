@@ -437,7 +437,7 @@ export default function PaymentRequests() {
           action,
           userName: appUser?.fullName || user?.displayName || 'Thành viên',
           timestamp: new Date().toISOString(),
-          note: rejectionReason || note || ''
+          note: rejectionReason || ''
       };
 
       const updatePayload: any = {

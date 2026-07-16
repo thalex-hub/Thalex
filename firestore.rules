@@ -383,7 +383,7 @@ service cloud.firestore {
     match /stock_transactions/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('view_warehouse') || hasPermission('manage_warehouse');
       allow create: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('manage_warehouse');
-      allow update: if isDirector() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('manage_warehouse');
+      allow update: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('manage_warehouse');
       allow delete: if isDirector();
     }
     match /stock_items/{id} { allow read: if isSignedIn(); allow write: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || hasPermission('manage_warehouse'); }

@@ -56,13 +56,35 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         
         // Update favicon if logo exists
         if (data.logo) {
-          let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-          if (!link) {
-            link = document.createElement('link');
-            link.rel = 'icon';
-            document.getElementsByTagName('head')[0].appendChild(link);
-          }
-          link.href = data.logo;
+          const updateFavicon = () => {
+            let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+            if (!link) {
+              link = document.createElement('link');
+              link.rel = 'icon';
+              document.head.appendChild(link);
+            }
+            
+            // If it's a data URI, we can try to specify the type
+            if (data.logo.startsWith('data:image/svg+xml')) {
+              link.type = 'image/svg+xml';
+            } else if (data.logo.startsWith('data:image/png')) {
+              link.type = 'image/png';
+            } else if (data.logo.startsWith('data:image/jpeg')) {
+              link.type = 'image/jpeg';
+            }
+            
+            link.href = data.logo;
+            
+            // Force browser to refresh favicon by removing and re-adding
+            const parent = link.parentNode;
+            if (parent) {
+              parent.removeChild(link);
+              parent.appendChild(link);
+            }
+          };
+          
+          // Small delay to ensure DOM is ready or previous updates finished
+          setTimeout(updateFavicon, 100);
         }
       }
       setLoading(false);

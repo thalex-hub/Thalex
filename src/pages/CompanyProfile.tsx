@@ -378,7 +378,8 @@ export default function CompanyProfile() {
                 </label>
               </div>
               <div className="text-center">
-                <p className="text-xs text-gray-400 mt-2">Định dạng: PNG, JPG, SVG (Tối đa 500KB)</p>
+                <p className="text-[10px] text-gray-500 mt-2 font-medium">Khuyên dùng ảnh hình vuông để hiển thị tốt nhất trên tab trình duyệt.</p>
+                <p className="text-xs text-gray-400 mt-1">Định dạng: PNG, JPG, SVG (Tối đa 500KB)</p>
                 {settings.logo && (
                   <button 
                     onClick={() => setSettings(prev => ({ ...prev, logo: '' }))}

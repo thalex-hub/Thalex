@@ -63,7 +63,7 @@ export default function OrderProposals() {
 
   // canSeeAll should only be true for roles that are meant to see EVERYTHING in the collection.
   // Standard staff should use the filtered queries below to avoid permission rejections on global reads.
-  const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR || isSuperAdmin;
+  const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR || isSuperAdmin || hasViewOrdersPerm;
 
   const [activeTab, setActiveTab] = React.useState<'pending' | 'approved' | 'cancelled'>('pending');
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -288,7 +288,7 @@ export default function OrderProposals() {
       unsubUsers();
       unsubProposals();
     };
-  }, [canSeeAll, user]);
+  }, [canSeeAll, user, appUser]);
 
   React.useEffect(() => {
     if (!user || !db || !canSeeAll) return;

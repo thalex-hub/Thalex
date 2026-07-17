@@ -39,7 +39,7 @@ export default function ProposalsOverview() {
   });
   const [allRecentProposals, setAllRecentProposals] = React.useState<any[]>([]);
   const [activeFilter, setActiveFilter] = React.useState<string>('all');
-  const { isAccountant, isHR, isAdmin, isManager, isDirector, user, appUser, isFinanceStaff } = useAuth();
+  const { isAccountant, isHR, isAdmin, isManager, isDirector, user, appUser, isFinanceStaff, hasPermission } = useAuth();
   
   // Defined roles for querying all
   const canSeeAllOverall = isAdmin || isDirector || isHR || isAccountant;
@@ -83,11 +83,13 @@ export default function ProposalsOverview() {
     const collections = ['leave_requests', 'advance_requests', 'payment_requests', 'order_proposals', 'reimbursement_requests'];
     const unsubscribes: any[] = [];
     const proposalSubsets: Record<string, any[]> = {};
+    const hasViewOrdersPerm = hasPermission('view_orders') || hasPermission('menu_orders_view');
 
     collections.forEach((colName) => {
       const showAllThisType = isAdmin || isDirector || 
                              (isHR && (colName === 'leave_requests' || colName === 'order_proposals')) || 
-                             (isAccountant && ['payment_requests', 'advance_requests', 'reimbursement_requests', 'order_proposals'].includes(colName));
+                             (isAccountant && ['payment_requests', 'advance_requests', 'reimbursement_requests', 'order_proposals'].includes(colName)) ||
+                             (hasViewOrdersPerm && colName === 'order_proposals');
 
       const processSnapshots = (docsLists: any[][]) => {
         const map = new Map();
@@ -135,7 +137,7 @@ export default function ProposalsOverview() {
     });
 
     return () => unsubscribes.forEach(u => u());
-  }, [user, isAdmin, isManager, isDirector, isAccountant, isHR, appUser]);
+  }, [user, isAdmin, isManager, isDirector, isAccountant, isHR, appUser, hasPermission]);
 
   const refinedProposals = React.useMemo(() => {
     let result = [...allRecentProposals];

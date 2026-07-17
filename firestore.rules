@@ -53,37 +53,37 @@ service cloud.firestore {
 
     function isDirectorRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'tổng giám đốc', 'phó tổng giám đốc', 'giám đốc'];
+      return r in ['superadmin', 'director', 'vicedirector', 'tổng giám đốc', 'phó tổng giám đốc', 'giám đốc', 'giám đốc điều hành', 'giám đốc tài chính', 'giám đốc kinh doanh'];
     }
 
     function isManagerRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'manager', 'generalmanager', 'hrmanager', 'chiefaccountant', 'salesmanager', 'technicalmanager', 'ketoantruong', 'trưởng phòng', 'quản lý'] || 
-             r.matches('.*_manager') || r.matches('.*trưởng phòng.*') || r.matches('.*quản lý.*');
+      return r in ['superadmin', 'director', 'vicedirector', 'manager', 'generalmanager', 'hrmanager', 'chiefaccountant', 'salesmanager', 'technicalmanager', 'ketoantruong', 'trưởng phòng', 'quản lý', 'phụ trách', 'điều hành'] || 
+             r.matches('.*_manager') || r.matches('.*trưởng phòng.*') || r.matches('.*quản lý.*') || r.matches('.*giám đốc.*');
     }
 
     function isAccountantRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'ketoantruong', 'ketoan', 'kế toán', 'kế toán trưởng'] || 
-             r.matches('.*_accountant') || r.matches('.*kế toán.*');
+      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'ketoantruong', 'ketoan', 'kế toán', 'kế toán trưởng', 'kế toán tổng hợp', 'kế toán thanh toán', 'kế toán viên', 'thủ quỹ'] || 
+             r.matches('.*_accountant') || r.matches('.*kế toán.*') || r.matches('.*thủ quỹ.*');
     }
 
     function isHRRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'hrmanager', 'hr', 'hrstaff', 'nhansu', 'nhân sự', 'phòng nhân sự', 'nhân viên nhân sự'] || 
-             r.matches('.*_hr') || r.matches('.*_nhansu') || r.matches('.*nhân sự.*');
+      return r in ['superadmin', 'director', 'vicedirector', 'hrmanager', 'hr', 'hrstaff', 'nhansu', 'nhân sự', 'phòng nhân sự', 'nhân viên nhân sự', 'hành chính', 'hành chính nhân sự'] || 
+             r.matches('.*_hr') || r.matches('.*_nhansu') || r.matches('.*nhân sự.*') || r.matches('.*hành chính.*');
     }
 
     function isFinanceStaffRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'generalmanager', 'manager', 'kế toán'] || 
-             r.matches('.*_accountant') || r.matches('.*kế toán.*');
+      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'generalmanager', 'manager', 'kế toán', 'tài chính'] || 
+             r.matches('.*_accountant') || r.matches('.*kế toán.*') || r.matches('.*tài chính.*');
     }
 
     function isStaffRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'salesstaff', 'accountantstaff', 'technicalstaff', 'generalstaff', 'staff', 'hrstaff', 'hr', 'nhansu', 'nhân sự', 'nhân viên'] || 
-             r.matches('.*_staff') || r.matches('.*_hr') || r.matches('.*_nhansu') || r.matches('.*nhân sự.*') || r.matches('.*nhân viên.*');
+      return r in ['superadmin', 'director', 'vicedirector', 'salesstaff', 'accountantstaff', 'technicalstaff', 'generalstaff', 'staff', 'hrstaff', 'hr', 'nhansu', 'nhân sự', 'nhân viên', 'kinh doanh', 'kỹ thuật', 'tạp vụ', 'bảo vệ', 'lái xe'] || 
+             r.matches('.*_staff') || r.matches('.*_hr') || r.matches('.*_nhansu') || r.matches('.*nhân sự.*') || r.matches('.*nhân viên.*') || r.matches('.*kinh doanh.*') || r.matches('.*kỹ thuật.*');
     }
 
     // Read permission for user's role from role_permissions, falling back to standard defaults if the doc doesn't exist

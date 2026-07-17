@@ -91,6 +91,8 @@ service cloud.firestore {
       return isSignedIn() && (
         (existsUserDoc() && exists(/databases/$(database)/documents/role_permissions/$(getUserRole())) && 
          perm in get(/databases/$(database)/documents/role_permissions/$(getUserRole())).data.get('permissions', [])) ||
+        // User-specific permission override
+        (existsUserDoc() && perm in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('permissions', [])) ||
         // Fallback for orders
         ((perm == 'view_orders' || perm == 'menu_orders_view' || perm == 'menu_orders') && 
           (getUserRole().lower() in ['salesmanager', 'salesstaff', 'chiefaccountant', 'accountantstaff', 'accountant', 'technicalmanager', 'technicalstaff', 'generalstaff', 'staff', 'hr', 'hrstaff', 'hrmanager', 'nhansu', 'nhân sự', 'sales', 'technical', 'accountant', 'kinh doanh', 'kỹ thuật'] || 
@@ -135,6 +137,7 @@ service cloud.firestore {
         request.auth.token.email.lower() == 'thangcd11@gmail.com'.lower() || 
         request.auth.token.email.lower() == 'info.vinasglobal@gmail.com'.lower() || 
         request.auth.token.email.lower() == 'vietnhan@thalex.vn'.lower() || 
+        request.auth.token.email.lower() == 'vietnhan@thalex.com.vn'.lower() || 
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (existsUserDoc() && (
           isDirectorRole(getUserRole()) || 
@@ -149,7 +152,7 @@ service cloud.firestore {
       let email = ('email' in request.auth.token) ? request.auth.token.email.lower() : '';
       return isSignedIn() && (
         request.auth.uid == 'vnN51rJHpdgaHtEaeCf5gxJrqLu2' ||
-        email in ['thangcd11@gmail.com', 'info.vinasglobal@gmail.com', 'vietnhan@thalex.vn', 'tuyetmai@thalex.vn', 'tuyetmai@thalex.com.vn'] || 
+        email in ['thangcd11@gmail.com', 'info.vinasglobal@gmail.com', 'vietnhan@thalex.vn', 'vietnhan@thalex.com.vn', 'tuyetmai@thalex.vn', 'tuyetmai@thalex.com.vn'] || 
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (existsUserDoc() && isDirectorRole(getUserRole()))
       );

@@ -495,11 +495,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const email = u.email || data.email || '';
               const expectedLegacyId = email ? email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
               
-              if (u.email === 'info.vinasglobal@gmail.com' && (data.accountStatus !== 'active' || data.roleId !== 'SuperAdmin' || !data.legacyId)) {
+              const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn';
+              
+              if (isSystemAdminEmail && (data.accountStatus !== 'active' || (u.email === 'info.vinasglobal@gmail.com' && data.roleId !== 'SuperAdmin') || !data.legacyId)) {
                 const refreshed = {
                   ...data,
                   accountStatus: 'active' as const,
-                  roleId: 'SuperAdmin' as const,
+                  roleId: (u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : (data.roleId || 'Director')) as any,
                   legacyId: expectedLegacyId,
                 };
                 setDoc(userRef, refreshed).catch(err => console.error("Self-heal write failed", err));
@@ -519,21 +521,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(data));
               }
             } else {
-              // User document not found. If superadmin, self-heal immediately!
-              if (u.email === 'info.vinasglobal@gmail.com') {
-                const expectedLegacyId = u.email ? u.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
-                const newUser = {
-                  uid: u.uid,
-                  fullName: 'Super Admin',
-                  email: u.email,
-                  avatar: `https://ui-avatars.com/api/?name=Super+Admin&background=random`,
-                  roleId: 'SuperAdmin',
-                  workStatus: 'official',
-                  accountStatus: 'active',
-                  legacyId: expectedLegacyId,
-                  createdAt: new Date().toISOString(),
-                };
-                setDoc(userRef, newUser).catch(err => console.error("Self-heal create failed", err));
+            // User document not found. If system admin, self-heal immediately!
+            const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn';
+            if (isSystemAdminEmail) {
+              const expectedLegacyId = u.email ? u.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
+              const newUser = {
+                uid: u.uid,
+                fullName: u.email === 'info.vinasglobal@gmail.com' ? 'Super Admin' : 'Nguyễn Việt Nhân',
+                email: u.email,
+                avatar: `https://ui-avatars.com/api/?name=${u.email === 'info.vinasglobal@gmail.com' ? 'Super+Admin' : 'Viet+Nhan'}&background=random`,
+                roleId: u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : 'Director',
+                workStatus: 'official',
+                accountStatus: 'active',
+                legacyId: expectedLegacyId,
+                createdAt: new Date().toISOString(),
+              };
+              setDoc(userRef, newUser).catch(err => console.error("Self-heal create failed", err));
                 setAppUser(newUser as any);
               } else {
                 if (u.email) {
@@ -707,10 +710,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const roleLower = role.toLowerCase();
 
   const hasPermission = (permissionId: string): boolean => {
-    const isSuperUser = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || roleLower === 'superadmin' || roleLower === 'admin';
+    const isSuperUser = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || roleLower === 'superadmin' || roleLower === 'admin';
     if (isSuperUser) return true;
     
+    // Check direct user permissions first
+    if (appUser?.permissions && appUser.permissions.includes(permissionId)) {
+      return true;
+    }
+
     const checkUserPermission = (permId: string): boolean => {
+      // Direct user permissions check as part of nested check
+      if (appUser?.permissions && appUser.permissions.includes(permId)) {
+        return true;
+      }
       if (rolePermissions[role]) {
         return rolePermissions[role].includes(permId);
       }
@@ -749,14 +761,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
-  const isSuperAdmin = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || roleLower === 'superadmin' || roleLower === 'admin';
+  const isSuperAdmin = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || roleLower === 'superadmin' || roleLower === 'admin';
   // Admin is SuperAdmin, Director, or anyone with manage_users
   const isAdmin = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || hasPermission('manage_users');
   // Director has top administrative authority or isDirector role directly
-  const isDirector = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector';
+  const isDirector = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn';
   
-  const isManager = roleLower === 'manager' || roleLower === 'generalmanager' || roleLower === 'hrmanager' || roleLower === 'chiefaccountant' || roleLower === 'salesmanager' || roleLower === 'technicalmanager' || roleLower.endsWith('_manager') || roleLower === 'ketoantruong' || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn';
-  const isAccountant = roleLower === 'accountant' || roleLower === 'chiefaccountant' || roleLower === 'accountantstaff' || roleLower.endsWith('_accountant') || roleLower === 'ketoantruong' || roleLower === 'ketoan' || roleLower === 'kế toán' || roleLower === 'kế toán trưởng' || roleLower.includes('kế toán') || roleLower.includes('thủ quỹ') || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn';
+  const isManager = roleLower === 'manager' || roleLower === 'generalmanager' || roleLower === 'hrmanager' || roleLower === 'chiefaccountant' || roleLower === 'salesmanager' || roleLower === 'technicalmanager' || roleLower.endsWith('_manager') || roleLower === 'ketoantruong' || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn';
+  const isAccountant = roleLower === 'accountant' || roleLower === 'chiefaccountant' || roleLower === 'accountantstaff' || roleLower.endsWith('_accountant') || roleLower === 'ketoantruong' || roleLower === 'ketoan' || roleLower === 'kế toán' || roleLower === 'kế toán trưởng' || roleLower.includes('kế toán') || roleLower.includes('thủ quỹ') || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn';
   const isHR = roleLower === 'hr' || roleLower === 'hrmanager' || roleLower === 'hrstaff' || roleLower === 'nhansu' || roleLower === 'nhân sự' || roleLower.includes('nhân sự') || roleLower.includes('hành chính') || roleLower.endsWith('_hr') || roleLower.endsWith('_nhansu') || hasPermission('manage_users');
   const isGeneral = roleLower === 'generalmanager' || roleLower === 'generalstaff' || appUser?.departmentId === 'phong-tong-hop' || roleLower.includes('general') || (appUser?.departmentName || '').toLowerCase().includes('tổng hợp');
   

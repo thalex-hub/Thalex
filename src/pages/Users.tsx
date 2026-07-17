@@ -7,7 +7,7 @@ import { cn, formatCurrencyInput, parseCurrencyInput, withTimeout } from '../lib
 import { AppUser } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { logActivity } from '../services/activityLogger';
-import { useAuth } from '../lib/authContext';
+import { useAuth, PERMISSIONS } from '../lib/authContext';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { format, differenceInDays, differenceInMonths, differenceInYears } from 'date-fns';
 import { exportToExcel } from '../lib/excel';
@@ -66,6 +66,7 @@ export default function Users() {
   const { isAdmin, isDirector, isHR, user: authUser, hasPermission } = useAuth();
   const canManage = isAdmin || isDirector || isHR;
   const canManageContracts = isDirector || hasPermission('manage_labor_contracts');
+  const canManagePermissions = isAdmin || isDirector;
   const [customRoleDepts, setCustomRoleDepts] = React.useState<string[]>([]);
   const [newDept, setNewDept] = React.useState({
     name: '',
@@ -302,6 +303,7 @@ export default function Users() {
         departmentId: editingUser.departmentId || '',
         positionId: editingUser.positionId || '',
         roleId: editingUser.roleId,
+        permissions: editingUser.permissions || [],
         accountStatus: editingUser.accountStatus,
         workStatus: editingUser.workStatus
       });
@@ -869,6 +871,37 @@ export default function Users() {
                       <label htmlFor="edit-needs-attendance" className="text-sm font-bold text-gray-700 cursor-pointer">Yêu cầu chấm công</label>
                     </div>
                   </div>
+
+                  {canManagePermissions && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold text-gray-400 uppercase">Quyền hạn bổ sung (Override)</label>
+                        <span className="text-[10px] text-gray-400 italic">Dùng để cấp thêm quyền ngoài vai trò mặc định</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-gray-50 p-4 rounded-3xl max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+                        {PERMISSIONS.map(perm => (
+                          <label key={perm.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-xl transition-all cursor-pointer group">
+                            <input 
+                              type="checkbox"
+                              className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                              checked={(editingUser.permissions || []).includes(perm.id)}
+                              onChange={e => {
+                                const current = editingUser.permissions || [];
+                                const next = e.target.checked 
+                                  ? [...current, perm.id]
+                                  : current.filter(id => id !== perm.id);
+                                setEditingUser({...editingUser, permissions: next});
+                              }}
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-[11px] font-bold text-gray-700 group-hover:text-purple-600 transition-colors">{perm.name}</span>
+                              <span className="text-[9px] text-gray-400">{perm.category}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {canManageContracts && (
                     <div>

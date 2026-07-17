@@ -63,7 +63,8 @@ export default function OrderProposals() {
 
   // canSeeAll should only be true for roles that are meant to see EVERYTHING in the collection.
   // Standard staff should use the filtered queries below to avoid permission rejections on global reads.
-  const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR || isSuperAdmin || hasViewOrdersPerm;
+  const canSeeAll = isAdmin || isDirector || isSuperAdmin;
+  const isSpecialStaff = isManager || isAccountant || isHR || isFinanceStaff || hasViewOrdersPerm;
 
   const [activeTab, setActiveTab] = React.useState<'pending' | 'approved' | 'cancelled'>('pending');
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -207,23 +208,33 @@ export default function OrderProposals() {
     }
     
     let unsubProposals = () => {};
+    
+    // For powerful roles, try global fetch first
     if (canSeeAll) {
       const q = query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'));
       unsubProposals = onSnapshot(q, (snap) => {
         setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setError(null);
       }, (err) => {
+        console.warn("Global order_proposals query failed, falling back to filtered queries:", err);
+        // If global fails (which shouldn't for Admin, but just in case), do nothing here 
+        // and let the component stay as is or we could trigger fallback.
+        // For now, if Admin fails, we show error.
         handleFirestoreError(err, OperationType.LIST, 'order_proposals');
-        setError("Không có quyền xem dữ liệu hoặc lỗi kết nối.");
-        setProposals([]);
+        setError("Lỗi khi tải toàn bộ dữ liệu. Đang thử tải dữ liệu liên quan...");
+        // Don't clear proposals yet, try fallback
       });
-    } else {
+    }
+
+    // For staff roles OR if we want to ensure we see our stuff even if global fails
+    if (!canSeeAll || isSpecialStaff) {
       // For non-admin/non-manager roles, split the compound OR + ORDER BY query to avoid composite index requirement.
       // This solves the blank page loading issue by executing independent simple queries and sorting in memory.
       let listCreated: any[] = [];
       let listLegacyCreated: any[] = [];
       let listFollowed: any[] = [];
       let listLegacyFollowed: any[] = [];
+      let listResponsible: any[] = [];
 
       const combineAndSortProposals = () => {
         const mergedMap = new Map();
@@ -231,26 +242,41 @@ export default function OrderProposals() {
         listLegacyCreated.forEach(item => mergedMap.set(item.id, item));
         listFollowed.forEach(item => mergedMap.set(item.id, item));
         listLegacyFollowed.forEach(item => mergedMap.set(item.id, item));
+        listResponsible.forEach(item => mergedMap.set(item.id, item));
+        
         const mergedList = Array.from(mergedMap.values());
         mergedList.sort((a, b) => {
           const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
           const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
           return tB - tA;
         });
-        setProposals(mergedList);
+        
+        // Only update if we have data or if the global one didn't already set data
+        setProposals(prev => {
+          if (mergedList.length === 0 && prev.length > 0 && canSeeAll) return prev;
+          return mergedList;
+        });
       };
 
       const q1 = query(collection(db, 'order_proposals'), where('createdBy', '==', user.uid));
       const q2 = query(collection(db, 'order_proposals'), where('followers', 'array-contains', user.uid));
+      const qResp = query(collection(db, 'order_proposals'), where('responsibleUserId', '==', user.uid));
 
       const unsub1 = onSnapshot(q1, (snap) => {
         listCreated = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         combineAndSortProposals();
         setError(null);
       }, (err) => {
-        handleFirestoreError(err, OperationType.LIST, 'order_proposals/createdBy');
-        setError("Lỗi khi tải dữ liệu của bạn.");
+        if (!canSeeAll) {
+           handleFirestoreError(err, OperationType.LIST, 'order_proposals/createdBy');
+           setError("Lỗi khi tải dữ liệu cá nhân.");
+        }
       });
+
+      const unsubResp = onSnapshot(qResp, (snap) => {
+        listResponsible = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        combineAndSortProposals();
+      }, (err) => !canSeeAll && handleFirestoreError(err, OperationType.LIST, 'order_proposals/responsible'));
 
       let unsubLegacy1 = () => {};
       if (appUser?.legacyId) {
@@ -258,13 +284,13 @@ export default function OrderProposals() {
         unsubLegacy1 = onSnapshot(qLegacy1, (snap) => {
           listLegacyCreated = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           combineAndSortProposals();
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'order_proposals/createdByLegacy'));
+        }, (err) => !canSeeAll && handleFirestoreError(err, OperationType.LIST, 'order_proposals/createdByLegacy'));
       }
 
       const unsub2 = onSnapshot(q2, (snap) => {
         listFollowed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         combineAndSortProposals();
-      }, (err) => handleFirestoreError(err, OperationType.LIST, 'order_proposals/followed'));
+      }, (err) => !canSeeAll && handleFirestoreError(err, OperationType.LIST, 'order_proposals/followed'));
 
       let unsubLegacy2 = () => {};
       if (appUser?.legacyId) {
@@ -272,11 +298,14 @@ export default function OrderProposals() {
         unsubLegacy2 = onSnapshot(qLegacy2, (snap) => {
           listLegacyFollowed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           combineAndSortProposals();
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'order_proposals/followedLegacy'));
+        }, (err) => !canSeeAll && handleFirestoreError(err, OperationType.LIST, 'order_proposals/followedLegacy'));
       }
 
+      const originalUnsubProposals = unsubProposals;
       unsubProposals = () => {
+        originalUnsubProposals();
         unsub1();
+        unsubResp();
         unsubLegacy1();
         unsub2();
         unsubLegacy2();

@@ -332,7 +332,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     ...LEADING_ACCOUNTANT_MENUS
   ],
   ketoan: [
-    'view_orders',
+    'view_orders', 'approve_orders',
     'view_advances', 'approve_advances', 'disburse_advances',
     'view_reimbursements', 'approve_reimbursements', 'disburse_reimbursements',
     'view_payment_requests', 'approve_payment_requests', 'disburse_payment_requests',
@@ -344,7 +344,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     ...LEADING_ACCOUNTANT_MENUS
   ],
   'kế toán': [
-    'view_orders',
+    'view_orders', 'approve_orders',
     'view_advances', 'approve_advances', 'disburse_advances',
     'view_reimbursements', 'approve_reimbursements', 'disburse_reimbursements',
     'view_payment_requests', 'approve_payment_requests', 'disburse_payment_requests',
@@ -356,7 +356,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     ...LEADING_ACCOUNTANT_MENUS
   ],
   ketoantruong: [
-    'view_orders',
+    'view_orders', 'approve_orders',
     'view_advances', 'approve_advances', 'disburse_advances',
     'view_reimbursements', 'approve_reimbursements', 'disburse_reimbursements',
     'view_payment_requests', 'approve_payment_requests', 'disburse_payment_requests',
@@ -368,7 +368,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     ...LEADING_ACCOUNTANT_MENUS
   ],
   'kế toán trưởng': [
-    'view_orders',
+    'view_orders', 'approve_orders',
     'view_advances', 'approve_advances', 'disburse_advances',
     'view_reimbursements', 'approve_reimbursements', 'disburse_reimbursements',
     'view_payment_requests', 'approve_payment_requests', 'disburse_payment_requests',
@@ -755,12 +755,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Director has top administrative authority or isDirector role directly
   const isDirector = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector';
   
-  const isManager = roleLower === 'manager' || roleLower === 'generalmanager' || roleLower === 'hrmanager' || roleLower === 'chiefaccountant' || roleLower === 'salesmanager' || roleLower === 'technicalmanager' || roleLower.endsWith('_manager') || roleLower === 'ketoantruong' || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn';
-  const isAccountant = roleLower === 'accountant' || roleLower === 'chiefaccountant' || roleLower === 'accountantstaff' || roleLower.endsWith('_accountant') || roleLower === 'ketoantruong' || roleLower === 'ketoan' || roleLower === 'kế toán' || roleLower === 'kế toán trưởng' || roleLower.includes('kế toán') || roleLower.includes('thủ quỹ') || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn';
+  const isManager = roleLower === 'manager' || roleLower === 'generalmanager' || roleLower === 'hrmanager' || roleLower === 'chiefaccountant' || roleLower === 'salesmanager' || roleLower === 'technicalmanager' || roleLower.endsWith('_manager') || roleLower === 'ketoantruong' || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn';
+  const isAccountant = roleLower === 'accountant' || roleLower === 'chiefaccountant' || roleLower === 'accountantstaff' || roleLower.endsWith('_accountant') || roleLower === 'ketoantruong' || roleLower === 'ketoan' || roleLower === 'kế toán' || roleLower === 'kế toán trưởng' || roleLower.includes('kế toán') || roleLower.includes('thủ quỹ') || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn';
   const isHR = roleLower === 'hr' || roleLower === 'hrmanager' || roleLower === 'hrstaff' || roleLower === 'nhansu' || roleLower === 'nhân sự' || roleLower.includes('nhân sự') || roleLower.includes('hành chính') || roleLower.endsWith('_hr') || roleLower.endsWith('_nhansu') || hasPermission('manage_users');
   const isGeneral = roleLower === 'generalmanager' || roleLower === 'generalstaff' || appUser?.departmentId === 'phong-tong-hop' || roleLower.includes('general') || (appUser?.departmentName || '').toLowerCase().includes('tổng hợp');
   
-  const canViewSalaries = isSuperAdmin || isDirector || hasPermission('view_salaries') || hasPermission('manage_users') || hasPermission('view_financial_reports') || user?.email === 'tuyetmai@thalex.vn';
+  const canViewSalaries = isSuperAdmin || isDirector || hasPermission('view_salaries') || hasPermission('manage_users') || hasPermission('view_financial_reports') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn';
   const canEditSalaries = isSuperAdmin || isDirector || hasPermission('manage_salaries') || hasPermission('manage_users');
   const isFinanceStaff = isSuperAdmin || isDirector || isAccountant || hasPermission('manage_cashflow') || hasPermission('view_cashflow');
   const isLeader = isAdmin || isManager || isHR || hasPermission('approve_leave_requests');

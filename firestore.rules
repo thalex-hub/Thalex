@@ -146,22 +146,25 @@ service cloud.firestore {
     }
 
     function isDirector() { 
+      let email = ('email' in request.auth.token) ? request.auth.token.email.lower() : '';
       return isSignedIn() && (
         request.auth.uid == 'vnN51rJHpdgaHtEaeCf5gxJrqLu2' ||
-        ('email' in request.auth.token && request.auth.token.email.lower() == 'thangcd11@gmail.com'.lower()) || 
-        ('email' in request.auth.token && request.auth.token.email.lower() == 'info.vinasglobal@gmail.com'.lower()) || 
-        ('email' in request.auth.token && request.auth.token.email.lower() == 'vietnhan@thalex.vn'.lower()) || 
+        email in ['thangcd11@gmail.com', 'info.vinasglobal@gmail.com', 'vietnhan@thalex.vn', 'tuyetmai@thalex.vn', 'tuyetmai@thalex.com.vn'] || 
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (existsUserDoc() && isDirectorRole(getUserRole()))
       );
     }
 
     function isManager() { 
-      return isDirector() || (existsUserDoc() && (isManagerRole(getUserRole()) || hasPermission('approve_leave_requests') || hasPermission('manage_tasks'))) || request.auth.token.email == 'tuyetmai@thalex.vn'; 
+      let email = ('email' in request.auth.token) ? request.auth.token.email.lower() : '';
+      return isDirector() || (existsUserDoc() && (isManagerRole(getUserRole()) || hasPermission('approve_leave_requests'))) || 
+             email in ['tuyetmai@thalex.vn', 'tuyetmai@thalex.com.vn']; 
     }
     
     function isAccountant() { 
-      return isDirector() || (existsUserDoc() && (isAccountantRole(getUserRole()) || hasPermission('manage_cashflow'))) || request.auth.token.email == 'tuyetmai@thalex.vn'; 
+      let email = ('email' in request.auth.token) ? request.auth.token.email.lower() : '';
+      return isDirector() || (existsUserDoc() && (isAccountantRole(getUserRole()) || hasPermission('manage_cashflow'))) || 
+             email in ['tuyetmai@thalex.vn', 'tuyetmai@thalex.com.vn']; 
     }
     
     function isHR() { 

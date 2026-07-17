@@ -70,7 +70,10 @@ export default function OrderProposals() {
   const [searchTerm, setSearchTerm] = React.useState('');
 
   const pendingProposals = React.useMemo(() => 
-    proposals.filter(p => ['pending', 'pending_director', ''].includes(p.status || 'pending')), 
+    proposals.filter(p => {
+      const s = p.status || 'pending';
+      return ['pending', 'pending_director', ''].includes(s) && s !== 'rejected' && s !== 'approved' && s !== 'cancelled';
+    }), 
     [proposals]
   );
 
@@ -80,7 +83,7 @@ export default function OrderProposals() {
   );
 
   const cancelledProposals = React.useMemo(() => 
-    proposals.filter(p => p.status === 'rejected'), 
+    proposals.filter(p => p.status === 'rejected' || p.status === 'cancelled'), 
     [proposals]
   );
 
@@ -2160,9 +2163,11 @@ function StatusBadge({ status }: { status: string }) {
     pending: { label: 'Kế toán thẩm định', icon: Clock, class: 'bg-orange-100 text-orange-600' },
     pending_director: { label: 'GĐ phê duyệt', icon: Clock, class: 'bg-purple-100 text-purple-600' },
     approved: { label: 'Đã duyệt', icon: CheckCircle, class: 'bg-green-100 text-green-700' },
-    rejected: { label: 'Từ chối', icon: XCircle, class: 'bg-red-100 text-red-700' }
+    rejected: { label: 'Từ chối', icon: XCircle, class: 'bg-red-100 text-red-700' },
+    cancelled: { label: 'Đã hủy', icon: XCircle, class: 'bg-gray-100 text-gray-600' },
+    returned: { label: 'Yêu cầu sửa lại', icon: Pencil, class: 'bg-amber-100 text-amber-700' }
   };
-  const config = configs[status] || configs.pending;
+  const config = configs[status] || (status === 'rejected' || status === 'cancelled' ? configs.rejected : configs.pending);
   return (
     <span className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase", config.class)}>
       <config.icon size={12} />

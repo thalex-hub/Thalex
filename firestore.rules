@@ -95,20 +95,20 @@ service cloud.firestore {
         ((perm == 'view_orders' || perm == 'menu_orders_view' || perm == 'menu_orders') && 
           (getUserRole().lower() in ['salesmanager', 'salesstaff', 'chiefaccountant', 'accountantstaff', 'accountant', 'technicalmanager', 'technicalstaff', 'generalstaff', 'staff', 'hr', 'hrstaff', 'hrmanager', 'nhansu', 'nhân sự', 'sales', 'technical', 'accountant', 'kinh doanh', 'kỹ thuật'] || 
            isManagerRole(getUserRole()) || isStaffRole(getUserRole()) || isAccountantRole(getUserRole()) || isHRRole(getUserRole()))) ||
-        (perm == 'approve_orders' && (getUserRole() == 'SalesManager' || isManagerRole(getUserRole()))) ||
+        (perm == 'approve_orders' && (getUserRole() == 'SalesManager' || isManagerRole(getUserRole()) || isAccountantRole(getUserRole()))) ||
         
         // Fallback for finance
         ((perm == 'view_cashflow' || perm == 'menu_cash_flow_view' || perm == 'view_financial_reports' || perm == 'menu_business_expenses_view') && 
           (getUserRole() in ['ChiefAccountant', 'AccountantStaff', 'Accountant'] || isAccountantRole(getUserRole()))) ||
         ((perm == 'manage_cashflow' || perm == 'menu_cash_flow_edit' || perm == 'approve_disbursements' || perm == 'menu_disbursements_edit') && 
-          getUserRole() in ['ChiefAccountant', 'Accountant']) ||
+          isAccountantRole(getUserRole())) ||
         
         // Fallback for proposals
         ((perm == 'view_advances' || perm == 'view_reimbursements' || perm == 'view_payment_requests' || perm == 'menu_proposals_view') && 
           (getUserRole() in ['ChiefAccountant', 'AccountantStaff', 'Accountant', 'SalesManager', 'SalesStaff', 'TechnicalManager', 'GeneralStaff', 'Staff'] || 
            isManagerRole(getUserRole()) || isStaffRole(getUserRole()) || isAccountantRole(getUserRole()))) ||
         ((perm == 'approve_advances' || perm == 'approve_reimbursements' || perm == 'approve_payment_requests') && 
-          (getUserRole() in ['ChiefAccountant', 'Accountant', 'SalesManager'] || isManagerRole(getUserRole()))) ||
+          (isAccountantRole(getUserRole()) || isManagerRole(getUserRole()))) ||
         ((perm == 'disburse_advances' || perm == 'disburse_reimbursements' || perm == 'disburse_payment_requests') && 
           (getUserRole() in ['ChiefAccountant', 'Accountant', 'AccountantStaff'] || isAccountantRole(getUserRole()))) ||
         
@@ -116,17 +116,16 @@ service cloud.firestore {
         ((perm == 'view_users' || perm == 'menu_hr_view' || perm == 'view_attendance' || perm == 'menu_attendance_view') && 
           (getUserRole() in ['HRManager', 'HRStaff', 'HR', 'ChiefAccountant', 'Accountant', 'AccountantStaff'] || isHRRole(getUserRole()))) ||
         ((perm == 'manage_users' || perm == 'menu_hr_edit' || perm == 'manage_attendance' || perm == 'menu_attendance_edit' || perm == 'approve_leave_requests') && 
-          (getUserRole() in ['HRManager', 'HR'] || isHRRole(getUserRole()))) ||
+          isHRRole(getUserRole())) ||
         
         // Fallback for Tasks / Warehouse / Storage
         (perm in ['view_tasks', 'menu_tasks_view', 'view_warehouse', 'menu_warehouse_view', 'view_storage', 'menu_storage_view']) ||
         ((perm == 'manage_tasks' || perm == 'menu_tasks_edit') && 
           (getUserRole() in ['HRManager', 'HRStaff', 'HR', 'SalesManager', 'TechnicalManager'] || isManagerRole(getUserRole()))) ||
         ((perm == 'manage_warehouse' || perm == 'menu_warehouse_edit') && 
-          (getUserRole() in ['ChiefAccountant', 'Accountant', 'TechnicalManager'] || isAccountantRole(getUserRole()))) ||
+          (isAccountantRole(getUserRole()) || isManagerRole(getUserRole()))) ||
         ((perm == 'manage_storage' || perm == 'menu_storage_edit') && 
-          (getUserRole() in ['HRManager', 'ChiefAccountant', 'TechnicalManager'] || 
-           isManagerRole(getUserRole()) || isHRRole(getUserRole()) || isAccountantRole(getUserRole())))
+          (isManagerRole(getUserRole()) || isHRRole(getUserRole()) || isAccountantRole(getUserRole())))
       );
     }
 

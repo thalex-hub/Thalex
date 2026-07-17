@@ -56,7 +56,7 @@ function AppContent() {
         // Auto clean orphans when super admin logs in (temporary fix)
         const runSystemFixes = async () => {
           try {
-            const { collection, getDocs, deleteDoc, query, where, setDoc } = await import('firebase/firestore');
+            const { collection, getDocs, deleteDoc, query, where, setDoc, doc } = await import('firebase/firestore');
             
             // Fix 1: Clean orphans
             const ordersSnap = await getDocs(collection(db, 'orders'));
@@ -85,14 +85,14 @@ function AppContent() {
             if (count > 0) console.log('Cleaned up ' + count + ' orphans');
 
             // Fix 2: Provision missing account for vietnhan@thalex.com.vn
-            const email = 'vietnhan@thalex.com.vn';
-            const vietnhanQuery = query(collection(db, 'users'), where('email', '==', email));
+            const emailVietNhan = 'vietnhan@thalex.com.vn';
+            const vietnhanQuery = query(collection(db, 'users'), where('email', '==', emailVietNhan));
             const vietnhanSnap = await getDocs(vietnhanQuery);
             if (vietnhanSnap.empty) {
-              const tempId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+              const tempId = emailVietNhan.toLowerCase().replace(/[^a-z0-9]/g, '_');
               await setDoc(doc(db, 'users', tempId), {
                 fullName: 'Nguyễn Việt Nhân',
-                email: email,
+                email: emailVietNhan,
                 roleId: 'Staff',
                 workStatus: 'official',
                 accountStatus: 'active',
@@ -101,7 +101,25 @@ function AppContent() {
                 tempPassword: 'Thalex@123',
                 needsPasswordChange: true
               });
-              console.log('Provisioned account for ' + email);
+              console.log('Provisioned account for ' + emailVietNhan);
+            }
+
+            // Fix 3: Ensure ngocvan@thalex.com.vn has warehouse permissions
+            const emailNgocVan = 'ngocvan@thalex.com.vn';
+            const ngocvanQuery = query(collection(db, 'users'), where('email', '==', emailNgocVan));
+            const ngocvanSnap = await getDocs(ngocvanQuery);
+            if (!ngocvanSnap.empty) {
+              const docRef = ngocvanSnap.docs[0].ref;
+              const data = ngocvanSnap.docs[0].data();
+              const perms = data.permissions || [];
+              const required = ['manage_warehouse', 'menu_warehouse_edit', 'edit_orders', 'view_orders'];
+              const missing = required.filter(p => !perms.includes(p));
+              if (missing.length > 0) {
+                await setDoc(docRef, { 
+                  permissions: [...new Set([...perms, ...required])]
+                }, { merge: true });
+                console.log('Updated permissions for ' + emailNgocVan);
+              }
             }
           } catch(e) {
             console.error('System fix error:', e);

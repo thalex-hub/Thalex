@@ -69,7 +69,8 @@ interface Warehouse {
 }
 
 export default function WarehouseManagement() {
-  const { isAdmin, isManager, isHR, isAccountant } = useAuth();
+  const { isAdmin, isManager, isHR, isAccountant, hasPermission } = useAuth();
+  const canManage = isAdmin || isManager || isHR || isAccountant || hasPermission('manage_warehouse') || hasPermission('menu_warehouse_edit');
   const [inventory, setInventory] = React.useState<InventoryItem[]>([]);
   const [stockItems, setStockItems] = React.useState<StockItem[]>([]);
   const [products, setProducts] = React.useState<Product[]>([]);
@@ -426,7 +427,7 @@ export default function WarehouseManagement() {
             <History size={18} />
             Lịch sử giao dịch
           </Link>
-          {(isAdmin || isManager || isHR || isAccountant) && (
+          {canManage && (
             <>
               <button 
                 onClick={() => setShowWarehouseModal(true)}

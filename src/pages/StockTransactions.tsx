@@ -119,7 +119,9 @@ interface FirestoreErrorInfo {
 }
 
 export default function StockTransactions() {
-  const { appUser, user, isAdmin, isManager, isHR, isAccountant } = useAuth();
+  const { appUser, user, isAdmin, isManager, isHR, isAccountant, hasPermission } = useAuth();
+  
+  const canManageWarehouse = isAdmin || isManager || isHR || isAccountant || hasPermission('manage_warehouse') || hasPermission('menu_warehouse_edit');
   
   const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
     const errInfo: FirestoreErrorInfo = {
@@ -768,7 +770,7 @@ export default function StockTransactions() {
           <p className="text-sm text-gray-500">Quản lý các đợt luân chuyển hàng hóa</p>
         </div>
         
-        {(isAdmin || isManager || isHR || isAccountant) && (
+        {canManageWarehouse && (
           <div className="flex gap-2">
             <button 
               onClick={() => { setTransactionType('inbound'); setShowAddModal(true); }}
@@ -982,7 +984,7 @@ export default function StockTransactions() {
                          <Eye size={18} />
                        </button>
 
-                       {tx.status === 'pending' && (isAdmin || isManager || isHR || isAccountant) && (
+                       {tx.status === 'pending' && canManageWarehouse && (
                          <>
                            <button 
                              disabled={!!processingTxId}

@@ -39,7 +39,7 @@ export default function ProposalsOverview() {
   });
   const [allRecentProposals, setAllRecentProposals] = React.useState<any[]>([]);
   const [activeFilter, setActiveFilter] = React.useState<string>('all');
-  const { isAccountant, isHR, isAdmin, isManager, isDirector, user, appUser, isFinanceStaff, hasPermission } = useAuth();
+  const { isAccountant, isHR, isAdmin, isManager, isDirector, isGeneral, user, appUser, isFinanceStaff, hasPermission } = useAuth();
   
   // Defined roles for querying all
   const canSeeAllOverall = isAdmin || isDirector || isHR || isAccountant;
@@ -86,9 +86,9 @@ export default function ProposalsOverview() {
     const hasViewOrdersPerm = hasPermission('view_orders') || hasPermission('menu_orders_view');
 
     collections.forEach((colName) => {
-      const showAllThisType = isAdmin || isDirector || 
+      const showAllThisType = isAdmin || isDirector || isGeneral ||
                              (isHR && (colName === 'leave_requests' || colName === 'order_proposals')) || 
-                             (isAccountant && ['payment_requests', 'advance_requests', 'reimbursement_requests', 'order_proposals'].includes(colName)) ||
+                             (isAccountant && ['leave_requests', 'payment_requests', 'advance_requests', 'reimbursement_requests', 'order_proposals'].includes(colName)) ||
                              (hasViewOrdersPerm && colName === 'order_proposals');
 
       const processSnapshots = (docsLists: any[][]) => {
@@ -198,9 +198,9 @@ export default function ProposalsOverview() {
       return dateB - dateA;
     });
 
-    const pendingCount = sorted.filter(p => !['approved', 'paid', 'disbursed', 'rejected'].includes(p.status)).length;
+    const pendingCount = sorted.filter(p => !['approved', 'paid', 'disbursed', 'rejected', 'cancelled'].includes(p.status)).length;
     const approvedCount = sorted.filter(p => ['approved', 'paid', 'disbursed'].includes(p.status)).length;
-    const rejectedCount = sorted.filter(p => p.status === 'rejected').length;
+    const rejectedCount = sorted.filter(p => p.status === 'rejected' || p.status === 'cancelled').length;
     const needsMyActionCount = sorted.filter(checkNeedsAction).length;
 
     setStats({ pending: pendingCount, approved: approvedCount, rejected: rejectedCount, needsMyAction: needsMyActionCount });
@@ -216,14 +216,14 @@ export default function ProposalsOverview() {
     } else if (activeFilter === 'approved') {
       result = result.filter(p => p.status === 'approved' || p.status === 'paid' || p.status === 'disbursed');
     } else if (activeFilter === 'rejected') {
-      result = result.filter(p => p.status === 'rejected');
+      result = result.filter(p => p.status === 'rejected' || p.status === 'cancelled');
     } else {
       // Default 'all' - Sort by date before slicing
       return result.sort((a,b) => {
         const dateA = new Date(a.createdAt || a.requestDate || a.startDate || 0).getTime();
         const dateB = new Date(b.createdAt || b.requestDate || b.startDate || 0).getTime();
         return dateB - dateA;
-      }).slice(0, 15);
+      }).slice(0, 100);
     }
     
     // Sort final result
@@ -446,6 +446,7 @@ function StatusBadge({ status }: { status: string }) {
     paid: { label: 'Đã chi tiền', icon: CheckCircle, class: 'bg-green-100 text-green-700' },
     disbursed: { label: 'Đã giải ngân', icon: CheckCircle, class: 'bg-green-100 text-green-700' },
     rejected: { label: 'Đã từ chối', icon: XCircle, class: 'bg-red-100 text-red-700' },
+    cancelled: { label: 'Đã hủy', icon: XCircle, class: 'bg-gray-100 text-gray-700' },
     returned: { label: 'Bổ sung hồ sơ', icon: Clock, class: 'bg-purple-50 text-purple-600 border border-purple-100' }
   };
   const config = configs[status] || configs.pending;

@@ -763,7 +763,12 @@ export default function OrderProposals() {
           });
         }
       }
-      alert(status === 'approved' ? "Phê duyệt đề xuất thành công!" : "Đã từ chối đề xuất.");
+      const successMsg = status === 'approved' 
+        ? "Phê duyệt đề xuất thành công!" 
+        : status === 'pending_director'
+        ? "Đã thẩm định đề xuất. Đang chờ Giám đốc phê duyệt."
+        : "Đã từ chối đề xuất.";
+      alert(successMsg);
     } catch (error) {
       console.error("Error in handleApprove:", error);
       alert("Đã có lỗi xảy ra khi phê duyệt đề xuất.");

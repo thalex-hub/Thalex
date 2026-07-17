@@ -1347,7 +1347,7 @@ function StatusBadge({ status }: { status: string }) {
       class: "bg-blue-100 text-blue-700",
     },
     implementing: {
-      label: "Đã vào cọc & Đang triển khai",
+      label: "Đang triển khai",
       class: "bg-amber-100 text-amber-700",
     },
     completed: {
@@ -1355,9 +1355,11 @@ function StatusBadge({ status }: { status: string }) {
       class: "bg-green-100 text-green-700",
     },
     cancelled: { label: "Đơn hàng bị hủy", class: "bg-red-100 text-red-700" },
+    pending: { label: "Chờ duyệt", class: "bg-orange-100 text-orange-700" },
+    approved: { label: "Đã duyệt", class: "bg-green-100 text-green-700" }
   };
   const config = configs[status] || {
-    label: status,
+    label: status || "Mới",
     class: "bg-gray-100 text-gray-600",
   };
   return (

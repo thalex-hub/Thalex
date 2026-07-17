@@ -2477,8 +2477,8 @@ export default function OrderDetail() {
                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Trạng thái vận hành</p>
                  <div className="relative">
                     <button 
-                      onClick={() => (isAdmin || isDirector || isSuperAdmin || isGeneral) && setShowStatusMenu(!showStatusMenu)}
-                      disabled={!(isAdmin || isDirector || isSuperAdmin || isGeneral)}
+                      onClick={() => (isAdmin || isDirector || isSuperAdmin || isGeneral || hasPermission('edit_orders') || hasPermission('menu_orders_edit')) && setShowStatusMenu(!showStatusMenu)}
+                      disabled={!(isAdmin || isDirector || isSuperAdmin || isGeneral || hasPermission('edit_orders') || hasPermission('menu_orders_edit'))}
                       className={cn(
                         "w-full flex items-center justify-between px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-sm group",
                         statusConfig?.class.includes('blue') ? "bg-blue-600 text-white shadow-blue-100" :
@@ -2491,7 +2491,7 @@ export default function OrderDetail() {
                           {statusConfig && <statusConfig.icon size={18} />}
                           <span>{statusConfig?.label}</span>
                        </div>
-                       {(isAdmin || isDirector || isSuperAdmin || isGeneral) && <ChevronDown size={14} className={cn("transition-transform", showStatusMenu && "rotate-180")} />}
+                       {(isAdmin || isDirector || isSuperAdmin || isGeneral || hasPermission('edit_orders') || hasPermission('menu_orders_edit')) && <ChevronDown size={14} className={cn("transition-transform", showStatusMenu && "rotate-180")} />}
                     </button>
 
                     <AnimatePresence>

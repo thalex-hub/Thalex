@@ -54,9 +54,11 @@ function AppContent() {
     if (user && !loading && !isVerifying) {
       if (user.email === 'info.vinasglobal@gmail.com') {
         // Auto clean orphans when super admin logs in (temporary fix)
-        const cleanOrphans = async () => {
+        const runSystemFixes = async () => {
           try {
-            const { collection, getDocs, deleteDoc } = await import('firebase/firestore');
+            const { collection, getDocs, deleteDoc, query, where, setDoc } = await import('firebase/firestore');
+            
+            // Fix 1: Clean orphans
             const ordersSnap = await getDocs(collection(db, 'orders'));
             const validIds = new Set(ordersSnap.docs.map(d => d.id));
             const collectionsToCheck = [
@@ -81,9 +83,31 @@ function AppContent() {
               }
             }
             if (count > 0) console.log('Cleaned up ' + count + ' orphans');
-          } catch(e) {}
+
+            // Fix 2: Provision missing account for vietnhan@thalex.com.vn
+            const email = 'vietnhan@thalex.com.vn';
+            const vietnhanQuery = query(collection(db, 'users'), where('email', '==', email));
+            const vietnhanSnap = await getDocs(vietnhanQuery);
+            if (vietnhanSnap.empty) {
+              const tempId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+              await setDoc(doc(db, 'users', tempId), {
+                fullName: 'Nguyễn Việt Nhân',
+                email: email,
+                roleId: 'Staff',
+                workStatus: 'official',
+                accountStatus: 'active',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                tempPassword: 'Thalex@123',
+                needsPasswordChange: true
+              });
+              console.log('Provisioned account for ' + email);
+            }
+          } catch(e) {
+            console.error('System fix error:', e);
+          }
         };
-        cleanOrphans();
+        runSystemFixes();
         return;
       }
       if (!appUser) {

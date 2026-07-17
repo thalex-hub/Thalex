@@ -61,7 +61,9 @@ export default function OrderProposals() {
   const hasViewOrdersPerm = hasPermission('view_orders') || 
                             hasPermission('menu_orders_view');
 
-  const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR || hasViewOrdersPerm;
+  // canSeeAll should only be true for roles that are meant to see EVERYTHING in the collection.
+  // Standard staff should use the filtered queries below to avoid permission rejections on global reads.
+  const canSeeAll = isAdmin || isManager || isDirector || isAccountant || isHR || isSuperAdmin;
 
   const [activeTab, setActiveTab] = React.useState<'pending' | 'approved' | 'cancelled'>('pending');
   const [searchTerm, setSearchTerm] = React.useState('');

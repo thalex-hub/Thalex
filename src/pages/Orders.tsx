@@ -71,7 +71,7 @@ export default function Orders() {
   const PAGE_SIZE = 12;
 
   const { user, appUser, isAdmin, isManager, isDirector, isFinanceStaff, isHR, hasPermission, isSuperAdmin } = useAuth();
-  const canSeeAll = isAdmin || isManager || isDirector || isFinanceStaff || isHR || hasPermission('view_orders') || hasPermission('menu_orders_view') || hasPermission('menu_orders');
+  const canSeeAll = isAdmin || isManager || isDirector || isFinanceStaff || isHR || isSuperAdmin;
 
   const [showFilterDropdown, setShowFilterDropdown] = React.useState(false);
   const [filterValue, setFilterValue] = React.useState<string>('all'); // all, under100m, 100mTo500m, above500m

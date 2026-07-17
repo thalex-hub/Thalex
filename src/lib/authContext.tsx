@@ -676,11 +676,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Dynamic template fallbacks for custom department roles
-      if (role.endsWith('_Manager')) {
-        return ['view_orders', 'create_orders', 'view_tasks', 'manage_tasks', 'view_storage'].includes(permId);
+      if (role.endsWith('_Manager') || roleLower.includes('manager') || roleLower.includes('trưởng phòng') || roleLower.includes('quản lý')) {
+        return ['view_orders', 'create_orders', 'view_tasks', 'manage_tasks', 'view_storage', 'menu_orders_view', 'menu_tasks_view', 'menu_storage_view'].includes(permId);
       }
-      if (role.endsWith('_Staff')) {
-        return ['view_orders', 'view_tasks', 'view_storage'].includes(permId);
+      if (role.endsWith('_Staff') || roleLower.includes('staff') || roleLower.includes('nhân viên') || roleLower.includes('kinh doanh') || roleLower.includes('kỹ thuật') || roleLower.includes('kế toán')) {
+        return ['view_orders', 'view_tasks', 'view_storage', 'menu_orders_view', 'menu_tasks_view', 'menu_storage_view'].includes(permId);
       }
       
       return false;

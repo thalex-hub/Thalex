@@ -76,14 +76,14 @@ service cloud.firestore {
 
     function isFinanceStaffRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'generalmanager', 'manager', 'kế toán', 'tài chính'] || 
-             r.matches('.*_accountant') || r.matches('.*kế toán.*') || r.matches('.*tài chính.*');
+      return r in ['superadmin', 'director', 'vicedirector', 'chiefaccountant', 'accountant', 'accountantstaff', 'generalmanager', 'manager', 'kế toán', 'tài chính', 'finance', 'ketoan'] || 
+             r.matches('.*_accountant') || r.matches('.*kế toán.*') || r.matches('.*tài chính.*') || r.matches('.*finance.*');
     }
 
     function isStaffRole(role) {
       let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'salesstaff', 'accountantstaff', 'technicalstaff', 'generalstaff', 'staff', 'hrstaff', 'hr', 'nhansu', 'nhân sự', 'nhân viên', 'kinh doanh', 'kỹ thuật', 'tạp vụ', 'bảo vệ', 'lái xe'] || 
-             r.matches('.*_staff') || r.matches('.*_hr') || r.matches('.*_nhansu') || r.matches('.*nhân sự.*') || r.matches('.*nhân viên.*') || r.matches('.*kinh doanh.*') || r.matches('.*kỹ thuật.*');
+      return r in ['superadmin', 'director', 'vicedirector', 'salesstaff', 'accountantstaff', 'technicalstaff', 'generalstaff', 'staff', 'hrstaff', 'hr', 'nhansu', 'nhân sự', 'nhân viên', 'kinh doanh', 'kỹ thuật', 'tạp vụ', 'bảo vệ', 'lái xe', 'sales', 'technical', 'accountant', 'kythuat', 'kinhdoanh', 'nhanvien'] || 
+             r.matches('.*_staff') || r.matches('.*_hr') || r.matches('.*_nhansu') || r.matches('.*nhân sự.*') || r.matches('.*nhân viên.*') || r.matches('.*kinh doanh.*') || r.matches('.*kỹ thuật.*') || r.matches('.*sales.*') || r.matches('.*technical.*');
     }
 
     // Read permission for user's role from role_permissions, falling back to standard defaults if the doc doesn't exist
@@ -93,7 +93,7 @@ service cloud.firestore {
          perm in get(/databases/$(database)/documents/role_permissions/$(getUserRole())).data.get('permissions', [])) ||
         // Fallback for orders
         ((perm == 'view_orders' || perm == 'menu_orders_view' || perm == 'menu_orders') && 
-          (getUserRole().lower() in ['salesmanager', 'salesstaff', 'chiefaccountant', 'accountantstaff', 'accountant', 'technicalmanager', 'technicalstaff', 'generalstaff', 'staff', 'hr', 'hrstaff', 'hrmanager', 'nhansu', 'nhân sự'] || 
+          (getUserRole().lower() in ['salesmanager', 'salesstaff', 'chiefaccountant', 'accountantstaff', 'accountant', 'technicalmanager', 'technicalstaff', 'generalstaff', 'staff', 'hr', 'hrstaff', 'hrmanager', 'nhansu', 'nhân sự', 'sales', 'technical', 'accountant', 'kinh doanh', 'kỹ thuật'] || 
            isManagerRole(getUserRole()) || isStaffRole(getUserRole()) || isAccountantRole(getUserRole()) || isHRRole(getUserRole()))) ||
         (perm == 'approve_orders' && (getUserRole() == 'SalesManager' || isManagerRole(getUserRole()))) ||
         
@@ -295,7 +295,9 @@ service cloud.firestore {
                      (resource.data.get('createdBy', '') == request.auth.uid) || 
                      (existsUserDoc() && resource.data.get('createdBy', '') == getUserLegacyId()) ||
                      (request.auth.uid in resource.data.get('followers', [])) ||
-                     (existsUserDoc() && getUserLegacyId() in resource.data.get('followers', []))
+                     (existsUserDoc() && getUserLegacyId() in resource.data.get('followers', [])) ||
+                     (resource.data.get('responsibleUserId', '') == request.auth.uid) ||
+                     (existsUserDoc() && resource.data.get('responsibleUserId', '') == getUserLegacyId())
                    ));
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() ||
@@ -312,19 +314,15 @@ service cloud.firestore {
       allow read: if isDirector() || isHR() || isFinanceStaff() || 
                    hasPermission('view_orders') || hasPermission('menu_orders_view') || hasPermission('menu_orders') || hasPermission('view_salaries') ||
                    (isSignedIn() && (
-                     ('responsibleUserId' in resource.data && resource.data.responsibleUserId == request.auth.uid) || 
-                     ('responsibleUserId' in resource.data && resource.data.responsibleUserId == request.auth.token.email.lower().replace('[^a-z0-9]', '_')) ||
-                     ('followers' in resource.data && request.auth.uid in resource.data.followers) ||
-                     ('followers' in resource.data && request.auth.token.email.lower().replace('[^a-z0-9]', '_') in resource.data.followers) ||
+                     ('responsibleUserId' in resource.data && (resource.data.responsibleUserId == request.auth.uid || resource.data.responsibleUserId == getUserLegacyId())) || 
+                     ('followers' in resource.data && (request.auth.uid in resource.data.followers || getUserLegacyId() in resource.data.followers)) ||
                      ('customerId' in resource.data && resource.data.customerId == request.auth.uid)
                    ));
       allow create: if isDirector() || isHR() || isFinanceStaff() || hasPermission('create_orders') || hasPermission('menu_orders_edit');
       allow update: if isDirector() || isHR() || isFinanceStaff() || hasPermission('edit_orders') || hasPermission('menu_orders_edit') ||
                     (isSignedIn() && (
-                     ('responsibleUserId' in resource.data && resource.data.responsibleUserId == request.auth.uid) || 
-                     ('responsibleUserId' in resource.data && resource.data.responsibleUserId == request.auth.token.email.lower().replace('[^a-z0-9]', '_')) ||
-                     ('followers' in resource.data && request.auth.uid in resource.data.followers) ||
-                     ('followers' in resource.data && request.auth.token.email.lower().replace('[^a-z0-9]', '_') in resource.data.followers)
+                     ('responsibleUserId' in resource.data && (resource.data.responsibleUserId == request.auth.uid || resource.data.responsibleUserId == getUserLegacyId())) || 
+                     ('followers' in resource.data && (request.auth.uid in resource.data.followers || getUserLegacyId() in resource.data.followers))
                    ));
       allow delete: if isDirector() || hasPermission('delete_orders');
       

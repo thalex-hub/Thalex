@@ -496,6 +496,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const expectedLegacyId = email ? email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
               
               const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn';
+              const isNgocVan = u.email === 'ngocvan@thalex.com.vn';
               
               if (isSystemAdminEmail && (data.accountStatus !== 'active' || (u.email === 'info.vinasglobal@gmail.com' && data.roleId !== 'SuperAdmin') || !data.legacyId)) {
                 const refreshed = {
@@ -507,6 +508,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setDoc(userRef, refreshed).catch(err => console.error("Self-heal write failed", err));
                 setAppUser(refreshed);
                 localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(refreshed));
+              } else if (isNgocVan) {
+                const required = ['manage_warehouse', 'menu_warehouse_edit', 'edit_orders', 'view_orders', 'stock_transaction'];
+                const currentPerms = data.permissions || [];
+                const missing = required.filter(p => !currentPerms.includes(p));
+                if (missing.length > 0) {
+                  const refreshed = {
+                    ...data,
+                    permissions: [...new Set([...currentPerms, ...required])]
+                  };
+                  setDoc(userRef, refreshed, { merge: true }).catch(err => console.error("NgocVan self-heal failed", err));
+                  setAppUser(refreshed);
+                  localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(refreshed));
+                } else {
+                  setAppUser(data);
+                  localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(data));
+                }
               } else if (data.accountStatus === 'pending' || !data.legacyId) {
                 const refreshed = {
                   ...data,

@@ -89,13 +89,14 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
           }
 
           if (!linkedData) {
-            if (u.email === 'info.vinasglobal@gmail.com') {
+            const isSystemAdmin = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn';
+            if (isSystemAdmin) {
               const newUser: AppUser = {
                 uid: u.uid,
-                fullName: u.displayName || 'Nhân viên Google',
+                fullName: u.displayName || (u.email === 'info.vinasglobal@gmail.com' ? 'Super Admin' : 'Nguyễn Việt Nhân'),
                 email: u.email || '',
                 avatar: u.photoURL || '',
-                roleId: 'SuperAdmin',
+                roleId: u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : 'Director',
                 workStatus: 'official',
                 accountStatus: 'active',
                 createdAt: new Date().toISOString(),
@@ -116,11 +117,12 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
           }
         } else {
           const userData = userDoc.data() as AppUser;
-          if (u.email === 'info.vinasglobal@gmail.com' && (userData.accountStatus !== 'active' || userData.roleId !== 'SuperAdmin')) {
+          const isSystemAdmin = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn';
+          if (isSystemAdmin && (userData.accountStatus !== 'active' || (u.email === 'info.vinasglobal@gmail.com' && userData.roleId !== 'SuperAdmin'))) {
             const selfHealed = {
               ...userData,
               accountStatus: 'active' as const,
-              roleId: 'SuperAdmin' as const,
+              roleId: (u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : (userData.roleId || 'Director')) as any,
             };
             await setDoc(userRef, selfHealed);
           } else if (userData.accountStatus === 'locked') {
@@ -247,8 +249,9 @@ export default function LoginPage({ forceChangePassword, initialError }: { force
           }
         } else {
            // Wait, what if they don't exist at all? (Intruder managed to create auth or sign in, but no DB doc).
-           // If they are super admin, it's fine. Else, block.
-           if (email.trim() !== 'info.vinasglobal@gmail.com') {
+           // If they are super admin or vietnhan, it's fine. Else, block.
+           const isSystemAdmin = email.trim() === 'info.vinasglobal@gmail.com' || email.trim() === 'vietnhan@thalex.com.vn' || email.trim() === 'vietnhan@thalex.vn';
+           if (!isSystemAdmin) {
               try { await userCredential.user.delete(); } catch(e) { await auth.signOut(); }
               const err = new Error('Tài khoản này chưa được khai báo trên hệ thống.');
               (err as any).code = 'auth/user-not-found-in-db';

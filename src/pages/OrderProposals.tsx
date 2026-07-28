@@ -63,8 +63,8 @@ export default function OrderProposals() {
 
   // canSeeAll should only be true for roles that are meant to see EVERYTHING in the collection.
   // Standard staff should use the filtered queries below to avoid permission rejections on global reads.
-  const canSeeAll = isAdmin || isDirector || isSuperAdmin;
-  const isSpecialStaff = isManager || isAccountant || isHR || isFinanceStaff || hasViewOrdersPerm;
+  const canSeeAll = isAdmin || isDirector || isSuperAdmin || isManager || isAccountant || isHR || isFinanceStaff || hasViewOrdersPerm;
+  const isSpecialStaff = !canSeeAll && (isManager || isAccountant || isHR || isFinanceStaff || hasViewOrdersPerm);
 
   const [activeTab, setActiveTab] = React.useState<'pending' | 'approved' | 'cancelled'>('pending');
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -219,18 +219,12 @@ export default function OrderProposals() {
         setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setError(null);
       }, (err) => {
-        console.warn("Global order_proposals query failed, falling back to filtered queries:", err);
-        // If global fails (which shouldn't for Admin, but just in case), do nothing here 
-        // and let the component stay as is or we could trigger fallback.
-        // For now, if Admin fails, we show error.
+        console.warn("Global order_proposals query failed:", err);
         handleFirestoreError(err, OperationType.LIST, 'order_proposals');
-        setError("Lỗi khi tải toàn bộ dữ liệu. Đang thử tải dữ liệu liên quan...");
-        // Don't clear proposals yet, try fallback
+        setError("Lỗi khi tải dữ liệu. Có thể bạn không có quyền xem tất cả đề xuất.");
       });
-    }
-
-    // For staff roles OR if we want to ensure we see our stuff even if global fails
-    if (!canSeeAll || isSpecialStaff) {
+    } else {
+      // For staff roles who only see their own items (and legacy items)
       // For non-admin/non-manager roles, split the compound OR + ORDER BY query to avoid composite index requirement.
       // This solves the blank page loading issue by executing independent simple queries and sorting in memory.
       let listCreated: any[] = [];

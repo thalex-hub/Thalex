@@ -496,7 +496,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const expectedLegacyId = email ? email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
               
               const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn';
-              const isNgocVan = u.email === 'ngocvan@thalex.com.vn';
+              const isNgocVan = u.email === 'ngocvan@thalex.com.vn' || u.email === 'ngocvan@thalex.vn';
               
               if (isSystemAdminEmail && (data.accountStatus !== 'active' || (u.email === 'info.vinasglobal@gmail.com' && data.roleId !== 'SuperAdmin') || !data.legacyId)) {
                 const refreshed = {
@@ -509,7 +509,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setAppUser(refreshed);
                 localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(refreshed));
               } else if (isNgocVan) {
-                const required = ['manage_warehouse', 'menu_warehouse_edit', 'edit_orders', 'view_orders', 'stock_transaction'];
+                const required = ['manage_warehouse', 'menu_warehouse_edit', 'view_warehouse', 'menu_warehouse_view', 'edit_orders', 'view_orders', 'menu_orders_view', 'menu_orders_edit'];
                 const currentPerms = data.permissions || [];
                 const missing = required.filter(p => !currentPerms.includes(p));
                 if (missing.length > 0) {
@@ -727,7 +727,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const roleLower = role.toLowerCase();
 
   const hasPermission = (permissionId: string): boolean => {
-    const isSuperUser = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || roleLower === 'superadmin' || roleLower === 'admin';
+    const isSuperUser = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn' || user?.email === 'ngocvan@thalex.vn' || roleLower === 'superadmin' || roleLower === 'admin';
     if (isSuperUser) return true;
     
     // Check direct user permissions first
@@ -782,7 +782,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Admin is SuperAdmin, Director, or anyone with manage_users
   const isAdmin = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || hasPermission('manage_users');
   // Director has top administrative authority or isDirector role directly
-  const isDirector = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn';
+  const isDirector = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn' || user?.email === 'ngocvan@thalex.vn';
   
   const isManager = roleLower === 'manager' || roleLower === 'generalmanager' || roleLower === 'hrmanager' || roleLower === 'chiefaccountant' || roleLower === 'salesmanager' || roleLower === 'technicalmanager' || roleLower.endsWith('_manager') || roleLower === 'ketoantruong' || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn';
   const isAccountant = roleLower === 'accountant' || roleLower === 'chiefaccountant' || roleLower === 'accountantstaff' || roleLower.endsWith('_accountant') || roleLower === 'ketoantruong' || roleLower === 'ketoan' || roleLower === 'kế toán' || roleLower === 'kế toán trưởng' || roleLower.includes('kế toán') || roleLower.includes('thủ quỹ') || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn';

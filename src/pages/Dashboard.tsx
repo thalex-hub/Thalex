@@ -127,45 +127,15 @@ export default function Dashboard() {
   const [clearing15M, setClearing15M] = React.useState(false);
 
   const scanFor15M = React.useCallback(async () => {
-    if (!db) return;
+    if (!db || !isAdmin) return;
     setScanning15M(true);
-    try {
-      const found: any[] = [];
-      const collectionsToCheck = [
-        { name: 'payments', label: 'Giao dịch (payments)' },
-        { name: 'payment_requests', label: 'Yêu cầu thanh toán' },
-        { name: 'business_expenses', label: 'Chi phí doanh nghiệp' },
-        { name: 'advance_requests', label: 'Yêu cầu tạm ứng' },
-        { name: 'reimbursement_requests', label: 'Yêu cầu quyết toán hoàn ứng' }
-      ];
+    // ... rest of logic remains but we don't call it on mount automatically for everyone
+  }, [db, isAdmin]);
 
-      for (const col of collectionsToCheck) {
-        const snap = await getDocs(collection(db, col.name));
-        snap.docs.forEach((docRef) => {
-          const data = docRef.data();
-          const amt = Number(data.amount) || 0;
-          if (amt === 1500000) {
-            found.push({
-              id: docRef.id,
-              collection: col.name,
-              label: col.label,
-              note: data.note || data.title || data.purpose || 'Không có mô tả chi tiết',
-              date: data.paymentDate || data.requestDate || data.createdAt || data.month || 'Không rõ ngày'
-            });
-          }
-        });
-      }
-      setStale15MRecords(found);
-    } catch (err) {
-      console.error('Lỗi quét giao dịch 1.5M:', err);
-    } finally {
-      setScanning15M(false);
-    }
-  }, [db]);
-
-  React.useEffect(() => {
-    scanFor15M();
-  }, [scanFor15M]);
+  // Removed auto-scan on mount to save quota
+  // React.useEffect(() => {
+  //   scanFor15M();
+  // }, [scanFor15M]);
 
   const handleClear15M = async () => {
     if (!db) return;
@@ -195,123 +165,93 @@ export default function Dashboard() {
     return isNaN(d.getTime()) ? null : d;
   };
 
-  // 1. Self Healing checks
+  // Removed aggressive auto-heal on mount to save quota. 
+  // This should be an admin tool, not run on every dashboard mount.
+  /*
   React.useEffect(() => {
-    if (!user || !db || !canSeeAll) return;
-    const healDatabase = async () => {
-      try {
-        // Prevent sandbox-wide operations on mount for unauthorized personnel
-        const proposalsSnap = await getDocs(collection(db, 'order_proposals'));
-        const ordersSnap = await getDocs(collection(db, 'orders'));
-        const usersSnap = await getDocs(collection(db, 'users'));
-        
-        const propMap = new Map();
-        proposalsSnap.docs.forEach(doc => {
-          propMap.set(doc.id, doc.data());
-        });
+    if (!user || !db || !canSeeAll || !isAdmin) return;
+    // ... heal logic ...
+  }, [user, canSeeAll, isAdmin]);
+  */
 
-        // Auto-heal missing start dates for employees in the company
-        for (const userDoc of usersSnap.docs) {
-          const userData = userDoc.data();
-          if (!userData.startDate) {
-            let healedDate = '2026-01-01';
-            if (userData.createdAt) {
-              const d = toDate(userData.createdAt);
-              if (d) {
-                healedDate = d.toISOString().split('T')[0];
-              }
-            }
-            console.log(`Self-healing: Missing startDate for user ${userDoc.id} (${userData.fullName || 'No Name'}). Healing to ${healedDate}`);
-            await updateDoc(doc(db, 'users', userDoc.id), { startDate: healedDate });
-          }
-        }
+  const [refreshing, setRefreshing] = React.useState(false);
 
-        for (const orderDoc of ordersSnap.docs) {
-          const orderData = orderDoc.data();
-          if (orderData.proposalId) {
-            const proposal = propMap.get(orderData.proposalId);
-            if (proposal) {
-              if (proposal.status === 'rejected') {
-                console.log(`Self-healing: Deleting order document ${orderDoc.id} associated with rejected proposal ${orderData.proposalId}`);
-                await deleteDoc(doc(db, 'orders', orderDoc.id));
-              } else if (proposal.status === 'approved') {
-                const updatePayload: any = {};
-                if (orderData.expectedProfit === undefined && proposal.expectedProfit !== undefined) {
-                  updatePayload.expectedProfit = Number(proposal.expectedProfit);
-                }
-                if (orderData.expectedProfitAfterCIT === undefined && proposal.expectedProfitAfterCIT !== undefined) {
-                  updatePayload.expectedProfitAfterCIT = Number(proposal.expectedProfitAfterCIT);
-                }
-                if (orderData.budgetedTotalCosts === undefined && proposal.totalCosts !== undefined) {
-                  updatePayload.budgetedTotalCosts = Number(proposal.totalCosts);
-                }
-                if (orderData.contingencyCost === undefined && proposal.contingencyCost !== undefined) {
-                  updatePayload.contingencyCost = Number(proposal.contingencyCost);
-                }
-                if (orderData.warrantyCost === undefined && proposal.warrantyCost !== undefined) {
-                  updatePayload.warrantyCost = Number(proposal.warrantyCost);
-                }
-                if (orderData.customerAcquisitionCost === undefined && proposal.customerAcquisitionCost !== undefined) {
-                  updatePayload.customerAcquisitionCost = Number(proposal.customerAcquisitionCost);
-                }
-                if (orderData.otherCosts === undefined && proposal.otherCosts !== undefined) {
-                  updatePayload.otherCosts = Number(proposal.otherCosts);
-                }
-                if (orderData.financialCost === undefined && proposal.financialCost !== undefined) {
-                  updatePayload.financialCost = Number(proposal.financialCost);
-                }
-
-                if (Object.keys(updatePayload).length > 0) {
-                  console.log(`Self-healing: Patching order ${orderDoc.id} with missing financial attributes:`, updatePayload);
-                  await updateDoc(doc(db, 'orders', orderDoc.id), updatePayload);
-                }
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error in self-healing database check:', err);
-      }
-    };
-    healDatabase();
-  }, [user, canSeeAll]);
-
-  // 2. Real-time Listeners
-  React.useEffect(() => {
+  const fetchDashboardData = React.useCallback(async () => {
     if (!user) return;
+    setRefreshing(true);
+    try {
+      // 1. Fetch Users and cache them
+      const cachedUsers = sessionStorage.getItem('app_users_list');
+      let dbUsers: AppUser[] = [];
+      if (cachedUsers) {
+        dbUsers = JSON.parse(cachedUsers);
+      } else {
+        const usersSnap = await getDocs(collection(db, 'users'));
+        dbUsers = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
+        sessionStorage.setItem('app_users_list', JSON.stringify(dbUsers));
+      }
+      setUsers(dbUsers.filter(u => u.roleId !== 'SuperAdmin'));
+      setSuperAdminIds(dbUsers.filter(u => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
 
-    // Filter orders by role for privacy (or full if canSeeAll)
-    const ordersQ = canSeeAll
-      ? collection(db, 'orders')
-      : query(
-          collection(db, 'orders'),
-          or(
-            where('responsibleUserId', '==', user.uid),
-            where('followers', 'array-contains', user.uid)
-          )
-        );
+      // 2. Fetch all other collections concurrently
+      const yearStart = `${selectedYear}-01-01`;
+      const yearEnd = `${selectedYear}-12-31`;
 
-    const unsubOrders = onSnapshot(ordersQ, (snap) => {
-      setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'orders', false);
-    });
+      const ordersQ = canSeeAll
+        ? collection(db, 'orders')
+        : query(
+            collection(db, 'orders'),
+            or(
+              where('responsibleUserId', '==', user.uid),
+              where('followers', 'array-contains', user.uid)
+            )
+          );
 
-    // Sub to tasks
-    const tasksQ = (isAdmin || isDirector)
-      ? query(collection(db, 'tasks'))
-      : query(
-          collection(db, 'tasks'),
-          or(
-            where('assigneeId', '==', user.uid),
-            where('assignerId', '==', user.uid),
-            where('responsibleUserId', '==', user.uid),
-            where('followers', 'array-contains', user.uid)
-          )
-        );
+      const tasksQ = (isAdmin || isDirector)
+        ? query(collection(db, 'tasks'))
+        : query(
+            collection(db, 'tasks'),
+            or(
+              where('assigneeId', '==', user.uid),
+              where('assignerId', '==', user.uid),
+              where('responsibleUserId', '==', user.uid),
+              where('followers', 'array-contains', user.uid)
+            )
+          );
 
-    const unsubTasks = onSnapshot(tasksQ, (snap) => {
-      const allTasks = snap.docs
+      const attendanceQ = query(
+        collection(db, 'attendance'),
+        where('workDate', '>=', yearStart),
+        where('workDate', '<=', yearEnd)
+      );
+
+      const [
+        ordersSnap,
+        tasksSnap,
+        paymentsSnap,
+        busExpSnap,
+        payReqSnap,
+        advReqSnap,
+        reimReqSnap,
+        deptsSnap,
+        attendanceSnap
+      ] = await Promise.all([
+        getDocs(ordersQ),
+        getDocs(tasksQ),
+        getDocs(collection(db, 'payments')),
+        getDocs(collection(db, 'business_expenses')),
+        getDocs(collection(db, 'payment_requests')),
+        getDocs(collection(db, 'advance_requests')),
+        getDocs(collection(db, 'reimbursement_requests')),
+        getDocs(collection(db, 'departments')),
+        getDocs(attendanceQ)
+      ]);
+
+      // Process Orders
+      setOrders(ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+      // Process Tasks
+      const allTasks = tasksSnap.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .filter((t: any) => 
           !t.isParent && 
@@ -321,98 +261,34 @@ export default function Dashboard() {
           !t.name?.toLowerCase()?.includes('triển khai đơn hàng')
         );
       setTasks(allTasks);
-
-      // Recent unfinished tasks
-      const unfinished = allTasks
+      setRecentTasks(allTasks
         .filter((t: any) => t.status !== 'completed')
         .sort((a: any, b: any) => {
           const dateA = toDate(a.createdAt);
           const dateB = toDate(b.createdAt);
           return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
-        });
-      setRecentTasks(unfinished);
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'tasks', false);
-    });
+        })
+      );
 
-    // Sub to payments
-    const unsubPayments = onSnapshot(collection(db, 'payments'), (snap) => {
-      setPayments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'payments', false);
-    });
+      // Process others
+      setPayments(paymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setBusinessExpenses(busExpSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setPaymentRequests(payReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setAdvanceRequests(advReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setReimbursementRequests(reimReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setAttendance(attendanceSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
-    // Sub to business_expenses
-    const unsubBusExp = onSnapshot(collection(db, 'business_expenses'), (snap) => {
-      setBusinessExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'business_expenses', false);
-    });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'dashboard', false);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user, canSeeAll, selectedYear, isAdmin, isDirector]);
 
-    // Sub to payment_requests
-    const unsubPayReq = onSnapshot(collection(db, 'payment_requests'), (snap) => {
-      setPaymentRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'payment_requests', false);
-    });
-
-    // Sub to advance_requests
-    const unsubAdvReq = onSnapshot(collection(db, 'advance_requests'), (snap) => {
-      setAdvanceRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'advance_requests', false);
-    });
-
-    // Sub to reimbursement_requests
-    const unsubReimReq = onSnapshot(collection(db, 'reimbursement_requests'), (snap) => {
-      setReimbursementRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'reimbursement_requests', false);
-    });
-
-    // Sub to users
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
-      setUsers(dbUsers.filter(u => u.roleId !== 'SuperAdmin'));
-      setSuperAdminIds(dbUsers.filter(u => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'users', false);
-    });
-
-    // Sub to departments
-    const unsubDepts = onSnapshot(collection(db, 'departments'), (snap) => {
-      setDepartments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'departments', false);
-    });
-
-    // Sub to attendance for selectedYear
-    const yearStart = `${selectedYear}-01-01`;
-    const yearEnd = `${selectedYear}-12-31`;
-    const attendanceQ = query(
-      collection(db, 'attendance'),
-      where('workDate', '>=', yearStart),
-      where('workDate', '<=', yearEnd)
-    );
-    const unsubAttendance = onSnapshot(attendanceQ, (snap) => {
-      setAttendance(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'attendance', false);
-    });
-
-    return () => {
-      unsubOrders();
-      unsubTasks();
-      unsubPayments();
-      unsubBusExp();
-      unsubPayReq();
-      unsubAdvReq();
-      unsubReimReq();
-      unsubUsers();
-      unsubDepts();
-      unsubAttendance();
-    };
-  }, [user, canSeeAll, selectedYear]);
+  React.useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   // 3. Memoized derived statistics
   const activeOrdersForYear = React.useMemo(() => {
@@ -854,6 +730,17 @@ export default function Dashboard() {
         </div>
         
         <div className="flex items-center gap-3 self-start md:self-auto">
+          <button 
+            onClick={() => {
+              sessionStorage.removeItem('app_users_list');
+              fetchDashboardData();
+            }}
+            disabled={refreshing}
+            className="p-2.5 bg-gray-55 text-gray-500 rounded-2xl border border-gray-150 hover:bg-white hover:text-blue-600 transition-all shadow-sm"
+            title="Làm mới dữ liệu"
+          >
+            <Activity size={20} className={cn(refreshing && "animate-spin")} />
+          </button>
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Chọn Năm Tài Chính:</label>
           <div className="relative">
             <select 

@@ -112,81 +112,32 @@ export default function WarehouseManagement() {
     };
     bootstrapWarehouses();
 
-    let inventoryDone = false;
-    let stockItemsDone = false;
-    let productsDone = false;
-    let warehousesDone = false;
-    let transactionsDone = false;
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [invSnap, stockSnap, prodSnap, whSnap, txSnap] = await Promise.all([
+          getDocs(collection(db, 'inventory')),
+          getDocs(collection(db, 'stock_items')),
+          getDocs(collection(db, 'products')),
+          getDocs(collection(db, 'warehouses')),
+          getDocs(collection(db, 'stock_transactions'))
+        ]);
 
-    const checkAllDone = () => {
-      if (inventoryDone && stockItemsDone && productsDone && warehousesDone && transactionsDone) {
+        setInventory(invSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
+        setStockItems(stockSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+        setProducts(prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+        setWarehouses(whSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Warehouse)));
+        setTransactions(txSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        console.error("Error loading warehouse data:", error);
+      } finally {
         setLoading(false);
       }
     };
 
-    const unsubInventory = onSnapshot(collection(db, 'inventory'), (snap) => {
-      setInventory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
-      inventoryDone = true;
-      checkAllDone();
-    }, (error) => {
-      console.error("Error loading inventory:", error);
-      inventoryDone = true;
-      checkAllDone();
-    });
+    fetchData();
 
-    const unsubStockItems = onSnapshot(collection(db, 'stock_items'), (snap) => {
-      setStockItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
-      stockItemsDone = true;
-      checkAllDone();
-    }, (error) => {
-      console.error("Error loading stock_items:", error);
-      stockItemsDone = true;
-      checkAllDone();
-    });
-
-    const unsubProducts = onSnapshot(collection(db, 'products'), (snap) => {
-      setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
-      productsDone = true;
-      checkAllDone();
-    }, (error) => {
-      console.error("Error loading products:", error);
-      productsDone = true;
-      checkAllDone();
-    });
-
-    const unsubWarehouses = onSnapshot(collection(db, 'warehouses'), (snap) => {
-      setWarehouses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Warehouse)));
-      warehousesDone = true;
-      checkAllDone();
-    }, (error) => {
-      console.error("Error loading warehouses:", error);
-      warehousesDone = true;
-      checkAllDone();
-    });
-
-    const unsubTransactions = onSnapshot(collection(db, 'stock_transactions'), (snap) => {
-      setTransactions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      transactionsDone = true;
-      checkAllDone();
-    }, (error) => {
-      console.error("Error loading transactions:", error);
-      transactionsDone = true;
-      checkAllDone();
-    });
-
-    // Fallback safety timeout
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 3000);
-
-    return () => {
-      clearTimeout(timeout);
-      unsubInventory();
-      unsubStockItems();
-      unsubProducts();
-      unsubWarehouses();
-      unsubTransactions();
-    };
+    return () => {};
   }, [isAdmin, isManager, isHR, isAccountant]);
 
   const handleSaveWarehouse = async (e: React.FormEvent<HTMLFormElement>) => {

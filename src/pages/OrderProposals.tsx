@@ -186,60 +186,37 @@ export default function OrderProposals() {
 
   const [error, setError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const fetchProposals = React.useCallback(async () => {
     if (!user) return;
+    setRefreshing(true);
     setError(null);
-
-    const unsubCustomers = onSnapshot(collection(db, 'customers'), (snap) => {
-      setCustomers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      console.error("Error loading customers in OrderProposals:", err);
-      setCustomers([]);
-    });
-
-    let unsubUsers = () => {};
-    if (canSeeAll) {
-      unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-        setUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }, (err) => {
-        console.error("Error loading users in OrderProposals:", err);
-        setUsers([]);
-      });
-    } else if (user) {
-      // At least put self in the users list
-      setUsers([{ id: user.uid, fullName: appUser?.fullName || user.displayName || 'Self', email: user.email }]);
-    }
-    
-    let unsubProposals = () => {};
-    
-    // For powerful roles, try global fetch first
-    if (canSeeAll) {
-      const q = query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'));
-      unsubProposals = onSnapshot(q, (snap) => {
+    try {
+      if (canSeeAll) {
+        const q = query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
         setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setError(null);
-      }, (err) => {
-        console.warn("Global order_proposals query failed:", err);
-        handleFirestoreError(err, OperationType.LIST, 'order_proposals');
-        setError("Lỗi khi tải dữ liệu. Có thể bạn không có quyền xem tất cả đề xuất.");
-      });
-    } else {
-      // For staff roles who only see their own items (and legacy items)
-      // For non-admin/non-manager roles, split the compound OR + ORDER BY query to avoid composite index requirement.
-      // This solves the blank page loading issue by executing independent simple queries and sorting in memory.
-      let listCreated: any[] = [];
-      let listLegacyCreated: any[] = [];
-      let listFollowed: any[] = [];
-      let listLegacyFollowed: any[] = [];
-      let listResponsible: any[] = [];
+      } else {
+        // Fetch specific queries for staff
+        const q1 = query(collection(db, 'order_proposals'), where('createdBy', '==', user.uid));
+        const q2 = query(collection(db, 'order_proposals'), where('followers', 'array-contains', user.uid));
+        const qResp = query(collection(db, 'order_proposals'), where('responsibleUserId', '==', user.uid));
+        
+        const [snap1, snap2, snapResp] = await Promise.all([getDocs(q1), getDocs(q2), getDocs(qResp)]);
+        
+        let legacySnap1: any = { docs: [] };
+        let legacySnap2: any = { docs: [] };
+        if (appUser?.legacyId) {
+          const qL1 = query(collection(db, 'order_proposals'), where('createdBy', '==', appUser.legacyId));
+          const qL2 = query(collection(db, 'order_proposals'), where('followers', 'array-contains', appUser.legacyId));
+          [legacySnap1, legacySnap2] = await Promise.all([getDocs(qL1), getDocs(qL2)]);
+        }
 
-      const combineAndSortProposals = () => {
         const mergedMap = new Map();
-        listCreated.forEach(item => mergedMap.set(item.id, item));
-        listLegacyCreated.forEach(item => mergedMap.set(item.id, item));
-        listFollowed.forEach(item => mergedMap.set(item.id, item));
-        listLegacyFollowed.forEach(item => mergedMap.set(item.id, item));
-        listResponsible.forEach(item => mergedMap.set(item.id, item));
+        [snap1, snap2, snapResp, legacySnap1, legacySnap2].forEach(snap => {
+          snap.docs.forEach((doc: any) => mergedMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        });
         
         const mergedList = Array.from(mergedMap.values());
         mergedList.sort((a, b) => {
@@ -247,135 +224,57 @@ export default function OrderProposals() {
           const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
           return tB - tA;
         });
-        
-        // Only update if we have data or if the global one didn't already set data
-        setProposals(prev => {
-          if (mergedList.length === 0 && prev.length > 0 && canSeeAll) return prev;
-          return mergedList;
-        });
-      };
-
-      const q1 = query(collection(db, 'order_proposals'), where('createdBy', '==', user.uid));
-      const q2 = query(collection(db, 'order_proposals'), where('followers', 'array-contains', user.uid));
-      const qResp = query(collection(db, 'order_proposals'), where('responsibleUserId', '==', user.uid));
-
-      const unsub1 = onSnapshot(q1, (snap) => {
-        listCreated = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        combineAndSortProposals();
-        setError(null);
-      }, (err) => {
-        if (!canSeeAll) {
-           handleFirestoreError(err, OperationType.LIST, 'order_proposals/createdBy');
-           setError("Lỗi khi tải dữ liệu cá nhân.");
-        }
-      });
-
-      const unsubResp = onSnapshot(qResp, (snap) => {
-        listResponsible = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        combineAndSortProposals();
-      }, (err) => !canSeeAll && handleFirestoreError(err, OperationType.LIST, 'order_proposals/responsible'));
-
-      let unsubLegacy1 = () => {};
-      if (appUser?.legacyId) {
-        const qLegacy1 = query(collection(db, 'order_proposals'), where('createdBy', '==', appUser.legacyId));
-        unsubLegacy1 = onSnapshot(qLegacy1, (snap) => {
-          listLegacyCreated = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          combineAndSortProposals();
-        }, (err) => !canSeeAll && handleFirestoreError(err, OperationType.LIST, 'order_proposals/createdByLegacy'));
+        setProposals(mergedList);
       }
-
-      const unsub2 = onSnapshot(q2, (snap) => {
-        listFollowed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        combineAndSortProposals();
-      }, (err) => !canSeeAll && handleFirestoreError(err, OperationType.LIST, 'order_proposals/followed'));
-
-      let unsubLegacy2 = () => {};
-      if (appUser?.legacyId) {
-        const qLegacy2 = query(collection(db, 'order_proposals'), where('followers', 'array-contains', appUser.legacyId));
-        unsubLegacy2 = onSnapshot(qLegacy2, (snap) => {
-          listLegacyFollowed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          combineAndSortProposals();
-        }, (err) => !canSeeAll && handleFirestoreError(err, OperationType.LIST, 'order_proposals/followedLegacy'));
-      }
-
-      const originalUnsubProposals = unsubProposals;
-      unsubProposals = () => {
-        originalUnsubProposals();
-        unsub1();
-        unsubResp();
-        unsubLegacy1();
-        unsub2();
-        unsubLegacy2();
-      };
+    } catch (err: any) {
+      console.error("Error fetching proposals:", err);
+      handleFirestoreError(err, OperationType.LIST, 'order_proposals');
+      setError("Lỗi khi tải dữ liệu đề xuất.");
+    } finally {
+      setRefreshing(false);
     }
-
-    return () => {
-      unsubCustomers();
-      unsubUsers();
-      unsubProposals();
-    };
-  }, [canSeeAll, user, appUser]);
+  }, [user, appUser, canSeeAll]);
 
   React.useEffect(() => {
-    if (!user || !db || !canSeeAll) return;
-    const healDatabase = async () => {
+    if (!user) return;
+    
+    // One-time fetches for customers and users
+    const fetchSupportData = async () => {
       try {
-        const proposalsSnap = await getDocs(collection(db, 'order_proposals'));
-        const ordersSnap = await getDocs(collection(db, 'orders'));
-        const propMap = new Map();
-        proposalsSnap.docs.forEach(doc => {
-          propMap.set(doc.id, doc.data());
-        });
-
-        for (const orderDoc of ordersSnap.docs) {
-          const orderData = orderDoc.data();
-          if (orderData.proposalId) {
-            const proposal = propMap.get(orderData.proposalId);
-            if (proposal) {
-              if (proposal.status === 'rejected') {
-                console.log(`Self-healing: Deleting order document ${orderDoc.id} associated with rejected proposal ${orderData.proposalId}`);
-                await deleteDoc(doc(db, 'orders', orderDoc.id));
-              } else if (proposal.status === 'approved') {
-                const updatePayload: any = {};
-                if (orderData.expectedProfit === undefined && proposal.expectedProfit !== undefined) {
-                  updatePayload.expectedProfit = Number(proposal.expectedProfit);
-                }
-                if (orderData.expectedProfitAfterCIT === undefined && proposal.expectedProfitAfterCIT !== undefined) {
-                  updatePayload.expectedProfitAfterCIT = Number(proposal.expectedProfitAfterCIT);
-                }
-                if (orderData.budgetedTotalCosts === undefined && proposal.totalCosts !== undefined) {
-                  updatePayload.budgetedTotalCosts = Number(proposal.totalCosts);
-                }
-                if (orderData.contingencyCost === undefined && proposal.contingencyCost !== undefined) {
-                  updatePayload.contingencyCost = Number(proposal.contingencyCost);
-                }
-                if (orderData.warrantyCost === undefined && proposal.warrantyCost !== undefined) {
-                  updatePayload.warrantyCost = Number(proposal.warrantyCost);
-                }
-                if (orderData.customerAcquisitionCost === undefined && proposal.customerAcquisitionCost !== undefined) {
-                  updatePayload.customerAcquisitionCost = Number(proposal.customerAcquisitionCost);
-                }
-                if (orderData.otherCosts === undefined && proposal.otherCosts !== undefined) {
-                  updatePayload.otherCosts = Number(proposal.otherCosts);
-                }
-                if (orderData.financialCost === undefined && proposal.financialCost !== undefined) {
-                  updatePayload.financialCost = Number(proposal.financialCost);
-                }
-
-                if (Object.keys(updatePayload).length > 0) {
-                  console.log(`Self-healing: Patching order ${orderDoc.id} with missing financial attributes:`, updatePayload);
-                  await updateDoc(doc(db, 'orders', orderDoc.id), updatePayload);
-                }
-              }
-            }
+        // Caching customers
+        const cachedCustomers = sessionStorage.getItem('app_customers_list');
+        if (cachedCustomers) {
+          setCustomers(JSON.parse(cachedCustomers));
+        } else {
+          const custSnap = await getDocs(collection(db, 'customers'));
+          const custList = custSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setCustomers(custList);
+          sessionStorage.setItem('app_customers_list', JSON.stringify(custList));
+        }
+        
+        if (canSeeAll) {
+          const cachedUsers = sessionStorage.getItem('app_users_list');
+          if (cachedUsers) {
+            setUsers(JSON.parse(cachedUsers));
+          } else {
+            const userSnap = await getDocs(collection(db, 'users'));
+            const userList = userSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setUsers(userList);
+            sessionStorage.setItem('app_users_list', JSON.stringify(userList));
           }
+        } else {
+          setUsers([{ id: user.uid, fullName: appUser?.fullName || user.displayName || 'Self', email: user.email }]);
         }
       } catch (err) {
-        console.error('Error in self-healing database check:', err);
+        console.error("Error fetching support data:", err);
       }
     };
-    healDatabase();
-  }, [user, canSeeAll]);
+
+    fetchSupportData();
+    fetchProposals();
+  }, [fetchProposals, canSeeAll, user]);
+
+  // Removed automatic healDatabase to save quota. It should be a manual admin action if needed.
 
   const handleCloseModal = () => {
     setShowAddModal(false);

@@ -53,12 +53,9 @@ function AppContent() {
   React.useEffect(() => {
     if (user && !loading && !isVerifying) {
       if (user.email === 'info.vinasglobal@gmail.com') {
-        // Auto clean orphans when super admin logs in (temporary fix)
         const runSystemFixes = async () => {
           try {
             const { collection, getDocs, deleteDoc, query, where, setDoc, doc } = await import('firebase/firestore');
-            
-            // Fix 1: Clean orphans
             const ordersSnap = await getDocs(collection(db, 'orders'));
             const validIds = new Set(ordersSnap.docs.map(d => d.id));
             const collectionsToCheck = [
@@ -83,11 +80,9 @@ function AppContent() {
               }
             }
             if (count > 0) console.log('Cleaned up ' + count + ' orphans');
-
-            // Fix 2: Provision missing account for vietnhan@thalex.com.vn
+            
             const emailVietNhan = 'vietnhan@thalex.com.vn';
-            const vietnhanQuery = query(collection(db, 'users'), where('email', '==', emailVietNhan));
-            const vietnhanSnap = await getDocs(vietnhanQuery);
+            const vietnhanSnap = await getDocs(query(collection(db, 'users'), where('email', '==', emailVietNhan)));
             if (vietnhanSnap.empty) {
               const tempId = emailVietNhan.toLowerCase().replace(/[^a-z0-9]/g, '_');
               await setDoc(doc(db, 'users', tempId), {
@@ -101,36 +96,16 @@ function AppContent() {
                 tempPassword: 'Thalex@123',
                 needsPasswordChange: true
               });
-              console.log('Provisioned account for ' + emailVietNhan);
-            }
-
-            // Fix 3: Ensure ngocvan@thalex.com.vn has warehouse permissions
-            const emailNgocVan = 'ngocvan@thalex.com.vn';
-            const ngocvanQuery = query(collection(db, 'users'), where('email', '==', emailNgocVan));
-            const ngocvanSnap = await getDocs(ngocvanQuery);
-            if (!ngocvanSnap.empty) {
-              const docRef = ngocvanSnap.docs[0].ref;
-              const data = ngocvanSnap.docs[0].data();
-              const perms = data.permissions || [];
-              const required = ['manage_warehouse', 'menu_warehouse_edit', 'edit_orders', 'view_orders'];
-              const missing = required.filter(p => !perms.includes(p));
-              if (missing.length > 0) {
-                await setDoc(docRef, { 
-                  permissions: [...new Set([...perms, ...required])]
-                }, { merge: true });
-                console.log('Updated permissions for ' + emailNgocVan);
-              }
             }
           } catch(e) {
             console.error('System fix error:', e);
           }
         };
         runSystemFixes();
-        return;
       }
-      if (!appUser) {
-        auth.signOut();
-      } else if (appUser.accountStatus === 'locked' || appUser.accountStatus === 'pending') {
+      
+      // Removed automatic signOut when appUser is missing to handle Firestore Quota errors gracefully
+      if (appUser && (appUser.accountStatus === 'locked' || appUser.accountStatus === 'pending')) {
         auth.signOut();
       }
     }
@@ -154,8 +129,31 @@ function AppContent() {
   }
 
   if (!appUser) {
-    auth.signOut();
-    return <LoginPage initialError={`Tài khoản ${user.email} (UID: ${user.uid}) chưa được khai báo hoặc đã bị xoá. Vui lòng đăng nhập lại hoặc liên hệ Admin.`} />;
+    // If quota exceeded, we might reach here. Show a better message instead of signing out.
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
+        <Logo className="h-12 mb-6" showName />
+        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md border border-red-100">
+           <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+             <Logo className="h-8 grayscale opacity-50" />
+           </div>
+           <h3 className="text-xl font-bold text-gray-900 mb-2">Không thể tải tài khoản</h3>
+           <p className="text-gray-500 text-sm mb-6">Hệ thống đang gặp sự cố về hạn mức dữ liệu (Quota Exceeded) hoặc tài khoản của bạn chưa được kích hoạt.</p>
+           <button 
+             onClick={() => window.location.reload()}
+             className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 mb-3"
+           >
+             Thử lại
+           </button>
+           <button 
+             onClick={() => auth.signOut()}
+             className="w-full text-gray-400 text-sm font-semibold hover:text-gray-600"
+           >
+             Đăng xuất
+           </button>
+        </div>
+      </div>
+    );
   }
 
   if (appUser.accountStatus === 'locked') {
@@ -166,7 +164,6 @@ function AppContent() {
     return <LoginPage initialError="Tài khoản đang chờ hỗ trợ kích hoạt. Vui lòng đăng nhập lại." />;
   }
 
-  // Force password change for new accounts
   if (appUser.needsPasswordChange) {
     return <LoginPage forceChangePassword />;
   }
@@ -231,4 +228,3 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-

@@ -154,12 +154,13 @@ export default function Attendance() {
       setDepartments(deptsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPaymentRequests(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-      const startForQuery = format(subMonths(startOfMonth(date), 12), 'yyyy-MM-dd');
+      const startForQuery = format(subMonths(startOfMonth(date), 2), 'yyyy-MM-dd');
       const q = query(
         collection(db, 'attendance'),
         where('userId', '==', user.uid),
         where('workDate', '>=', startForQuery),
-        where('workDate', '<=', end)
+        where('workDate', '<=', end),
+        orderBy('workDate', 'desc')
       );
       const snap = await getDocs(q);
       const allAttSnapshot = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -225,12 +226,12 @@ export default function Attendance() {
     try {
       const q = query(
         collection(db, 'attendance'),
-        where('userId', '==', user.uid)
+        where('userId', '==', user.uid),
+        orderBy('workDate', 'desc'),
+        limit(10)
       );
       const snap = await getDocs(q);
-      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      data.sort((a: any, b: any) => new Date(b.workDate).getTime() - new Date(a.workDate).getTime());
-      setHistory(data.slice(0, 10));
+      setHistory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, 'attendance');
     }

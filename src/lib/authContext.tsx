@@ -488,6 +488,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const userRef = doc(db, 'users', u.uid);
           
+          // Try to load from cache immediately to prevent flashing/logout
+          const cached = localStorage.getItem(`app_user_${u.uid}`);
+          if (cached) {
+            try {
+              setAppUser(JSON.parse(cached));
+            } catch (e) {
+              console.error("Failed to parse cached app user", e);
+            }
+          }
+
           // Use onSnapshot for real-time updates
           unsubscribeDoc = onSnapshot(userRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -495,7 +505,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const email = u.email || data.email || '';
               const expectedLegacyId = email ? email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
               
-              const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn';
+              const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn' || u.email === 'thangcd11@gmail.com';
               const isNgocVan = u.email === 'ngocvan@thalex.com.vn' || u.email === 'ngocvan@thalex.vn';
               
               if (isSystemAdminEmail && (data.accountStatus !== 'active' || (u.email === 'info.vinasglobal@gmail.com' && data.roleId !== 'SuperAdmin') || !data.legacyId)) {
@@ -505,16 +515,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   roleId: (u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : (data.roleId || 'Director')) as any,
                   legacyId: expectedLegacyId,
                 };
-                setDoc(userRef, refreshed).catch(err => console.error("Self-heal write failed", err));
+                setDoc(userRef, refreshed, { merge: true }).catch(err => console.error("Self-heal write failed", err));
                 setAppUser(refreshed);
                 localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(refreshed));
               } else if (isNgocVan) {
-                const required = ['manage_warehouse', 'menu_warehouse_edit', 'view_warehouse', 'menu_warehouse_view', 'edit_orders', 'view_orders', 'menu_orders_view', 'menu_orders_edit'];
+                const required = [
+                  'manage_warehouse', 'menu_warehouse_edit', 'view_warehouse', 'menu_warehouse_view', 
+                  'edit_orders', 'view_orders', 'menu_orders_view', 'menu_orders_edit', 'approve_orders',
+                  'create_orders', 'manage_tasks', 'menu_tasks_edit', 'view_tasks'
+                ];
                 const currentPerms = data.permissions || [];
                 const missing = required.filter(p => !currentPerms.includes(p));
-                if (missing.length > 0) {
+                if (missing.length > 0 || data.roleId !== 'Director') {
                   const refreshed = {
                     ...data,
+                    roleId: 'Director',
                     permissions: [...new Set([...currentPerms, ...required])]
                   };
                   setDoc(userRef, refreshed, { merge: true }).catch(err => console.error("NgocVan self-heal failed", err));
@@ -530,7 +545,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   accountStatus: 'active' as const,
                   legacyId: expectedLegacyId,
                 };
-                setDoc(userRef, refreshed).catch(err => console.error("Self-heal write failed", err));
+                setDoc(userRef, refreshed, { merge: true }).catch(err => console.error("Self-heal write failed", err));
                 setAppUser(refreshed);
                 localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(refreshed));
               } else {
@@ -538,22 +553,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(data));
               }
             } else {
-            // User document not found. If system admin, self-heal immediately!
-            const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn';
-            if (isSystemAdminEmail) {
-              const expectedLegacyId = u.email ? u.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
-              const newUser = {
-                uid: u.uid,
-                fullName: u.email === 'info.vinasglobal@gmail.com' ? 'Super Admin' : 'Nguyễn Việt Nhân',
-                email: u.email,
-                avatar: `https://ui-avatars.com/api/?name=${u.email === 'info.vinasglobal@gmail.com' ? 'Super+Admin' : 'Viet+Nhan'}&background=random`,
-                roleId: u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : 'Director',
-                workStatus: 'official',
-                accountStatus: 'active',
-                legacyId: expectedLegacyId,
-                createdAt: new Date().toISOString(),
-              };
-              setDoc(userRef, newUser).catch(err => console.error("Self-heal create failed", err));
+              // User document not found. If system admin, self-heal immediately!
+              const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn' || u.email === 'thangcd11@gmail.com';
+              if (isSystemAdminEmail) {
+                const expectedLegacyId = u.email ? u.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
+                const newUser = {
+                  uid: u.uid,
+                  fullName: u.email === 'info.vinasglobal@gmail.com' ? 'Super Admin' : 'Nguyễn Việt Nhân',
+                  email: u.email,
+                  avatar: `https://ui-avatars.com/api/?name=${u.email === 'info.vinasglobal@gmail.com' ? 'Super+Admin' : 'Viet+Nhan'}&background=random`,
+                  roleId: u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : 'Director',
+                  workStatus: 'official',
+                  accountStatus: 'active',
+                  legacyId: expectedLegacyId,
+                  createdAt: new Date().toISOString(),
+                };
+                setDoc(userRef, newUser).catch(err => console.error("Self-heal create failed", err));
                 setAppUser(newUser as any);
               } else {
                 if (u.email) {
@@ -573,11 +588,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                           };
                           setDoc(userRef, linkedData).then(() => {
                             deleteDoc(doc(db, 'users', tempId)).catch(() => {});
-                            // State will also update from the next snapshot trigger
                             setAppUser(linkedData as AppUser);
                             setLoading(false);
                           }).catch(() => {
-                            setAppUser(null);
                             setLoading(false);
                           });
                           return;
@@ -591,11 +604,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                           if (!qSnap.empty) {
                             const oldDoc = qSnap.docs[0];
                             const data = oldDoc.data() as AppUser;
-                            if (oldDoc.id === u.uid) {
-                              // The document is already migrated/assigned to the correct UID. 
-                              // onSnapshot will pick this up. Do nothing.
-                              return;
-                            }
+                            if (oldDoc.id === u.uid) return;
                             if (data.accountStatus !== 'locked') {
                               const linkedData = { ...data, uid: u.uid };
                               setDoc(userRef, linkedData).then(() => {
@@ -603,70 +612,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 setAppUser(linkedData as AppUser);
                                 setLoading(false);
                               }).catch(() => {
-                                setAppUser(null);
                                 setLoading(false);
                               });
                               return;
                             }
                           }
-                          
-                          // Check if the current userDoc existance has changed while we were doing async work
-                          getDoc(userRef).then(currentDocSnap => {
-                            if (!currentDocSnap.exists()) {
-                              setAppUser(null);
-                            }
-                            setLoading(false);
-                          }).catch(() => {
-                            setAppUser(null);
-                            setLoading(false);
-                          });
+                          setLoading(false);
                         }).catch(() => {
-                          setAppUser(null);
                           setLoading(false);
                         });
                       });
                     }).catch(() => {
-                      setAppUser(null);
                       setLoading(false);
                     });
                     return;
                   }
                 }
-                setAppUser(null);
               }
+              setLoading(false);
             }
-            setLoading(false);
           }, (error) => {
+            console.error("User snapshot error:", error);
             handleFirestoreError(error, OperationType.GET, `users/${u.uid}`, false);
-            // On snapshot error (e.g., connection lost or offline), load from cache or fallback
-            const cached = localStorage.getItem(`app_user_${u.uid}`);
-            if (cached) {
-              try {
-                setAppUser(JSON.parse(cached));
-              } catch (e) {
-                console.error("Failed to parse cached app user", e);
-                setAppUser(null);
-              }
-            } else {
-              setAppUser(null);
-            }
+            // On snapshot error, we ALREADY tried to load from cache at the start
             setLoading(false);
           });
 
         } catch (error) {
+          console.error("User initial fetch error:", error);
           handleFirestoreError(error, OperationType.GET, `users/${u.uid}`, false);
-          // On getDoc error, try to load from cache
-          const cached = localStorage.getItem(`app_user_${u.uid}`);
-          if (cached) {
-            try {
-              setAppUser(JSON.parse(cached));
-            } catch (e) {
-              console.error("Failed to parse cached app user", e);
-              setAppUser(null);
-            }
-          } else {
-            setAppUser(null);
-          }
           setLoading(false);
         }
       } else {
@@ -708,14 +682,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    // Try to load from cache first
+    const cachedPerms = sessionStorage.getItem('app_role_permissions');
+    if (cachedPerms) {
+      try {
+        setRolePermissions(JSON.parse(cachedPerms));
+      } catch (e) {
+        console.error("Failed to parse cached role permissions", e);
+      }
+    }
+
     const unsubRolePerms = onSnapshot(collection(db, 'role_permissions'), (snap) => {
       const perms: Record<string, string[]> = {};
       snap.docs.forEach(doc => {
         perms[doc.id] = doc.data().permissions || [];
       });
       setRolePermissions(perms);
+      sessionStorage.setItem('app_role_permissions', JSON.stringify(perms));
     }, (error) => {
       console.error("Error loading role permissions:", error);
+      handleFirestoreError(error, OperationType.LIST, 'role_permissions', false);
     });
 
     return () => {
@@ -778,15 +764,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
-  const isSuperAdmin = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || roleLower === 'superadmin' || roleLower === 'admin';
+  const isSuperAdmin = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn' || user?.email === 'ngocvan@thalex.vn' || roleLower === 'superadmin' || roleLower === 'admin';
   // Admin is SuperAdmin, Director, or anyone with manage_users
-  const isAdmin = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || hasPermission('manage_users');
+  const isAdmin = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || hasPermission('manage_users') || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn';
   // Director has top administrative authority or isDirector role directly
-  const isDirector = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn' || user?.email === 'ngocvan@thalex.vn';
+  const isDirector = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn' || user?.email === 'ngocvan@thalex.vn' || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn';
   
-  const isManager = roleLower === 'manager' || roleLower === 'generalmanager' || roleLower === 'hrmanager' || roleLower === 'chiefaccountant' || roleLower === 'salesmanager' || roleLower === 'technicalmanager' || roleLower.endsWith('_manager') || roleLower === 'ketoantruong' || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn';
-  const isAccountant = roleLower === 'accountant' || roleLower === 'chiefaccountant' || roleLower === 'accountantstaff' || roleLower.endsWith('_accountant') || roleLower === 'ketoantruong' || roleLower === 'ketoan' || roleLower === 'kế toán' || roleLower === 'kế toán trưởng' || roleLower.includes('kế toán') || roleLower.includes('thủ quỹ') || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn';
-  const isHR = roleLower === 'hr' || roleLower === 'hrmanager' || roleLower === 'hrstaff' || roleLower === 'nhansu' || roleLower === 'nhân sự' || roleLower.includes('nhân sự') || roleLower.includes('hành chính') || roleLower.endsWith('_hr') || roleLower.endsWith('_nhansu') || hasPermission('manage_users');
+  const isManager = roleLower === 'manager' || roleLower === 'generalmanager' || roleLower === 'hrmanager' || roleLower === 'chiefaccountant' || roleLower === 'salesmanager' || roleLower === 'technicalmanager' || roleLower.endsWith('_manager') || roleLower === 'ketoantruong' || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn';
+  const isAccountant = roleLower === 'accountant' || roleLower === 'chiefaccountant' || roleLower === 'accountantstaff' || roleLower.endsWith('_accountant') || roleLower === 'ketoantruong' || roleLower === 'ketoan' || roleLower === 'kế toán' || roleLower === 'kế toán trưởng' || roleLower.includes('kế toán') || roleLower.includes('thủ quỹ') || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn';
+  const isHR = roleLower === 'hr' || roleLower === 'hrmanager' || roleLower === 'hrstaff' || roleLower === 'nhansu' || roleLower === 'nhân sự' || roleLower.includes('nhân sự') || roleLower.includes('hành chính') || roleLower.endsWith('_hr') || roleLower.endsWith('_nhansu') || hasPermission('manage_users') || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn';
   const isGeneral = roleLower === 'generalmanager' || roleLower === 'generalstaff' || appUser?.departmentId === 'phong-tong-hop' || roleLower.includes('general') || (appUser?.departmentName || '').toLowerCase().includes('tổng hợp');
   
   const canViewSalaries = isSuperAdmin || isDirector || hasPermission('view_salaries') || hasPermission('manage_users') || hasPermission('view_financial_reports') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn';

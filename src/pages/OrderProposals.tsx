@@ -1444,7 +1444,7 @@ export default function OrderProposals() {
                       </button>
                     </>
                   )}
-                  {isDirector && (viewingProposal.status === 'approved' || viewingProposal.status === 'rejected' || viewingProposal.status === 'cancelled') && (
+                  {(isSuperAdmin || isDirector) && (
                     <button 
                       onClick={() => {
                         setDeleteConfirmId(viewingProposal.id);
@@ -2051,6 +2051,8 @@ export default function OrderProposals() {
                     setDeleteConfirmId(null);
                     try {
                       await deleteDoc(doc(db, 'order_proposals', id));
+                      setProposals(prev => prev.filter(p => p.id !== id));
+                      alert('Xóa đề xuất thành công');
                     } catch (err: any) {
                       alert('Lỗi: ' + err.message);
                     }

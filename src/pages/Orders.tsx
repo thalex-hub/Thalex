@@ -61,6 +61,74 @@ export default function Orders() {
     totalBudgetedCosts: 0,
     totalNetProfit: 0,
   });
+
+  const processOrders = React.useCallback((ordersList: any[]) => {
+    let invoicedRevenue = 0;
+    let invoicedCount = 0;
+    let totalRevenue = 0;
+    let totalProfit = 0;
+    let activeCount = 0;
+    let totalCostPrice = 0;
+    let totalBudgetedCosts = 0;
+    let totalNetProfit = 0;
+
+    const loadedOrders = [...ordersList].sort((a, b) => {
+      const valA = a.startDate || a.createdAt;
+      const valB = b.startDate || b.createdAt;
+      const dateA = valA ? new Date(valA).getTime() : 0;
+      const dateB = valB ? new Date(valB).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    ordersList.forEach((o) => {
+      if (o.status === "cancelled" || o.status === "rejected") return;
+      
+      const basePrice =
+        o.basePrice ||
+        Math.round(Number(o.contractValueWithVAT || o.totalValue) / 1.1) ||
+        0;
+      const profit =
+        Number(o.expectedProfit) ||
+        basePrice - (Number(o.budgetedTotalCosts) || Number(o.totalCosts) || 0);
+
+      const costPrice = Number(o.costPrice) || 0;
+      const budgetedCosts = Number(o.budgetedTotalCosts) || Number(o.totalCosts) || (basePrice - profit);
+      const netProfit = o.expectedProfitAfterCIT !== undefined && o.expectedProfitAfterCIT !== null && o.expectedProfitAfterCIT !== ''
+        ? Number(o.expectedProfitAfterCIT)
+        : (profit - ((basePrice - costPrice) > 0 ? 0.2 * (basePrice - costPrice) : 0));
+
+      totalRevenue += basePrice;
+      totalProfit += profit;
+      totalCostPrice += costPrice;
+      totalBudgetedCosts += budgetedCosts;
+      totalNetProfit += netProfit;
+      activeCount++;
+
+      if (o.invoices && o.invoices.length > 0) {
+        const invSum = o.invoices.reduce((sum: number, inv: any) => sum + (Number(inv.amount) || 0), 0);
+        invoicedRevenue += invSum;
+        if (invSum >= basePrice) {
+          invoicedCount++;
+        }
+      } else if (o.isInvoiced) {
+        invoicedCount++;
+        invoicedRevenue += basePrice;
+      }
+    });
+    setGlobalStats({
+      totalInvoicedRevenue: invoicedRevenue,
+      totalOrders: activeCount,
+      invoicedCount,
+      totalRevenue,
+      totalProfit,
+      totalCostPrice,
+      totalBudgetedCosts,
+      totalNetProfit,
+    });
+
+    setOrders(loadedOrders);
+    setLoading(false);
+  }, []);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
   const [loading, setLoading] = React.useState(true);
@@ -214,74 +282,6 @@ export default function Orders() {
   React.useEffect(() => {
     if (!user) return;
     setLoading(true);
-
-    const processOrders = (ordersList: any[]) => {
-      let invoicedRevenue = 0;
-      let invoicedCount = 0;
-      let totalRevenue = 0;
-      let totalProfit = 0;
-      let activeCount = 0;
-      let totalCostPrice = 0;
-      let totalBudgetedCosts = 0;
-      let totalNetProfit = 0;
-
-      const loadedOrders = [...ordersList].sort((a, b) => {
-        const valA = a.startDate || a.createdAt;
-        const valB = b.startDate || b.createdAt;
-        const dateA = valA ? new Date(valA).getTime() : 0;
-        const dateB = valB ? new Date(valB).getTime() : 0;
-        return dateB - dateA;
-      });
-
-      ordersList.forEach((o) => {
-        if (o.status === "cancelled" || o.status === "rejected") return;
-        
-        const basePrice =
-          o.basePrice ||
-          Math.round(Number(o.contractValueWithVAT || o.totalValue) / 1.1) ||
-          0;
-        const profit =
-          Number(o.expectedProfit) ||
-          basePrice - (Number(o.budgetedTotalCosts) || Number(o.totalCosts) || 0);
-
-        const costPrice = Number(o.costPrice) || 0;
-        const budgetedCosts = Number(o.budgetedTotalCosts) || Number(o.totalCosts) || (basePrice - profit);
-        const netProfit = o.expectedProfitAfterCIT !== undefined && o.expectedProfitAfterCIT !== null && o.expectedProfitAfterCIT !== ''
-          ? Number(o.expectedProfitAfterCIT)
-          : (profit - ((basePrice - costPrice) > 0 ? 0.2 * (basePrice - costPrice) : 0));
-
-        totalRevenue += basePrice;
-        totalProfit += profit;
-        totalCostPrice += costPrice;
-        totalBudgetedCosts += budgetedCosts;
-        totalNetProfit += netProfit;
-        activeCount++;
-
-        if (o.invoices && o.invoices.length > 0) {
-          const invSum = o.invoices.reduce((sum: number, inv: any) => sum + (Number(inv.amount) || 0), 0);
-          invoicedRevenue += invSum;
-          if (invSum >= basePrice) {
-            invoicedCount++;
-          }
-        } else if (o.isInvoiced) {
-          invoicedCount++;
-          invoicedRevenue += basePrice;
-        }
-      });
-      setGlobalStats({
-        totalInvoicedRevenue: invoicedRevenue,
-        totalOrders: activeCount,
-        invoicedCount,
-        totalRevenue,
-        totalProfit,
-        totalCostPrice,
-        totalBudgetedCosts,
-        totalNetProfit,
-      });
-
-      setOrders(loadedOrders);
-      setLoading(false);
-    };
 
     let cleanup = () => {};
 
@@ -1326,6 +1326,9 @@ export default function Orders() {
 
                       // Now delete the order
                       await deleteDoc(doc(db, 'orders', id));
+                      const remainingOrders = orders.filter(o => o.id !== id);
+                      processOrders(remainingOrders);
+                      alert('Xóa đơn hàng thành công');
                     } catch (err: any) {
                       alert('Lỗi: ' + err.message);
                     }

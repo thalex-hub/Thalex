@@ -893,7 +893,7 @@ export default function ReimbursementRequests() {
                 <div className="flex items-center gap-4" onClick={e => e.stopPropagation()}>
                   <StatusBadge status={req.status} />
                   
-                  {(isDirector || isFinanceStaff) && (
+                  {(isDirector || isFinanceStaff || isSuperAdmin) && (
                     <button 
                       type="button"
                       onClick={(e) => {
@@ -1191,7 +1191,7 @@ export default function ReimbursementRequests() {
                   onClick={() => setDeleteConfirmId(null)} 
                   className="flex-1 py-3 border border-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors uppercase tracking-wider text-xs"
                 >
-                  Hủy bỏ
+                  Hủy
                 </button>
                 <button 
                   type="button" 
@@ -1202,7 +1202,7 @@ export default function ReimbursementRequests() {
                   }} 
                   className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-colors uppercase tracking-wider text-xs"
                 >
-                  Xác nhận Xóa
+                  Đồng ý
                 </button>
               </div>
             </motion.div>
@@ -1579,7 +1579,7 @@ export default function ReimbursementRequests() {
                   onClick={() => setRejectingRequest(null)} 
                   className="flex-1 py-3 border border-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors uppercase tracking-wider text-xs"
                 >
-                  Hủy bỏ
+                  Hủy
                 </button>
                 <button 
                   type="button" 
@@ -1599,7 +1599,7 @@ export default function ReimbursementRequests() {
                   }} 
                   className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-colors uppercase tracking-wider text-xs"
                 >
-                  Xác nhận
+                  Đồng ý
                 </button>
               </div>
             </motion.div>

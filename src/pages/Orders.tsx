@@ -963,7 +963,7 @@ export default function Orders() {
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusBadge status={order.status} />
-                      {isSuperAdmin && (
+                      {(isSuperAdmin || isDirector) && (
                         <button 
                           type="button"
                           onClick={(e) => {
@@ -972,7 +972,7 @@ export default function Orders() {
                             setDeleteConfirmId(order.id);
                           }}
                           className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50 text-base"
-                          title="Xóa đơn hàng (Superadmin)"
+                          title="Xóa đơn hàng"
                         >
                           <Trash2 size={20} />
                         </button>
@@ -1295,7 +1295,7 @@ export default function Orders() {
                   onClick={() => setDeleteConfirmId(null)} 
                   className="flex-1 py-3 border border-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors uppercase tracking-wider text-xs"
                 >
-                  Hủy bỏ
+                  Hủy
                 </button>
                 <button 
                   type="button" 
@@ -1332,7 +1332,7 @@ export default function Orders() {
                   }} 
                   className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-colors uppercase tracking-wider text-xs"
                 >
-                  Xác nhận Xóa
+                  Đồng ý
                 </button>
               </div>
             </motion.div>

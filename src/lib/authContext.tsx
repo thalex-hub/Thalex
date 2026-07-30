@@ -650,6 +650,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
+    // Safety check to clear stuck verification flag
+    if (typeof window !== 'undefined' && sessionStorage.getItem('is_verifying_login') === 'true') {
+      const timeoutId = setTimeout(() => {
+        if (loading) {
+          console.warn("Auth verification stuck, clearing flag...");
+          sessionStorage.removeItem('is_verifying_login');
+          // If we have a user but are stuck, trigger handleAuthStateChanged manually
+          if (auth.currentUser) {
+            handleAuthStateChanged(auth.currentUser);
+          } else {
+            setLoading(false);
+          }
+        }
+      }, 10000); // 10 seconds safety
+      
+      const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
+        // Prevent flashing during JIT authentication by ignoring updates 
+        if (typeof window !== 'undefined' && sessionStorage.getItem('is_verifying_login') === 'true') {
+          return;
+        }
+        handleAuthStateChanged(u);
+      });
+
+      return () => {
+        clearTimeout(timeoutId);
+        unsubscribeAuth();
+      };
+    }
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
       // Prevent flashing during JIT authentication by ignoring updates 
       if (typeof window !== 'undefined' && sessionStorage.getItem('is_verifying_login') === 'true') {

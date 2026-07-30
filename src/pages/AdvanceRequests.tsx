@@ -598,7 +598,7 @@ export default function AdvanceRequests() {
                <div className="flex items-center gap-2">
                   <StatusBadge status={req.status} />
                   
-                  {isSuperAdmin && (
+                  {(isSuperAdmin || isDirector) && (
                     <button 
                       type="button"
                       onClick={(e) => {
@@ -1301,7 +1301,7 @@ export default function AdvanceRequests() {
                   onClick={() => setDeleteConfirmId(null)} 
                   className="flex-1 py-3 border border-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors uppercase tracking-wider text-xs"
                 >
-                  Hủy bỏ
+                  Hủy
                 </button>
                 <button 
                   type="button" 
@@ -1316,7 +1316,7 @@ export default function AdvanceRequests() {
                   }} 
                   className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-colors uppercase tracking-wider text-xs"
                 >
-                  Xác nhận Xóa
+                  Đồng ý
                 </button>
               </div>
             </motion.div>

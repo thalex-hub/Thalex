@@ -48,7 +48,15 @@ function AppContent() {
   const { user, appUser, loading } = useAuth();
   const { settings } = useCompany();
 
-  const isVerifying = typeof window !== 'undefined' && sessionStorage.getItem('is_verifying_login') === 'true';
+  const [isVerifying, setIsVerifying] = React.useState(typeof window !== 'undefined' && sessionStorage.getItem('is_verifying_login') === 'true');
+
+  React.useEffect(() => {
+    const handleAuthVerifyDone = () => {
+      setIsVerifying(false);
+    };
+    window.addEventListener('auth_verify_done', handleAuthVerifyDone);
+    return () => window.removeEventListener('auth_verify_done', handleAuthVerifyDone);
+  }, []);
 
   React.useEffect(() => {
     if (user && !loading && !isVerifying) {
@@ -56,6 +64,7 @@ function AppContent() {
         const runSystemFixes = async () => {
           try {
             const { collection, getDocs, deleteDoc, query, where, setDoc, doc } = await import('firebase/firestore');
+            
             const ordersSnap = await getDocs(collection(db, 'orders'));
             const validIds = new Set(ordersSnap.docs.map(d => d.id));
             const collectionsToCheck = [
@@ -81,21 +90,23 @@ function AppContent() {
             }
             if (count > 0) console.log('Cleaned up ' + count + ' orphans');
             
-            const emailVietNhan = 'vietnhan@thalex.com.vn';
-            const vietnhanSnap = await getDocs(query(collection(db, 'users'), where('email', '==', emailVietNhan)));
-            if (vietnhanSnap.empty) {
-              const tempId = emailVietNhan.toLowerCase().replace(/[^a-z0-9]/g, '_');
-              await setDoc(doc(db, 'users', tempId), {
-                fullName: 'Nguyễn Việt Nhân',
-                email: emailVietNhan,
-                roleId: 'Staff',
-                workStatus: 'official',
-                accountStatus: 'active',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                tempPassword: 'Thalex@123',
-                needsPasswordChange: true
-              });
+            const vietnhanEmails = ['vietnhan@thalex.com.vn', 'vietnhan@thalex.vn'];
+            for (const email of vietnhanEmails) {
+              const vietnhanSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
+              if (vietnhanSnap.empty) {
+                const tempId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                await setDoc(doc(db, 'users', tempId), {
+                  fullName: 'Nguyễn Việt Nhân',
+                  email: email,
+                  roleId: 'Director',
+                  workStatus: 'official',
+                  accountStatus: 'active',
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  tempPassword: 'Thalex@123',
+                  needsPasswordChange: true
+                });
+              }
             }
           } catch(e) {
             console.error('System fix error:', e);

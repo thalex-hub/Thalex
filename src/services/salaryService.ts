@@ -289,7 +289,25 @@ export function calculateSingleMonthSalary(
   // Calculate Commission/Bonus matching Payroll module
   const userPercent = targetUser?.bonusPercentage?.['default'] || targetUser?.bonusPercentage || 0;
   const userKpi = targetUser?.kpiRevenue?.['default'] || targetUser?.kpiRevenue || 0;
-  const isDirectorOrAdmin = targetUser?.roleId === 'Director' || targetUser?.roleId === 'SuperAdmin';
+  
+  const directorEmails = [
+    'info.vinasglobal@gmail.com',
+    'lethanhhieu@thalex.vn',
+    'thanhhieu@thalex.vn',
+    'lethanhhieu@thalex.com.vn',
+    'admin@thalex.vn',
+    'admin@thalex.com.vn',
+    'vietnhan@thalex.vn',
+    'vietnhan@thalex.com.vn',
+    'ngocvan@thalex.vn',
+    'ngocvan@thalex.com.vn',
+    'tuyetmai@thalex.vn',
+    'tuyetmai@thalex.com.vn'
+  ];
+  
+  const isDirectorOrAdmin = targetUser?.roleId === 'Director' || 
+                           targetUser?.roleId === 'SuperAdmin' || 
+                           directorEmails.includes(targetUser?.email?.toLowerCase());
 
   let monthlyRevenue = 0;
 
@@ -315,7 +333,7 @@ export function calculateSingleMonthSalary(
   
   const userDept = departments.find(d => d.id === targetUser?.departmentId);
   const deptName = userDept?.name?.toLowerCase() || '';
-  const isDirectorCategory = targetUser?.roleId === 'Director' || targetUser?.roleId === 'SuperAdmin' || deptName.includes('ban giám đốc');
+  const isDirectorCategory = isDirectorOrAdmin || deptName.includes('ban giám đốc');
   const isSalesCategory = deptName.includes('kinh doanh') || deptName.includes('sales') || deptName.includes('bán hàng');
   const isKpiBased = isDirectorCategory || isSalesCategory;
 

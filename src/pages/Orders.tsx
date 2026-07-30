@@ -1172,7 +1172,7 @@ export default function Orders() {
                     <td className="px-6 py-4">
                       <div className="flex justify-center items-center gap-2 font-medium">
                         <StatusBadge status={order.status} />
-                        {isSuperAdmin && (
+                        {(isSuperAdmin || isDirector) && (
                           <button 
                             type="button"
                             onClick={(e) => {
@@ -1181,7 +1181,7 @@ export default function Orders() {
                               setDeleteConfirmId(order.id);
                             }}
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50 text-base"
-                            title="Xóa đơn hàng (Superadmin)"
+                            title="Xóa đơn hàng"
                           >
                             <Trash2 size={20} />
                           </button>

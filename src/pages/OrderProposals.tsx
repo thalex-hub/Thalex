@@ -1444,6 +1444,18 @@ export default function OrderProposals() {
                       </button>
                     </>
                   )}
+                  {isDirector && (viewingProposal.status === 'approved' || viewingProposal.status === 'rejected' || viewingProposal.status === 'cancelled') && (
+                    <button 
+                      onClick={() => {
+                        setDeleteConfirmId(viewingProposal.id);
+                        setViewingProposal(null);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 py-4 bg-red-50 text-red-600 border border-red-100 rounded-2xl font-black uppercase tracking-widest hover:bg-red-100 transition-all shadow-sm"
+                    >
+                      <Trash2 size={20} />
+                      Xóa đề xuất (Director)
+                    </button>
+                  )}
                 </div>
               </div>
               

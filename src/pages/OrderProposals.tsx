@@ -188,92 +188,90 @@ export default function OrderProposals() {
 
   const [refreshing, setRefreshing] = React.useState(false);
 
-  const fetchProposals = React.useCallback(async () => {
+  React.useEffect(() => {
     if (!user) return;
     setRefreshing(true);
-    setError(null);
-    try {
-      if (canSeeAll) {
-        const q = query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'));
-        const snap = await getDocs(q);
-        setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } else {
-        // Fetch specific queries for staff
-        const q1 = query(collection(db, 'order_proposals'), where('createdBy', '==', user.uid));
-        const q2 = query(collection(db, 'order_proposals'), where('followers', 'array-contains', user.uid));
-        const qResp = query(collection(db, 'order_proposals'), where('responsibleUserId', '==', user.uid));
-        
-        const [snap1, snap2, snapResp] = await Promise.all([getDocs(q1), getDocs(q2), getDocs(qResp)]);
-        
-        let legacySnap1: any = { docs: [] };
-        let legacySnap2: any = { docs: [] };
-        if (appUser?.legacyId) {
-          const qL1 = query(collection(db, 'order_proposals'), where('createdBy', '==', appUser.legacyId));
-          const qL2 = query(collection(db, 'order_proposals'), where('followers', 'array-contains', appUser.legacyId));
-          [legacySnap1, legacySnap2] = await Promise.all([getDocs(qL1), getDocs(qL2)]);
-        }
+    
+    // Real-time customers
+    const unsubCustomers = onSnapshot(collection(db, 'customers'), (snap) => {
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCustomers(list);
+      sessionStorage.setItem('app_customers_list', JSON.stringify(list));
+    });
 
-        const mergedMap = new Map();
-        [snap1, snap2, snapResp, legacySnap1, legacySnap2].forEach(snap => {
-          snap.docs.forEach((doc: any) => mergedMap.set(doc.id, { id: doc.id, ...doc.data() }));
-        });
-        
-        const mergedList = Array.from(mergedMap.values());
-        mergedList.sort((a, b) => {
+    // Real-time users
+    let unsubUsers = () => {};
+    if (canSeeAll) {
+      unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setUsers(list);
+        sessionStorage.setItem('app_users_list', JSON.stringify(list));
+      });
+    } else {
+      setUsers([{ id: user.uid, fullName: appUser?.fullName || user.displayName || 'Self', email: user.email }]);
+    }
+
+    // Real-time proposals
+    let unsubProposals = () => {};
+    if (canSeeAll) {
+      const q = query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'));
+      unsubProposals = onSnapshot(q, (snap) => {
+        setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setRefreshing(false);
+      }, (err) => {
+        console.error("Error fetching proposals:", err);
+        handleFirestoreError(err, OperationType.LIST, 'order_proposals');
+        setError("Lỗi khi tải dữ liệu đề xuất.");
+        setRefreshing(false);
+      });
+    } else {
+      const results: Record<string, any[]> = { q1: [], q2: [], qResp: [], qL1: [], qL2: [] };
+      const combine = () => {
+        const map = new Map();
+        Object.values(results).flat().forEach(p => map.set(p.id, p));
+        const list = Array.from(map.values()).sort((a, b) => {
           const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
           const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
           return tB - tA;
         });
-        setProposals(mergedList);
+        setProposals(list);
+        setRefreshing(false);
+      };
+
+      const u1 = onSnapshot(query(collection(db, 'order_proposals'), where('createdBy', '==', user.uid)), (snap) => {
+        results.q1 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        combine();
+      });
+      const u2 = onSnapshot(query(collection(db, 'order_proposals'), where('followers', 'array-contains', user.uid)), (snap) => {
+        results.q2 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        combine();
+      });
+      const uResp = onSnapshot(query(collection(db, 'order_proposals'), where('responsibleUserId', '==', user.uid)), (snap) => {
+        results.qResp = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        combine();
+      });
+
+      let uL1 = () => {}, uL2 = () => {};
+      if (appUser?.legacyId) {
+        uL1 = onSnapshot(query(collection(db, 'order_proposals'), where('createdBy', '==', appUser.legacyId)), (snap) => {
+          results.qL1 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          combine();
+        });
+        uL2 = onSnapshot(query(collection(db, 'order_proposals'), where('followers', 'array-contains', appUser.legacyId)), (snap) => {
+          results.qL2 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          combine();
+        });
       }
-    } catch (err: any) {
-      console.error("Error fetching proposals:", err);
-      handleFirestoreError(err, OperationType.LIST, 'order_proposals');
-      setError("Lỗi khi tải dữ liệu đề xuất.");
-    } finally {
-      setRefreshing(false);
+
+      unsubProposals = () => { u1(); u2(); uResp(); uL1(); uL2(); };
     }
-  }, [user, appUser, canSeeAll]);
 
-  React.useEffect(() => {
-    if (!user) return;
-    
-    // One-time fetches for customers and users
-    const fetchSupportData = async () => {
-      try {
-        // Caching customers
-        const cachedCustomers = sessionStorage.getItem('app_customers_list');
-        if (cachedCustomers) {
-          setCustomers(JSON.parse(cachedCustomers));
-        }
-        
-        // Always fetch fresh data in background
-        const custSnap = await getDocs(collection(db, 'customers'));
-        const custList = custSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setCustomers(custList);
-        sessionStorage.setItem('app_customers_list', JSON.stringify(custList));
-        
-        if (canSeeAll) {
-          const cachedUsers = sessionStorage.getItem('app_users_list');
-          if (cachedUsers) {
-            setUsers(JSON.parse(cachedUsers));
-          }
-          
-          const userSnap = await getDocs(collection(db, 'users'));
-          const userList = userSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setUsers(userList);
-          sessionStorage.setItem('app_users_list', JSON.stringify(userList));
-        } else {
-          setUsers([{ id: user.uid, fullName: appUser?.fullName || user.displayName || 'Self', email: user.email }]);
-        }
-      } catch (err) {
-        console.error("Error fetching support data:", err);
-      }
+    return () => {
+      unsubCustomers();
+      unsubUsers();
+      unsubProposals();
     };
-
-    fetchSupportData();
-    fetchProposals();
-  }, [fetchProposals, canSeeAll, user]);
+  }, [canSeeAll, user, appUser]);
 
   // Removed automatic healDatabase to save quota. It should be a manual admin action if needed.
 

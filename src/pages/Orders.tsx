@@ -149,21 +149,13 @@ export default function Orders() {
   const [users, setUsers] = React.useState<any[]>([]);
 
   React.useEffect(() => {
-    const fetchUsers = async () => {
-      const cached = sessionStorage.getItem('app_users_list');
-      if (cached) {
-        setUsers(JSON.parse(cached));
-      }
-      try {
-        const snap = await getDocs(collection(db, 'users'));
-        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setUsers(list);
-        sessionStorage.setItem('app_users_list', JSON.stringify(list));
-      } catch (err) {
-        console.error("Error loading users:", err);
-      }
-    };
-    fetchUsers();
+    return onSnapshot(collection(db, 'users'), (snap) => {
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUsers(list);
+      sessionStorage.setItem('app_users_list', JSON.stringify(list));
+    }, (err) => {
+      console.error("Error loading users:", err);
+    });
   }, []);
 
   const newOrders = React.useMemo(() => 
@@ -283,15 +275,13 @@ export default function Orders() {
     if (!user) return;
     setLoading(true);
 
-    let cleanup = () => {};
+    let unsub = () => {};
 
     if (canSeeAll) {
-      // For large collections, we should ideally paginate. 
-      // For now, we use getDocs instead of onSnapshot to at least stop continuous reads.
-      getDocs(collection(db, "orders")).then((snap) => {
+      unsub = onSnapshot(collection(db, "orders"), (snap) => {
         const list = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
         processOrders(list);
-      }).catch((error) => {
+      }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "orders");
         setLoading(false);
       });
@@ -310,35 +300,36 @@ export default function Orders() {
       const q1 = query(collection(db, "orders"), where("responsibleUserId", "==", user.uid));
       const q2 = query(collection(db, "orders"), where("followers", "array-contains", user.uid));
 
-      getDocs(q1).then((snap) => {
+      const u1 = onSnapshot(q1, (snap) => {
         list1 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
         combine();
-      }).catch((err) => handleFirestoreError(err, OperationType.LIST, "orders/responsible_uid"));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/responsible_uid"));
 
-      if (appUser?.legacyId) {
-        const qLegacy1 = query(collection(db, "orders"), where("responsibleUserId", "==", appUser.legacyId));
-        getDocs(qLegacy1).then((snap) => {
-          listLegacy1 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
-          combine();
-        }).catch((err) => handleFirestoreError(err, OperationType.LIST, "orders/responsible_legacy"));
-      }
-
-      getDocs(q2).then((snap) => {
+      const u2 = onSnapshot(q2, (snap) => {
         list2 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
         combine();
-      }).catch((err) => handleFirestoreError(err, OperationType.LIST, "orders/followers_uid"));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/followers_uid"));
 
+      let uL1 = () => {}, uL2 = () => {};
       if (appUser?.legacyId) {
+        const qLegacy1 = query(collection(db, "orders"), where("responsibleUserId", "==", appUser.legacyId));
+        uL1 = onSnapshot(qLegacy1, (snap) => {
+          listLegacy1 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+          combine();
+        }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/responsible_legacy"));
+
         const qLegacy2 = query(collection(db, "orders"), where("followers", "array-contains", appUser.legacyId));
-        getDocs(qLegacy2).then((snap) => {
+        uL2 = onSnapshot(qLegacy2, (snap) => {
           listLegacy2 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
           combine();
-        }).catch((err) => handleFirestoreError(err, OperationType.LIST, "orders/followers_legacy"));
+        }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/followers_legacy"));
       }
+
+      unsub = () => { u1(); u2(); uL1(); uL2(); };
     }
 
-    return () => cleanup();
-  }, [user, canSeeAll, appUser]);
+    return () => unsub();
+  }, [user, canSeeAll, appUser, processOrders]);
 
   const fetchOrders = async (direction?: "next" | "prev") => {
     // Handled in real-time by onSnapshot

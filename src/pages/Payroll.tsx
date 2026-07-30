@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../lib/authContext';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, orderBy, or } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, or, onSnapshot } from 'firebase/firestore';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from 'date-fns';
 import { isHoliday } from '../lib/holidays';
 import { Wallet, TrendingUp, AlertTriangle, Calendar, ChevronLeft, ChevronRight, FileSpreadsheet, Shield } from 'lucide-react';
@@ -72,109 +72,90 @@ export default function Payroll() {
     return getUserStatusInMonth(u, monthKey) === 'probation';
   };
 
-  const fetchMonthData = async () => {
+  React.useEffect(() => {
     if (!user) return;
+    
     setLoading(true);
-    setMonthData([]); 
-    try {
-      const startForQuery = format(subMonths(startOfMonth(currentMonth), 12), 'yyyy-MM-dd');
-      const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-      const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-      
-      const canSeeAllOrders = isDirector || isAccountant || isHR || isManager || canViewSalaries;
-      let ordersData: any[] = [];
-      if (canSeeAllOrders) {
-        const snap = await getDocs(query(collection(db, 'orders')));
-        ordersData = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-      } else {
-        const [snap1, snap2] = await Promise.all([
-          getDocs(query(collection(db, 'orders'), where('responsibleUserId', '==', user.uid))),
-          getDocs(query(collection(db, 'orders'), where('followers', 'array-contains', user.uid)))
-        ]);
-        const map = new Map();
-        snap1.docs.forEach((d: any) => map.set(d.id, { id: d.id, ...d.data() }));
-        snap2.docs.forEach((d: any) => map.set(d.id, { id: d.id, ...d.data() }));
-        ordersData = Array.from(map.values());
-      }
+    const startForQuery = format(subMonths(startOfMonth(currentMonth), 12), 'yyyy-MM-dd');
+    const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
+    
+    // 1. Snapshot for Users (Ensures real-time bonus/KPI updates)
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('fullName', 'asc')), (snap) => {
+      const users = snap.docs
+        .map(d => ({ uid: d.id, ...d.data() }))
+        .filter((u: any) => u.roleId !== 'SuperAdmin');
+      setAllUsers(users);
+    });
 
-      const canSeeAllPayments = isDirector || isAccountant || isHR || isManager || canViewSalaries;
-      const paymentsQ = canSeeAllPayments
-        ? query(
-            collection(db, 'payment_requests'),
-            where('category', '==', 'salary'),
-            where('status', 'in', ['approved', 'paid'])
-          )
-        : query(
-            collection(db, 'payment_requests'),
+    // 2. Snapshot for Orders (Ensures real-time revenue/commission updates)
+    const canSeeAllOrders = isDirector || isAccountant || isHR || isManager || canViewSalaries;
+    const ordersQ = canSeeAllOrders 
+      ? query(collection(db, 'orders'))
+      : query(collection(db, 'orders'), or(where('responsibleUserId', '==', user.uid), where('followers', 'array-contains', user.uid)));
+    
+    const unsubOrders = onSnapshot(ordersQ, (snap) => {
+      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // 3. One-time fetch for other data or more snapshots
+    const fetchRemainingData = async () => {
+      try {
+        const canSeeAllPayments = isDirector || isAccountant || isHR || isManager || canViewSalaries;
+        const paymentsQ = canSeeAllPayments
+          ? query(collection(db, 'payment_requests'), where('category', '==', 'salary'), where('status', 'in', ['approved', 'paid']))
+          : query(collection(db, 'payment_requests'), where('userId', '==', user.uid), where('category', '==', 'salary'), where('status', 'in', ['approved', 'paid']));
+
+        const isSuperUser = isDirector || isAccountant || isHR || isManager || canViewSalaries;
+        const advancesQ = isSuperUser ? query(collection(db, 'advance_requests')) : query(collection(db, 'advance_requests'), where('userId', '==', user.uid));
+        const reimbQ = isSuperUser ? query(collection(db, 'reimbursement_requests')) : query(collection(db, 'reimbursement_requests'), where('userId', '==', user.uid));
+
+        const [deptsSnap, paymentsSnap, advanceSnap, reimbSnap] = await Promise.all([
+          getDocs(collection(db, 'departments')),
+          getDocs(paymentsQ),
+          getDocs(advancesQ),
+          getDocs(reimbQ)
+        ]).catch(() => [null, null, null, null]);
+
+        if (deptsSnap) setDepartments(deptsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        if (paymentsSnap) setPaymentRequests(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        if (advanceSnap) setAllAdvanceRequests(advanceSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        if (reimbSnap) setAllReimbursements(reimbSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        // Attendance remains tied to activeTab and currentMonth
+        if (activeTab === 'personal') {
+          const q = query(
+            collection(db, 'attendance'),
             where('userId', '==', user.uid),
-            where('category', '==', 'salary'),
-            where('status', 'in', ['approved', 'paid'])
+            where('workDate', '>=', startForQuery),
+            where('workDate', '<=', end),
+            orderBy('workDate', 'asc')
           );
-
-      const isSuperUser = isDirector || isAccountant || isHR || isManager || canViewSalaries;
-      const advancesQ = isSuperUser 
-        ? query(collection(db, 'advance_requests'))
-        : query(collection(db, 'advance_requests'), where('userId', '==', user.uid));
-        
-      const reimbQ = isSuperUser 
-        ? query(collection(db, 'reimbursement_requests'))
-        : query(collection(db, 'reimbursement_requests'), where('userId', '==', user.uid));
-
-      const [deptsSnap, paymentsSnap, advanceSnap, reimbSnap] = await Promise.all([
-        getDocs(collection(db, 'departments')),
-        getDocs(paymentsQ),
-        getDocs(advancesQ),
-        getDocs(reimbQ)
-      ]);
-      
-      setOrders(ordersData);
-      setDepartments(deptsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setPaymentRequests(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setAllAdvanceRequests(advanceSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setAllReimbursements(reimbSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-      if (activeTab === 'personal') {
-        const q = query(
-          collection(db, 'attendance'),
-          where('userId', '==', user.uid),
-          where('workDate', '>=', startForQuery),
-          where('workDate', '<=', end),
-          orderBy('workDate', 'asc')
-        );
-        const snap = await getDocs(q);
-        setMonthData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } else {
-        // Fetch ALL attendance and ALL users for summary
-        const [usersSnap, attendanceSnap] = await Promise.all([
-          getDocs(query(collection(db, 'users'), orderBy('fullName', 'asc'))),
-          getDocs(query(
+          const snap = await getDocs(q);
+          setMonthData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } else {
+          const q = query(
             collection(db, 'attendance'),
             where('workDate', '>=', startForQuery),
             where('workDate', '<=', end)
-          ))
-        ]).catch(err => {
-          handleFirestoreError(err, OperationType.GET, 'payroll_summary');
-          throw err;
-        });
-
-        const users = usersSnap.docs
-          .map(d => ({ uid: d.id, ...d.data() }))
-          .filter((u: any) => u.roleId !== 'SuperAdmin');
-        const attendance = attendanceSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        
-        setAllUsers(users);
-        setMonthData(attendance);
+          );
+          const snap = await getDocs(q);
+          setMonthData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+      } catch (err) {
+        console.error("Error fetching payroll data:", err);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  React.useEffect(() => {
-    fetchMonthData();
+    fetchRemainingData();
+
+    return () => {
+      unsubUsers();
+      unsubOrders();
+    };
   }, [currentMonth, user, activeTab, appUser, isDirector, isAccountant, isHR, isManager, canViewSalaries]);
+
 
   const calculateUserStats = React.useCallback((targetUser: any, attendance: any[]) => {
     const userAdvances = allAdvanceRequests.filter(r => r.userId === targetUser.uid);

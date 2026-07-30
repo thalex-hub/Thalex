@@ -176,82 +176,47 @@ export default function Dashboard() {
 
   const [refreshing, setRefreshing] = React.useState(false);
 
-  const fetchDashboardData = React.useCallback(async () => {
+  React.useEffect(() => {
     if (!user) return;
-    setRefreshing(true);
-    try {
-      // 1. Fetch Users and cache them
-      const cachedUsers = sessionStorage.getItem('app_users_list');
-      let dbUsers: AppUser[] = [];
-      if (cachedUsers) {
-        dbUsers = JSON.parse(cachedUsers);
-      } else {
-        const usersSnap = await getDocs(collection(db, 'users'));
-        dbUsers = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
-        sessionStorage.setItem('app_users_list', JSON.stringify(dbUsers));
-      }
+
+    const yearStart = `${selectedYear}-01-01`;
+    const yearEnd = `${selectedYear}-12-31`;
+
+    // 1. Users & SuperAdmins
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+      const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
       setUsers(dbUsers.filter(u => u.roleId !== 'SuperAdmin'));
       setSuperAdminIds(dbUsers.filter(u => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'users'));
 
-      // 2. Fetch all other collections concurrently
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
+    // 2. Orders
+    const ordersQ = canSeeAll
+      ? collection(db, 'orders')
+      : query(
+          collection(db, 'orders'),
+          or(
+            where('responsibleUserId', '==', user.uid),
+            where('followers', 'array-contains', user.uid)
+          )
+        );
+    const unsubOrders = onSnapshot(ordersQ, (snap) => {
+      setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
 
-      const ordersQ = canSeeAll
-        ? collection(db, 'orders')
-        : query(
-            collection(db, 'orders'),
-            or(
-              where('responsibleUserId', '==', user.uid),
-              where('followers', 'array-contains', user.uid)
-            )
-          );
-
-      const tasksQ = (isAdmin || isDirector)
-        ? query(collection(db, 'tasks'))
-        : query(
-            collection(db, 'tasks'),
-            or(
-              where('assigneeId', '==', user.uid),
-              where('assignerId', '==', user.uid),
-              where('responsibleUserId', '==', user.uid),
-              where('followers', 'array-contains', user.uid)
-            )
-          );
-
-      const attendanceQ = query(
-        collection(db, 'attendance'),
-        where('workDate', '>=', yearStart),
-        where('workDate', '<=', yearEnd)
-      );
-
-      const [
-        ordersSnap,
-        tasksSnap,
-        paymentsSnap,
-        busExpSnap,
-        payReqSnap,
-        advReqSnap,
-        reimReqSnap,
-        deptsSnap,
-        attendanceSnap
-      ] = await Promise.all([
-        getDocs(ordersQ),
-        getDocs(tasksQ),
-        getDocs(collection(db, 'payments')),
-        getDocs(collection(db, 'business_expenses')),
-        getDocs(collection(db, 'payment_requests')),
-        getDocs(collection(db, 'advance_requests')),
-        getDocs(collection(db, 'reimbursement_requests')),
-        getDocs(collection(db, 'departments')),
-        getDocs(attendanceQ)
-      ]);
-
-      // Process Orders
-      setOrders(ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
-      // Process Tasks
-      const allTasks = tasksSnap.docs
+    // 3. Tasks
+    const tasksQ = (isAdmin || isDirector)
+      ? query(collection(db, 'tasks'))
+      : query(
+          collection(db, 'tasks'),
+          or(
+            where('assigneeId', '==', user.uid),
+            where('assignerId', '==', user.uid),
+            where('responsibleUserId', '==', user.uid),
+            where('followers', 'array-contains', user.uid)
+          )
+        );
+    const unsubTasks = onSnapshot(tasksQ, (snap) => {
+      const allTasks = snap.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .filter((t: any) => 
           !t.isParent && 
@@ -269,26 +234,61 @@ export default function Dashboard() {
           return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
         })
       );
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'tasks'));
 
-      // Process others
-      setPayments(paymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setBusinessExpenses(busExpSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setPaymentRequests(payReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setAdvanceRequests(advReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setReimbursementRequests(reimReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setAttendance(attendanceSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // 4. Payments
+    const unsubPayments = onSnapshot(collection(db, 'payments'), (snap) => {
+      setPayments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'payments'));
 
-    } catch (err) {
-      handleFirestoreError(err, OperationType.LIST, 'dashboard', false);
-    } finally {
-      setRefreshing(false);
-    }
+    // 5. Business Expenses
+    const unsubBusExp = onSnapshot(collection(db, 'business_expenses'), (snap) => {
+      setBusinessExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'business_expenses'));
+
+    // 6. Payment Requests
+    const unsubPayReq = onSnapshot(collection(db, 'payment_requests'), (snap) => {
+      setPaymentRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'payment_requests'));
+
+    // 7. Advance Requests
+    const unsubAdvReq = onSnapshot(collection(db, 'advance_requests'), (snap) => {
+      setAdvanceRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'advance_requests'));
+
+    // 8. Reimbursement Requests
+    const unsubReimReq = onSnapshot(collection(db, 'reimbursement_requests'), (snap) => {
+      setReimbursementRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'reimbursement_requests'));
+
+    // 9. Departments
+    const unsubDepts = onSnapshot(collection(db, 'departments'), (snap) => {
+      setDepartments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'departments'));
+
+    // 10. Attendance
+    const attendanceQ = query(
+      collection(db, 'attendance'),
+      where('workDate', '>=', yearStart),
+      where('workDate', '<=', yearEnd)
+    );
+    const unsubAttendance = onSnapshot(attendanceQ, (snap) => {
+      setAttendance(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'attendance'));
+
+    return () => {
+      unsubUsers();
+      unsubOrders();
+      unsubTasks();
+      unsubPayments();
+      unsubBusExp();
+      unsubPayReq();
+      unsubAdvReq();
+      unsubReimReq();
+      unsubDepts();
+      unsubAttendance();
+    };
   }, [user, canSeeAll, selectedYear, isAdmin, isDirector]);
-
-  React.useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
 
   // 3. Memoized derived statistics
   const activeOrdersForYear = React.useMemo(() => {
@@ -733,7 +733,7 @@ export default function Dashboard() {
           <button 
             onClick={() => {
               sessionStorage.removeItem('app_users_list');
-              fetchDashboardData();
+              window.location.reload();
             }}
             disabled={refreshing}
             className="p-2.5 bg-gray-55 text-gray-500 rounded-2xl border border-gray-150 hover:bg-white hover:text-blue-600 transition-all shadow-sm"

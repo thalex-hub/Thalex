@@ -277,18 +277,19 @@ export function calculateSingleMonthSalary(
       if (targetUser?.needsAttendance === false) {
         actualDays += 1;
       } else {
-        totalPenalties += daySalary;
-        // Only push violation strings if we actually have some records that month (to avoid spamming history for inactive months)
+        // Fix: Only apply penalties if there's at least one record in the month, 
+        // to avoid wiping out bonuses/salary for historical/future months with no data.
         if (hasAnyRecordsInMonth) {
-           violations.push({ date: dateStr, type: 'Nghỉ không phép / Không chấm công', penalty: daySalary });
+          totalPenalties += daySalary;
+          violations.push({ date: dateStr, type: 'Nghỉ không phép / Không chấm công', penalty: daySalary });
         }
       }
     }
   });
 
   // Calculate Commission/Bonus matching Payroll module
-  const userPercent = targetUser?.bonusPercentage?.['default'] || targetUser?.bonusPercentage || 0;
-  const userKpi = targetUser?.kpiRevenue?.['default'] || targetUser?.kpiRevenue || 0;
+  const userPercent = Number(targetUser?.bonusPercentage?.[monthKey] ?? targetUser?.bonusPercentage?.default ?? (typeof targetUser?.bonusPercentage === 'number' ? targetUser.bonusPercentage : 0));
+  const userKpi = Number(targetUser?.kpiRevenue?.[monthKey] ?? targetUser?.kpiRevenue?.default ?? (typeof targetUser?.kpiRevenue === 'number' ? targetUser.kpiRevenue : 0));
   
   const directorEmails = [
     'info.vinasglobal@gmail.com',
@@ -302,29 +303,40 @@ export function calculateSingleMonthSalary(
     'ngocvan@thalex.vn',
     'ngocvan@thalex.com.vn',
     'tuyetmai@thalex.vn',
-    'tuyetmai@thalex.com.vn'
+    'tuyetmai@thalex.com.vn',
+    'giangnt@thalex.vn',
+    'hongphuc@thalex.vn',
+    'thangcd11@gmail.com',
+    'duythang@thalex.vn'
   ];
   
   const isDirectorOrAdmin = targetUser?.roleId === 'Director' || 
                            targetUser?.roleId === 'SuperAdmin' || 
-                           directorEmails.includes(targetUser?.email?.toLowerCase());
+                           (targetUser?.email && directorEmails.includes(targetUser.email.toLowerCase()));
 
   let monthlyRevenue = 0;
 
   orders.forEach(o => {
-    const isOwner = isDirectorOrAdmin || (o.responsibleUserId === targetUser?.uid);
+    const isOwner = isDirectorOrAdmin || 
+                   (o.responsibleUserId === targetUser?.uid) || 
+                   (targetUser?.legacyId && o.responsibleUserId === targetUser.legacyId);
+    
     if (!isOwner) return;
 
     if (o.invoices && o.invoices.length > 0) {
       o.invoices.forEach((inv: any) => {
         const invDate = inv.date ? new Date(inv.date) : (inv.createdAt ? new Date(inv.createdAt) : null);
-        if (invDate && invDate.getMonth() === currentMonth.getMonth() && invDate.getFullYear() === currentMonth.getFullYear()) {
+        if (invDate && !isNaN(invDate.getTime()) && 
+            invDate.getMonth() === currentMonth.getMonth() && 
+            invDate.getFullYear() === currentMonth.getFullYear()) {
           monthlyRevenue += Number(inv.amount) || 0;
         }
       });
     } else if (o.isInvoiced && o.invoicedAt) {
       const invDate = new Date(o.invoicedAt);
-      if (invDate.getMonth() === currentMonth.getMonth() && invDate.getFullYear() === currentMonth.getFullYear()) {
+      if (!isNaN(invDate.getTime()) && 
+          invDate.getMonth() === currentMonth.getMonth() && 
+          invDate.getFullYear() === currentMonth.getFullYear()) {
         const val = o.basePrice || Math.round(Number(o.contractValueWithVAT || o.totalValue) / 1.1) || 0;
         monthlyRevenue += Number(val);
       }
@@ -340,8 +352,8 @@ export function calculateSingleMonthSalary(
   const finalMonthlyBonus = Number(targetUser?.monthlyBonuses?.[monthKey] || targetUser?.monthlyBonus || 0);
   let commission = 0;
   if (isKpiBased) {
-    if (monthlyRevenue >= Number(userKpi) && Number(userPercent) > 0) {
-      commission = monthlyRevenue * (Number(userPercent) / 100);
+    if (monthlyRevenue >= userKpi && userPercent > 0) {
+      commission = monthlyRevenue * (userPercent / 100);
     }
   }
 

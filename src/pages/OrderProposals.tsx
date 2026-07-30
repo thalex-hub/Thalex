@@ -1058,7 +1058,7 @@ export default function OrderProposals() {
                      e.stopPropagation();
                      setDeleteConfirmId(prop.id);
                    }}
-                   className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                   className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50"
                    title="Xóa đề xuất (Superadmin)"
                  >
                    <Trash2 size={20} />
@@ -2012,7 +2012,7 @@ export default function OrderProposals() {
       </AnimatePresence>
       <AnimatePresence>
         {deleteConfirmId && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 

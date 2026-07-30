@@ -138,6 +138,7 @@ export default function Customers() {
       });
       
       await logActivity('Create Customer', 'Customers', docRef.id, { customerName: newCustomer.companyName });
+      sessionStorage.removeItem('app_customers_list');
 
       setShowAddModal(false);
       setNewCustomer({ 
@@ -177,6 +178,7 @@ export default function Customers() {
       });
 
       await logActivity('Update Customer', 'Customers', id, { customerName: editingCustomer.name });
+      sessionStorage.removeItem('app_customers_list');
 
       setEditingCustomer(null);
     } catch (error) {
@@ -192,6 +194,7 @@ export default function Customers() {
     if (confirm(`Xóa khách hàng ${name}?`)) {
       await deleteDoc(doc(db, 'customers', id));
       await logActivity('Delete Customer', 'Customers', id, { customerName: name });
+      sessionStorage.removeItem('app_customers_list');
     }
   };
 

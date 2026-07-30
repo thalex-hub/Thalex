@@ -733,6 +733,7 @@ export default function Dashboard() {
           <button 
             onClick={() => {
               sessionStorage.removeItem('app_users_list');
+              sessionStorage.removeItem('app_customers_list');
               window.location.reload();
             }}
             disabled={refreshing}

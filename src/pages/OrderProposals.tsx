@@ -245,23 +245,24 @@ export default function OrderProposals() {
         const cachedCustomers = sessionStorage.getItem('app_customers_list');
         if (cachedCustomers) {
           setCustomers(JSON.parse(cachedCustomers));
-        } else {
-          const custSnap = await getDocs(collection(db, 'customers'));
-          const custList = custSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setCustomers(custList);
-          sessionStorage.setItem('app_customers_list', JSON.stringify(custList));
         }
+        
+        // Always fetch fresh data in background
+        const custSnap = await getDocs(collection(db, 'customers'));
+        const custList = custSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setCustomers(custList);
+        sessionStorage.setItem('app_customers_list', JSON.stringify(custList));
         
         if (canSeeAll) {
           const cachedUsers = sessionStorage.getItem('app_users_list');
           if (cachedUsers) {
             setUsers(JSON.parse(cachedUsers));
-          } else {
-            const userSnap = await getDocs(collection(db, 'users'));
-            const userList = userSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setUsers(userList);
-            sessionStorage.setItem('app_users_list', JSON.stringify(userList));
           }
+          
+          const userSnap = await getDocs(collection(db, 'users'));
+          const userList = userSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setUsers(userList);
+          sessionStorage.setItem('app_users_list', JSON.stringify(userList));
         } else {
           setUsers([{ id: user.uid, fullName: appUser?.fullName || user.displayName || 'Self', email: user.email }]);
         }

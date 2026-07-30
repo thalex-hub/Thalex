@@ -552,6 +552,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setAppUser(data);
                 localStorage.setItem(`app_user_${u.uid}`, JSON.stringify(data));
               }
+              setLoading(false);
             } else {
               // User document not found. If system admin, self-heal immediately!
               const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn' || u.email === 'thangcd11@gmail.com';

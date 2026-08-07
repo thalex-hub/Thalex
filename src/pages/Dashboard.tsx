@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { db } from '../lib/firebase';
 import { AppUser } from '../types';
 import { collection, query, onSnapshot, where, Timestamp, or, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
@@ -103,39 +103,34 @@ export default function Dashboard() {
   const { isFinanceStaff, user, isAdmin, isManager, isDirector } = useAuth();
   const canSeeAll = isAdmin || isManager || isDirector || isFinanceStaff;
 
-  const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
-  const [revenueChartType, setRevenueChartType] = React.useState<'bar' | 'area'>('bar');
-  const [cashFlowChartType, setCashFlowChartType] = React.useState<'composed' | 'bar'>('composed');
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [revenueChartType, setRevenueChartType] = useState<'bar' | 'area'>('bar');
+  const [cashFlowChartType, setCashFlowChartType] = useState<'composed' | 'bar'>('composed');
 
   // Firestore collections states
-  const [orders, setOrders] = React.useState<any[]>([]);
-  const [tasks, setTasks] = React.useState<any[]>([]);
-  const [payments, setPayments] = React.useState<any[]>([]);
-  const [businessExpenses, setBusinessExpenses] = React.useState<any[]>([]);
-  const [paymentRequests, setPaymentRequests] = React.useState<any[]>([]);
-  const [users, setUsers] = React.useState<any[]>([]);
-  const [departments, setDepartments] = React.useState<any[]>([]);
-  const [attendance, setAttendance] = React.useState<any[]>([]);
-  const [advanceRequests, setAdvanceRequests] = React.useState<any[]>([]);
-  const [reimbursementRequests, setReimbursementRequests] = React.useState<any[]>([]);
-  const [recentTasks, setRecentTasks] = React.useState<any[]>([]);
-  const [superAdminIds, setSuperAdminIds] = React.useState<string[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [businessExpenses, setBusinessExpenses] = useState<any[]>([]);
+  const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [attendance, setAttendance] = useState<any[]>([]);
+  const [advanceRequests, setAdvanceRequests] = useState<any[]>([]);
+  const [reimbursementRequests, setReimbursementRequests] = useState<any[]>([]);
+  const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [superAdminIds, setSuperAdminIds] = useState<string[]>([]);
 
   // Specialized utility to scan and auto-clean 1.5M ghost transactions / proposal artifacts
-  const [stale15MRecords, setStale15MRecords] = React.useState<any[]>([]);
-  const [scanning15M, setScanning15M] = React.useState(false);
-  const [clearing15M, setClearing15M] = React.useState(false);
+  const [stale15MRecords, setStale15MRecords] = useState<any[]>([]);
+  const [scanning15M, setScanning15M] = useState(false);
+  const [clearing15M, setClearing15M] = useState(false);
 
-  const scanFor15M = React.useCallback(async () => {
+  const scanFor15M = useCallback(async () => {
     if (!db || !isAdmin) return;
     setScanning15M(true);
     // ... rest of logic remains but we don't call it on mount automatically for everyone
   }, [db, isAdmin]);
-
-  // Removed auto-scan on mount to save quota
-  // React.useEffect(() => {
-  //   scanFor15M();
-  // }, [scanFor15M]);
 
   const handleClear15M = async () => {
     if (!db) return;
@@ -165,18 +160,9 @@ export default function Dashboard() {
     return isNaN(d.getTime()) ? null : d;
   };
 
-  // Removed aggressive auto-heal on mount to save quota. 
-  // This should be an admin tool, not run on every dashboard mount.
-  /*
-  React.useEffect(() => {
-    if (!user || !db || !canSeeAll || !isAdmin) return;
-    // ... heal logic ...
-  }, [user, canSeeAll, isAdmin]);
-  */
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [refreshing, setRefreshing] = React.useState(false);
-
-  React.useEffect(() => {
+  useEffect(() => {
     if (!user) return;
 
     const yearStart = `${selectedYear}-01-01`;
@@ -291,7 +277,7 @@ export default function Dashboard() {
   }, [user, canSeeAll, selectedYear, isAdmin, isDirector]);
 
   // 3. Memoized derived statistics
-  const activeOrdersForYear = React.useMemo(() => {
+  const activeOrdersForYear = useMemo(() => {
     return orders.filter(o => {
       if (o.status === 'cancelled' || o.status === 'rejected') return false;
       const date = toDate(o.createdAt || o.startDate);
@@ -300,7 +286,7 @@ export default function Dashboard() {
   }, [orders, selectedYear]);
 
   // Section 1: Stats calculation
-  const stats = React.useMemo(() => {
+  const stats = useMemo(() => {
     let totalInvoicedRevenue = 0;
     let totalActuallyInvoiced = 0;
     let totalCostPrice = 0;

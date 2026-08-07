@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, or, getDocs, limit, deleteDoc } from 'firebase/firestore';
 import { Calendar, Plus, CheckCircle, XCircle, Clock, FileText, AlertCircle, ShieldCheck, UserCheck, RefreshCcw, FileSpreadsheet, Search, Trash2 } from 'lucide-react';
@@ -12,17 +12,17 @@ import { sendProposalEmailNotification } from '../lib/proposalEmail';
 
 export default function LeaveRequests() {
   const { appUser, isAdmin, isManager, isDirector, isSuperAdmin } = useAuth();
-  const [requests, setRequests] = React.useState<any[]>([]);
-  const [allUsers, setAllUsers] = React.useState<any[]>([]);
-  const [selectedUserForStats, setSelectedUserForStats] = React.useState<string>(auth.currentUser?.uid || '');
-  const [showAddModal, setShowAddModal] = React.useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
-  const [rejectingRequest, setRejectingRequest] = React.useState<{ req: any, action: 'rejected' | 'returned' } | null>(null);
-  const [rejectionReasonInput, setRejectionReasonInput] = React.useState('');
-  const [viewingRequest, setViewingRequest] = React.useState<any>(null);
-  const [loading, setLoading] = React.useState(false);
-  const [searchTerm, setSearchTerm] = React.useState('');
-  const [newRequest, setNewRequest] = React.useState({
+  const [requests, setRequests] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [selectedUserForStats, setSelectedUserForStats] = useState<string>(auth.currentUser?.uid || '');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [rejectingRequest, setRejectingRequest] = useState<{ req: any, action: 'rejected' | 'returned' } | null>(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [viewingRequest, setViewingRequest] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [newRequest, setNewRequest] = useState({
     type: 'annual',
     startDate: '',
     endDate: '',
@@ -30,7 +30,7 @@ export default function LeaveRequests() {
     approvalLevel: 'director' // Default to director
   });
 
-  const filteredRequests = React.useMemo(() => {
+  const filteredRequests = useMemo(() => {
     if (!searchTerm.trim()) return requests;
     const q = searchTerm.toLowerCase().trim();
     return requests.filter(req => {
@@ -50,7 +50,7 @@ export default function LeaveRequests() {
     });
   }, [requests, searchTerm]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!auth.currentUser || !appUser) return;
 
     if (isAdmin || isManager || isDirector) {

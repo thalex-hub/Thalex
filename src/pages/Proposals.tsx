@@ -1,5 +1,4 @@
-import React from 'react';
-// Force Vite HMR Cache Clear
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, onSnapshot, orderBy, or, limit } from 'firebase/firestore';
@@ -32,53 +31,53 @@ import { exportToExcel } from '../lib/excel';
 import { useAuth } from '../lib/authContext';
 
 export default function ProposalsOverview() {
-  const [stats, setStats] = React.useState({
+  const [stats, setStats] = useState({
     pending: 0,
     approved: 0,
     rejected: 0,
     needsMyAction: 0
   });
-  const [allRecentProposals, setAllRecentProposals] = React.useState<any[]>([]);
-  const [activeFilter, setActiveFilter] = React.useState<string>('all');
+  const [allRecentProposals, setAllRecentProposals] = useState<any[]>([]);
+  const [activeFilter, setActiveFilter] = useState<string>('all');
   const { isAccountant, isHR, isAdmin, isManager, isDirector, isGeneral, user, appUser, isFinanceStaff, hasPermission } = useAuth();
   
   // Defined roles for querying all
   const canSeeAllOverall = isAdmin || isDirector || isHR || isAccountant;
   
   // Define stats logic in a reused function
-  const checkNeedsAction = React.useCallback((p: any) => {
+  const checkNeedsAction = useCallback((p: any) => {
     if (['approved', 'paid', 'disbursed', 'rejected'].includes(p.status)) return false;
     
     // 1. Director / Admin Actionable items
     if (isAdmin || isDirector) {
       if (p.colRef === 'leave_requests' && (p.status === 'pending' || !p.status)) return true;
-      if (['payment_requests', 'advance_requests', 'order_proposals'].includes(p.colRef) && p.status === 'pending_director') return true;
+      if (['payment_requests', 'advance_requests', 'order_proposals', 'business_trip_requests'].includes(p.colRef) && p.status === 'pending_director') return true;
       if (p.colRef === 'reimbursement_requests' && p.status === 'accountant_verified') return true;
       if (p.colRef === 'order_proposals' && (p.status === 'pending' || !p.status)) return true; 
     }
 
     // 2. Accountant / Finance Actionable items
     if (isFinanceStaff || isAccountant) {
-      if (['payment_requests', 'advance_requests'].includes(p.colRef) && (p.status === 'pending_finance' || p.status === 'pending' || !p.status)) return true;
+      if (['payment_requests', 'advance_requests', 'business_trip_requests'].includes(p.colRef) && (p.status === 'pending_finance' || p.status === 'pending' || !p.status)) return true;
       if (['reimbursement_requests', 'order_proposals'].includes(p.colRef) && (p.status === 'pending' || !p.status)) return true;
-      if (['payment_requests', 'advance_requests'].includes(p.colRef) && p.status === 'approved') return true;
+      if (['payment_requests', 'advance_requests', 'business_trip_requests'].includes(p.colRef) && p.status === 'approved') return true;
     }
 
     // 3. Manager Actionable items
     if (isManager && !isAdmin && !isDirector) {
        if (p.colRef === 'leave_requests' && (p.status === 'pending' || !p.status) && p.approvalLevel === 'department' && p.departmentId === appUser?.departmentId) return true;
+       if (p.colRef === 'business_trip_requests' && (p.status === 'pending' || !p.status) && p.departmentId === appUser?.departmentId) return true;
     }
     
     // 4. HR Actionable items
     if (isHR) {
-      if (p.colRef === 'leave_requests' && (p.status === 'pending' || !p.status)) return true;
-      if (p.colRef === 'order_proposals' && (p.status === 'pending' || !p.status)) return true;
+      if (['leave_requests', 'order_proposals', 'business_trip_requests'].includes(p.colRef) && (p.status === 'pending' || !p.status)) return true;
     }
     
     return false;
   }, [isAdmin, isDirector, isFinanceStaff, isAccountant, isManager, isHR, appUser]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!user) return;
 
     const collections = ['leave_requests', 'advance_requests', 'payment_requests', 'order_proposals', 'reimbursement_requests', 'business_trip_requests'];
@@ -88,8 +87,8 @@ export default function ProposalsOverview() {
 
     collections.forEach((colName) => {
       const showAllThisType = isAdmin || isDirector || isGeneral ||
-                             (isHR && (colName === 'leave_requests' || colName === 'order_proposals')) || 
-                             (isAccountant && ['leave_requests', 'payment_requests', 'advance_requests', 'reimbursement_requests', 'order_proposals'].includes(colName)) ||
+                             (isHR && (colName === 'leave_requests' || colName === 'order_proposals' || colName === 'business_trip_requests')) || 
+                             (isAccountant && ['leave_requests', 'payment_requests', 'advance_requests', 'reimbursement_requests', 'order_proposals', 'business_trip_requests'].includes(colName)) ||
                              (hasViewOrdersPerm && colName === 'order_proposals');
 
       const processSnapshots = (docsLists: any[][]) => {
@@ -140,7 +139,7 @@ export default function ProposalsOverview() {
     return () => unsubscribes.forEach(u => u());
   }, [user, isAdmin, isManager, isDirector, isAccountant, isHR, appUser, hasPermission]);
 
-  const refinedProposals = React.useMemo(() => {
+  const refinedProposals = useMemo(() => {
     let result = [...allRecentProposals];
     
     // Deduplicate reimbursement requests tramping on each other
@@ -192,7 +191,7 @@ export default function ProposalsOverview() {
   }, [allRecentProposals]);
 
   // Separate effect for stats
-  React.useEffect(() => {
+  useEffect(() => {
     const sorted = [...refinedProposals].sort((a, b) => {
       const dateA = new Date(a.createdAt || a.requestDate || a.startDate || 0).getTime();
       const dateB = new Date(b.createdAt || b.requestDate || b.startDate || 0).getTime();
@@ -207,7 +206,7 @@ export default function ProposalsOverview() {
     setStats({ pending: pendingCount, approved: approvedCount, rejected: rejectedCount, needsMyAction: needsMyActionCount });
   }, [refinedProposals, checkNeedsAction]);
 
-  const filteredProposals = React.useMemo(() => {
+  const filteredProposals = useMemo(() => {
     let result = [...refinedProposals];
     
     if (activeFilter === 'my_action') {
@@ -233,7 +232,7 @@ export default function ProposalsOverview() {
       const dateB = new Date(b.createdAt || b.requestDate || b.startDate || 0).getTime();
       return dateB - dateA;
     });
-  }, [allRecentProposals, activeFilter, checkNeedsAction]);
+  }, [refinedProposals, activeFilter, checkNeedsAction]);
 
   const getProposalLabel = (col: string) => {
     switch(col) {
@@ -289,7 +288,7 @@ export default function ProposalsOverview() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
          <button 
-           onClick={() => setActiveFilter(activeFilter === 'my_action' ? null : 'my_action')}
+           onClick={() => setActiveFilter(activeFilter === 'my_action' ? 'all' : 'my_action')}
            className={cn(
              "bg-white p-6 rounded-3xl border shadow-sm flex items-center gap-4 transition-all hover:shadow-md text-left w-full",
              activeFilter === 'my_action' ? "border-blue-200 ring-2 ring-blue-500/20" : "border-gray-100"
@@ -304,7 +303,7 @@ export default function ProposalsOverview() {
             </div>
          </button>
          <button 
-           onClick={() => setActiveFilter(activeFilter === 'pending' ? null : 'pending')}
+           onClick={() => setActiveFilter(activeFilter === 'pending' ? 'all' : 'pending')}
            className={cn(
              "bg-white p-6 rounded-3xl border shadow-sm flex items-center gap-4 transition-all hover:shadow-md text-left w-full",
              activeFilter === 'pending' ? "border-orange-200 ring-2 ring-orange-500/20" : "border-gray-100"
@@ -319,7 +318,7 @@ export default function ProposalsOverview() {
             </div>
          </button>
          <button 
-           onClick={() => setActiveFilter(activeFilter === 'approved' ? null : 'approved')}
+           onClick={() => setActiveFilter(activeFilter === 'approved' ? 'all' : 'approved')}
            className={cn(
              "bg-white p-6 rounded-3xl border shadow-sm flex items-center gap-4 transition-all hover:shadow-md text-left w-full",
              activeFilter === 'approved' ? "border-green-200 ring-2 ring-green-500/20" : "border-gray-100"
@@ -334,7 +333,7 @@ export default function ProposalsOverview() {
             </div>
          </button>
          <button 
-           onClick={() => setActiveFilter(activeFilter === 'rejected' ? null : 'rejected')}
+           onClick={() => setActiveFilter(activeFilter === 'rejected' ? 'all' : 'rejected')}
            className={cn(
              "bg-white p-6 rounded-3xl border shadow-sm flex items-center gap-4 transition-all hover:shadow-md text-left w-full",
              activeFilter === 'rejected' ? "border-red-200 ring-2 ring-red-500/20" : "border-gray-100"
@@ -419,8 +418,8 @@ export default function ProposalsOverview() {
                           <p className="text-xs text-gray-500">{format(new Date(prop.createdAt || prop.requestDate), 'dd/MM/yyyy HH:mm')}</p>
                        </div>
                        <p className="text-xs text-gray-400 mt-0.5">
-                         {(isAdmin || isAccountant || isHR) && <span className="font-bold text-gray-600 mr-1">{prop.userName}:</span>}
-                         {prop.reason || prop.note || prop.name || prop.title || 'Không có chi tiết'}
+                          {(isAdmin || isAccountant || isHR) && <span className="font-bold text-gray-600 mr-1">{prop.userName}:</span>}
+                          {prop.reason || prop.note || prop.name || prop.title || 'Không có chi tiết'}
                        </p>
                     </div>
                  </div>

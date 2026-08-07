@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, or, getDocs, limit, deleteDoc } from 'firebase/firestore';
 import { 
@@ -33,16 +33,16 @@ import { BusinessTripRequest, BusinessTripExpense } from '../types';
 
 export default function BusinessTripRequests() {
   const { appUser, isAdmin, isDirector, isSuperAdmin } = useAuth();
-  const [requests, setRequests] = React.useState<BusinessTripRequest[]>([]);
-  const [showAddModal, setShowAddModal] = React.useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
-  const [rejectingRequest, setRejectingRequest] = React.useState<{ req: any, action: 'rejected' | 'returned' } | null>(null);
-  const [rejectionReasonInput, setRejectionReasonInput] = React.useState('');
-  const [viewingRequest, setViewingRequest] = React.useState<BusinessTripRequest | null>(null);
-  const [loading, setLoading] = React.useState(false);
-  const [searchTerm, setSearchTerm] = React.useState('');
+  const [requests, setRequests] = useState<BusinessTripRequest[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [rejectingRequest, setRejectingRequest] = useState<{ req: any, action: 'rejected' | 'returned' } | null>(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [viewingRequest, setViewingRequest] = useState<BusinessTripRequest | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   
-  const [newRequest, setNewRequest] = React.useState({
+  const [newRequest, setNewRequest] = useState({
     departureDate: '',
     returnDate: '',
     transportation: '',
@@ -50,7 +50,7 @@ export default function BusinessTripRequests() {
     estimatedExpenses: [{ description: '', amount: 0 }] as BusinessTripExpense[]
   });
 
-  const filteredRequests = React.useMemo(() => {
+  const filteredRequests = useMemo(() => {
     if (!searchTerm.trim()) return requests;
     const q = searchTerm.toLowerCase().trim();
     return requests.filter(req => {
@@ -65,7 +65,7 @@ export default function BusinessTripRequests() {
     });
   }, [requests, searchTerm]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!auth.currentUser || !appUser) return;
 
     const processSnapshots = (docs: any[]) => {

@@ -69,6 +69,7 @@ const menuItems = [
       { label: 'Hoàn ứng', path: '/proposals/reimbursement' },
       { label: 'Thanh toán', path: '/proposals/payment' },
       { label: 'Đơn hàng', path: '/proposals/order' },
+      { label: 'Công tác', path: '/proposals/business-trip' },
     ]
   },
   { icon: ShoppingCart, label: 'Đơn hàng', path: '/orders' },

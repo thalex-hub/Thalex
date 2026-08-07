@@ -43,6 +43,7 @@ export default function BusinessTripRequests() {
   const [searchTerm, setSearchTerm] = useState('');
   
   const [newRequest, setNewRequest] = useState({
+    title: '',
     departureDate: '',
     returnDate: '',
     transportation: '',
@@ -120,6 +121,7 @@ export default function BusinessTripRequests() {
         userEmail: auth.currentUser.email || '',
         userName: appUser.fullName || 'Nhân viên',
         departmentId: appUser.departmentId || '',
+        title: newRequest.title,
         departureDate: new Date(newRequest.departureDate).toISOString(),
         returnDate: new Date(newRequest.returnDate).toISOString(),
         transportation: newRequest.transportation,
@@ -146,6 +148,7 @@ export default function BusinessTripRequests() {
 
       setShowAddModal(false);
       setNewRequest({ 
+        title: '',
         departureDate: '', 
         returnDate: '', 
         transportation: '', 
@@ -276,12 +279,14 @@ export default function BusinessTripRequests() {
                </div>
                <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-bold text-gray-800">{req.userName}</p>
+                    <p className="font-bold text-gray-800">{req.title || req.userName}</p>
                     <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded font-bold uppercase">
                       Công tác
                     </span>
                   </div>
                   <p className="text-sm text-gray-500 mt-1">
+                    Người đi: <span className="font-medium text-gray-700">{req.userName}</span>
+                    <br/>
                     Lý do: <span className="font-medium text-gray-700">{req.reason}</span>
                     <br/>
                     Thời gian: <span className="font-semibold text-gray-700">{format(new Date(req.departureDate), 'dd/MM/yyyy')}</span> - <span className="font-semibold text-gray-700">{format(new Date(req.returnDate), 'dd/MM/yyyy')}</span>
@@ -331,6 +336,11 @@ export default function BusinessTripRequests() {
                   </div>
                   
                   <div className="space-y-6">
+                     <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Tiêu đề công tác</label>
+                        <input type="text" required placeholder="Ví dụ: Công tác triển khai dự án tại Đà Nẵng" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none" value={newRequest.title} onChange={e => setNewRequest({...newRequest, title: e.target.value})} />
+                     </div>
+
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Thời gian đi</label>
@@ -419,8 +429,9 @@ export default function BusinessTripRequests() {
                       Đề xuất công tác
                     </span>
                     <h3 className="text-xl font-extrabold text-gray-900 mt-2">
-                      {viewingRequest.userName}
+                      {viewingRequest.title || viewingRequest.userName}
                     </h3>
+                    <p className="text-sm text-gray-500 font-bold mt-1 uppercase">Người đi: {viewingRequest.userName}</p>
                   </div>
                   <button onClick={() => setViewingRequest(null)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><XCircle size={20} /></button>
                 </div>

@@ -543,6 +543,7 @@
         "departureDate": { "type": "string", "format": "date-time" },
         "returnDate": { "type": "string", "format": "date-time" },
         "transportation": { "type": "string" },
+        "title": { "type": "string" },
         "estimatedExpenses": { "type": "array", "items": { "type": "object" } },
         "totalEstimatedAmount": { "type": "number" },
         "reason": { "type": "string" },

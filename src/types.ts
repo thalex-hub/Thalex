@@ -199,6 +199,7 @@ export interface BusinessTripRequest {
   transportation: string;
   estimatedExpenses: BusinessTripExpense[];
   totalEstimatedAmount: number;
+  title: string;
   reason: string;
   status: 'pending' | 'pending_director' | 'approved' | 'rejected' | 'returned' | 'cancelled';
   createdAt: string;

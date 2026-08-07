@@ -183,6 +183,33 @@ export interface Order {
   invoices?: OrderInvoice[];
 }
 
+export interface BusinessTripExpense {
+  description: string;
+  amount: number;
+}
+
+export interface BusinessTripRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail?: string;
+  departmentId: string;
+  departureDate: string;
+  returnDate: string;
+  transportation: string;
+  estimatedExpenses: BusinessTripExpense[];
+  totalEstimatedAmount: number;
+  reason: string;
+  status: 'pending' | 'pending_director' | 'approved' | 'rejected' | 'returned' | 'cancelled';
+  createdAt: string;
+  updatedAt?: string;
+  approvedAt?: string;
+  approverId?: string;
+  approverName?: string;
+  rejectionReason?: string;
+  followers?: string[];
+}
+
 export interface UserActivityLog {
   id: string;
   userId: string;

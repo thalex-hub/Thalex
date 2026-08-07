@@ -20,7 +20,8 @@ import {
   Bell,
   Banknote,
   DollarSign,
-  RefreshCcw
+  RefreshCcw,
+  Plane
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
@@ -80,7 +81,7 @@ export default function ProposalsOverview() {
   React.useEffect(() => {
     if (!user) return;
 
-    const collections = ['leave_requests', 'advance_requests', 'payment_requests', 'order_proposals', 'reimbursement_requests'];
+    const collections = ['leave_requests', 'advance_requests', 'payment_requests', 'order_proposals', 'reimbursement_requests', 'business_trip_requests'];
     const unsubscribes: any[] = [];
     const proposalSubsets: Record<string, any[]> = {};
     const hasViewOrdersPerm = hasPermission('view_orders') || hasPermission('menu_orders_view');
@@ -241,6 +242,7 @@ export default function ProposalsOverview() {
       case 'payment_requests': return 'Thanh toán';
       case 'order_proposals': return 'Đơn hàng';
       case 'reimbursement_requests': return 'Hoàn ứng';
+      case 'business_trip_requests': return 'Công tác';
       default: return 'Khác';
     }
   };
@@ -252,6 +254,7 @@ export default function ProposalsOverview() {
       case 'payment_requests': return '/proposals/payment';
       case 'order_proposals': return '/proposals/order';
       case 'reimbursement_requests': return '/proposals/reimbursement';
+      case 'business_trip_requests': return '/proposals/business-trip';
       default: return '#';
     }
   };
@@ -261,6 +264,7 @@ export default function ProposalsOverview() {
     { title: 'Tạm ứng', icon: Banknote, color: 'text-green-600', bg: 'bg-green-50', link: '/proposals/advance', desc: 'Yêu cầu tạm ứng lương, chi phí' },
     { title: 'Thanh toán', icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-50', link: '/proposals/payment', desc: 'Đề xuất chi tiền nhà cung cấp' },
     { title: 'Đơn hàng', icon: FileText, color: 'text-purple-600', bg: 'bg-purple-50', link: '/proposals/order', desc: 'Đề xuất triển khai dự án mới' },
+    { title: 'Công tác', icon: Plane, color: 'text-sky-600', bg: 'bg-sky-50', link: '/proposals/business-trip', desc: 'Đề xuất đi công tác, di chuyển' },
   ];
 
   const handleExportExcel = () => {
@@ -399,11 +403,13 @@ export default function ProposalsOverview() {
                       "w-10 h-10 rounded-xl flex items-center justify-center",
                       prop.colRef === 'leave_requests' ? "bg-orange-50 text-orange-600" :
                       prop.colRef === 'advance_requests' ? "bg-green-50 text-green-600" :
-                      prop.colRef === 'payment_requests' ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"
+                      prop.colRef === 'payment_requests' ? "bg-blue-50 text-blue-600" : 
+                      prop.colRef === 'business_trip_requests' ? "bg-sky-50 text-sky-600" : "bg-purple-50 text-purple-600"
                     )}>
                        {prop.colRef === 'leave_requests' ? <Calendar size={18} /> :
                         prop.colRef === 'advance_requests' ? <Banknote size={18} /> :
                         prop.colRef === 'payment_requests' ? <DollarSign size={18} /> : 
+                        prop.colRef === 'business_trip_requests' ? <Plane size={18} /> :
                         prop.colRef === 'reimbursement_requests' ? <RefreshCcw size={18} /> : <FileText size={18} />}
                     </div>
                     <div>

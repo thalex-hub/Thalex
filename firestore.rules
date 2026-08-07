@@ -258,6 +258,18 @@ service cloud.firestore {
       allow delete: if isDirector() || isHR() || isOwner(existing());
     }
 
+    // Business Trip Requests
+    match /business_trip_requests/{id} {
+      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
+                   hasPermission('menu_proposals_view') ||
+                   (isSignedIn() && request.auth.uid in resource.data.followers) ||
+                   (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if isDirector() || isHR() || isOwner(existing()) || 
+                   (isSignedIn() && request.auth.uid in resource.data.followers);
+      allow delete: if isDirector() || isHR() || isOwner(existing());
+    }
+
     // Advance, Payment, Reimbursement Requests
     match /advance_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 

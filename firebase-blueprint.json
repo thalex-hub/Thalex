@@ -532,6 +532,26 @@
       },
       "required": ["name", "type", "ownerId", "createdAt"]
     },
+    "BusinessTripRequest": {
+      "title": "BusinessTripRequest",
+      "description": "Employee business trip proposals",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "departureDate": { "type": "string", "format": "date-time" },
+        "returnDate": { "type": "string", "format": "date-time" },
+        "transportation": { "type": "string" },
+        "estimatedExpenses": { "type": "array", "items": { "type": "object" } },
+        "totalEstimatedAmount": { "type": "number" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "pending_director", "approved", "rejected", "returned", "cancelled"] },
+        "approverId": { "type": "string" },
+        "approverName": { "type": "string" }
+      },
+      "required": ["userId", "departureDate", "returnDate", "transportation", "status"]
+    },
     "TaskComment": {
       "title": "TaskComment",
       "description": "Comments on tasks",
@@ -567,6 +587,7 @@
     "payments": { "schema": "Payment", "description": "Financial payments" },
     "order_proposals": { "schema": "OrderProposal", "description": "Order proposals" },
     "orders": { "schema": "Order", "description": "Orders" },
+    "business_trip_requests": { "schema": "BusinessTripRequest", "description": "Business trip requests" },
     "customers": { "schema": "Customer", "description": "CRM Customers" },
     "customer_activities": { "schema": "CustomerActivity", "description": "CRM Activities" },
     "approvals": { "schema": "Approval", "description": "Approval history" },

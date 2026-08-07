@@ -25,6 +25,7 @@ const AdvanceRequests = React.lazy(() => import('./pages/AdvanceRequests'));
 const ReimbursementRequests = React.lazy(() => import('./pages/ReimbursementRequests'));
 const PaymentRequests = React.lazy(() => import('./pages/PaymentRequests'));
 const OrderProposals = React.lazy(() => import('./pages/OrderProposals'));
+const BusinessTripRequests = React.lazy(() => import('./pages/BusinessTripRequests'));
 const Proposals = React.lazy(() => import('./pages/Proposals'));
 const CashFlowManagement = React.lazy(() => import('./pages/CashFlowManagement'));
 const Disbursements = React.lazy(() => import('./pages/Disbursements'));
@@ -214,6 +215,7 @@ function AppContent() {
             <Route path="/proposals/reimbursement" element={<ReimbursementRequests />} />
             <Route path="/proposals/payment" element={<PaymentRequests />} />
             <Route path="/proposals/order" element={<OrderProposals />} />
+            <Route path="/proposals/business-trip" element={<BusinessTripRequests />} />
             <Route path="/cash-flow" element={<CashFlowManagement />} />
             <Route path="/disbursements" element={<Disbursements />} />
             <Route path="/storage" element={<Storage />} />

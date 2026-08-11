@@ -1,6 +1,6 @@
 import React from 'react';
 import { auth, db, storage } from '../lib/firebase';
-import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, setDoc, getDoc, getDocs, where, Timestamp } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, setDoc, getDoc, getDocs, where, Timestamp, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
   Shield, Mail, Phone, Briefcase, BadgeCheck, Users as UsersIcon, Plus, Edit2, 
@@ -185,7 +185,7 @@ export default function BusinessManagement() {
   React.useEffect(() => {
     if (!user) return;
 
-    const unsubUsers = onSnapshot(query(collection(db, 'users')), (snap) => {
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), limit(500)), (snap) => {
       const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
       setUsers(dbUsers.filter(u => u.roleId !== 'SuperAdmin'));
       setError(null);
@@ -193,13 +193,13 @@ export default function BusinessManagement() {
       handleFirestoreError(err, OperationType.LIST, 'users', false);
     });
 
-    const unsubDepts = onSnapshot(query(collection(db, 'departments')), (snap) => {
+    const unsubDepts = onSnapshot(query(collection(db, 'departments'), limit(100)), (snap) => {
       setDepartments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'departments', false);
     });
 
-    const unsubPos = onSnapshot(query(collection(db, 'positions')), (snap) => {
+    const unsubPos = onSnapshot(query(collection(db, 'positions'), limit(100)), (snap) => {
       setPositions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'positions', false);

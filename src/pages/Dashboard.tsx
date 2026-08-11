@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { db } from '../lib/firebase';
 import { AppUser } from '../types';
-import { collection, query, onSnapshot, where, Timestamp, or, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, Timestamp, or, getDocs, updateDoc, doc, deleteDoc, limit, orderBy } from 'firebase/firestore';
 import { cn, formatCurrency, formatPercent } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import WeeklySchedule from '../components/WeeklySchedule';
@@ -100,7 +100,7 @@ const CustomStatCard = ({ title, value, change, color = "blue", subtitle, icon: 
 };
 
 export default function Dashboard() {
-  const { isFinanceStaff, user, isAdmin, isManager, isDirector } = useAuth();
+  const { isFinanceStaff, user, isAdmin, isManager, isDirector, allUsers } = useAuth();
   const canSeeAll = isAdmin || isManager || isDirector || isFinanceStaff;
 
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -169,112 +169,104 @@ export default function Dashboard() {
     const yearEnd = `${selectedYear}-12-31`;
 
     // 1. Users & SuperAdmins
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
-      setUsers(dbUsers.filter(u => u.roleId !== 'SuperAdmin'));
-      setSuperAdminIds(dbUsers.filter(u => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'users'));
+    const fetchedUsers = allUsers;
+    setUsers(fetchedUsers.filter(u => u.roleId !== 'SuperAdmin'));
+    setSuperAdminIds(fetchedUsers.filter((u: any) => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
 
-    // 2. Orders
-    const ordersQ = canSeeAll
-      ? collection(db, 'orders')
-      : query(
-          collection(db, 'orders'),
-          or(
-            where('responsibleUserId', '==', user.uid),
-            where('followers', 'array-contains', user.uid)
-          )
+    const fetchData = async () => {
+      setRefreshing(true);
+      try {
+        // 2. Orders
+        const ordersQ = canSeeAll
+          ? query(collection(db, 'orders'), limit(500))
+          : query(
+              collection(db, 'orders'),
+              or(
+                where('responsibleUserId', '==', user.uid),
+                where('followers', 'array-contains', user.uid)
+              ),
+              limit(100)
+            );
+        const ordersSnap = await getDocs(ordersQ);
+        setOrders(ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        // 3. Tasks
+        const tasksQ = (isAdmin || isDirector)
+          ? query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(500))
+          : query(
+              collection(db, 'tasks'),
+              or(
+                where('assigneeId', '==', user.uid),
+                where('assignerId', '==', user.uid),
+                where('responsibleUserId', '==', user.uid),
+                where('followers', 'array-contains', user.uid)
+              ),
+              orderBy('createdAt', 'desc'),
+              limit(100)
+            );
+        const tasksSnap = await getDocs(tasksQ);
+        const allTasks = tasksSnap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter((t: any) => 
+            !t.isParent && 
+            t.type !== 'parent' && 
+            !t.name?.startsWith('Triển khai –') && 
+            !t.name?.startsWith('Triển khai -') && 
+            !t.name?.toLowerCase()?.includes('triển khai đơn hàng')
+          );
+        setTasks(allTasks);
+        setRecentTasks(allTasks
+          .filter((t: any) => t.status !== 'completed')
+          .sort((a: any, b: any) => {
+            const dateA = toDate(a.createdAt);
+            const dateB = toDate(b.createdAt);
+            return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+          })
         );
-    const unsubOrders = onSnapshot(ordersQ, (snap) => {
-      setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
 
-    // 3. Tasks
-    const tasksQ = (isAdmin || isDirector)
-      ? query(collection(db, 'tasks'))
-      : query(
-          collection(db, 'tasks'),
-          or(
-            where('assigneeId', '==', user.uid),
-            where('assignerId', '==', user.uid),
-            where('responsibleUserId', '==', user.uid),
-            where('followers', 'array-contains', user.uid)
-          )
+        // 4. Payments
+        const paymentsSnap = await getDocs(query(collection(db, 'payments'), limit(200)));
+        setPayments(paymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        // 5. Business Expenses
+        const busExpSnap = await getDocs(query(collection(db, 'business_expenses'), limit(200)));
+        setBusinessExpenses(busExpSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        // 6. Payment Requests
+        const payReqSnap = await getDocs(query(collection(db, 'payment_requests'), limit(200)));
+        setPaymentRequests(payReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        // 7. Advance Requests
+        const advReqSnap = await getDocs(query(collection(db, 'advance_requests'), limit(200)));
+        setAdvanceRequests(advReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        // 8. Reimbursement Requests
+        const reimReqSnap = await getDocs(query(collection(db, 'reimbursement_requests'), limit(200)));
+        setReimbursementRequests(reimReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        // 9. Departments
+        const deptsSnap = await getDocs(collection(db, 'departments'));
+        setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        // 10. Attendance
+        const attendanceQ = query(
+          collection(db, 'attendance'),
+          where('workDate', '>=', yearStart),
+          where('workDate', '<=', yearEnd),
+          limit(1000)
         );
-    const unsubTasks = onSnapshot(tasksQ, (snap) => {
-      const allTasks = snap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter((t: any) => 
-          !t.isParent && 
-          t.type !== 'parent' && 
-          !t.name?.startsWith('Triển khai –') && 
-          !t.name?.startsWith('Triển khai -') && 
-          !t.name?.toLowerCase()?.includes('triển khai đơn hàng')
-        );
-      setTasks(allTasks);
-      setRecentTasks(allTasks
-        .filter((t: any) => t.status !== 'completed')
-        .sort((a: any, b: any) => {
-          const dateA = toDate(a.createdAt);
-          const dateB = toDate(b.createdAt);
-          return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
-        })
-      );
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'tasks'));
+        const attendanceSnap = await getDocs(attendanceQ);
+        setAttendance(attendanceSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
-    // 4. Payments
-    const unsubPayments = onSnapshot(collection(db, 'payments'), (snap) => {
-      setPayments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'payments'));
-
-    // 5. Business Expenses
-    const unsubBusExp = onSnapshot(collection(db, 'business_expenses'), (snap) => {
-      setBusinessExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'business_expenses'));
-
-    // 6. Payment Requests
-    const unsubPayReq = onSnapshot(collection(db, 'payment_requests'), (snap) => {
-      setPaymentRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'payment_requests'));
-
-    // 7. Advance Requests
-    const unsubAdvReq = onSnapshot(collection(db, 'advance_requests'), (snap) => {
-      setAdvanceRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'advance_requests'));
-
-    // 8. Reimbursement Requests
-    const unsubReimReq = onSnapshot(collection(db, 'reimbursement_requests'), (snap) => {
-      setReimbursementRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'reimbursement_requests'));
-
-    // 9. Departments
-    const unsubDepts = onSnapshot(collection(db, 'departments'), (snap) => {
-      setDepartments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'departments'));
-
-    // 10. Attendance
-    const attendanceQ = query(
-      collection(db, 'attendance'),
-      where('workDate', '>=', yearStart),
-      where('workDate', '<=', yearEnd)
-    );
-    const unsubAttendance = onSnapshot(attendanceQ, (snap) => {
-      setAttendance(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'attendance'));
-
-    return () => {
-      unsubUsers();
-      unsubOrders();
-      unsubTasks();
-      unsubPayments();
-      unsubBusExp();
-      unsubPayReq();
-      unsubAdvReq();
-      unsubReimReq();
-      unsubDepts();
-      unsubAttendance();
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+      } finally {
+        setRefreshing(false);
+      }
     };
-  }, [user, canSeeAll, selectedYear, isAdmin, isDirector]);
+
+    fetchData();
+  }, [user, canSeeAll, selectedYear, isAdmin, isDirector, allUsers]);
 
   // 3. Memoized derived statistics
   const activeOrdersForYear = useMemo(() => {

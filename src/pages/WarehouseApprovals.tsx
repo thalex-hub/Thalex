@@ -10,7 +10,8 @@ import {
   getDocs,
   where,
   orderBy,
-  runTransaction
+  runTransaction,
+  limit
 } from 'firebase/firestore';
 import { 
   History, 
@@ -135,7 +136,7 @@ export default function WarehouseApprovals() {
       checkAllDone();
     });
 
-    const unsubProducts = onSnapshot(collection(db, 'products'), (snap) => {
+    const unsubProducts = onSnapshot(query(collection(db, 'products'), limit(500)), (snap) => {
       setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
       productsDone = true;
       checkAllDone();
@@ -145,7 +146,7 @@ export default function WarehouseApprovals() {
       checkAllDone();
     });
 
-    const unsubWarehouses = onSnapshot(collection(db, 'warehouses'), (snap) => {
+    const unsubWarehouses = onSnapshot(query(collection(db, 'warehouses'), limit(100)), (snap) => {
       setWarehouses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Warehouse)));
       warehousesDone = true;
       checkAllDone();
@@ -155,7 +156,7 @@ export default function WarehouseApprovals() {
       checkAllDone();
     });
 
-    const unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(200)), (snap) => {
       setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       ordersDone = true;
       checkAllDone();

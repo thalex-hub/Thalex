@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { db, storage } from '../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, getDoc, collection, query, where, onSnapshot, addDoc, deleteDoc, getDocs, updateDoc, increment, writeBatch, orderBy, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, addDoc, deleteDoc, getDocs, updateDoc, increment, writeBatch, orderBy, runTransaction, limit } from 'firebase/firestore';
 import { 
   ShoppingCart, 
   Clock, 
@@ -55,7 +55,7 @@ import { useAuth } from '../lib/authContext';
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isAdmin, isManager, isDirector, isSuperAdmin, isFinanceStaff, appUser, isAccountant, isHR, isGeneral, hasPermission } = useAuth();
+  const { user, isAdmin, isManager, isDirector, isSuperAdmin, isFinanceStaff, appUser, isAccountant, isHR, isGeneral, hasPermission, allUsers } = useAuth();
   const [order, setOrder] = React.useState<any>(null);
   const [tasks, setTasks] = React.useState<any[]>([]);
   const [processing, setProcessing] = React.useState(false);
@@ -1327,49 +1327,44 @@ export default function OrderDetail() {
     });
 
     const canSeeUsers = isAdmin || isDirector || isHR || isManager || isAccountant || isFinanceStaff || hasPermission('view_users') || hasPermission('manage_users');
-    let unsubUsers = () => {};
     if (canSeeUsers) {
-      unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-        setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
-      }, (err) => {
-        handleFirestoreError(err, OperationType.LIST, 'users', false);
-      });
+      setUsers(allUsers.map(u => ({ uid: u.id, ...u })));
     } else if (user) {
       // At least add current user to the list
       setUsers([{ uid: user.uid, fullName: appUser?.fullName || user.displayName || 'Me', ...appUser }]);
     }
 
-    const unsubscribeTasks = onSnapshot(query(collection(db, 'tasks'), where('orderId', '==', id)), (snap) => {
+    const unsubscribeTasks = onSnapshot(query(collection(db, 'tasks'), where('orderId', '==', id), limit(200)), (snap) => {
       setTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'tasks', false);
     });
 
-    const unsubscribePayments = onSnapshot(query(collection(db, 'payments'), where('orderId', '==', id)), (snap) => {
+    const unsubscribePayments = onSnapshot(query(collection(db, 'payments'), where('orderId', '==', id), limit(100)), (snap) => {
       setPayments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'payments', false);
     });
 
-    const unsubscribeAdvances = onSnapshot(query(collection(db, 'advance_requests'), where('relatedOrderId', '==', id)), (snap) => {
+    const unsubscribeAdvances = onSnapshot(query(collection(db, 'advance_requests'), where('relatedOrderId', '==', id), limit(100)), (snap) => {
       setAdvances(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'advance_requests', false);
     });
 
-    const unsubscribePaymentReqs = onSnapshot(query(collection(db, 'payment_requests'), where('relatedOrderId', '==', id)), (snap) => {
+    const unsubscribePaymentReqs = onSnapshot(query(collection(db, 'payment_requests'), where('relatedOrderId', '==', id), limit(100)), (snap) => {
       setPaymentRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'payment_requests', false);
     });
 
-    const unsubscribeReimbursementReqs = onSnapshot(query(collection(db, 'reimbursement_requests'), where('relatedOrderId', '==', id)), (snap) => {
+    const unsubscribeReimbursementReqs = onSnapshot(query(collection(db, 'reimbursement_requests'), where('relatedOrderId', '==', id), limit(100)), (snap) => {
       setReimbursementRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'reimbursement_requests', false);
     });
 
-    const unsubscribeStockTx = onSnapshot(query(collection(db, 'stock_transactions'), where('orderId', '==', id)), (snap) => {
+    const unsubscribeStockTx = onSnapshot(query(collection(db, 'stock_transactions'), where('orderId', '==', id), limit(200)), (snap) => {
       setStockTransactions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'stock_transactions', false);
@@ -1377,7 +1372,6 @@ export default function OrderDetail() {
 
     return () => {
       unsubDoc();
-      unsubUsers();
       unsubscribeTasks();
       unsubscribePayments();
       unsubscribeAdvances();
@@ -1385,7 +1379,7 @@ export default function OrderDetail() {
       unsubscribeReimbursementReqs();
       unsubscribeStockTx();
     };
-  }, [id]);
+  }, [id, allUsers]);
 
   React.useEffect(() => {
     if (!order?.customerId) return;
@@ -1399,7 +1393,7 @@ export default function OrderDetail() {
       // But here we're filtering by customerId, which is part of the owner rules.
       const canSeeAllActivity = isAdmin || isDirector || isHR || isManager || isAccountant || isFinanceStaff || hasPermission('view_orders') || hasPermission('menu_orders_view');
       
-      unsubOrders = onSnapshot(query(collection(db, 'orders'), where('customerId', '==', order.customerId)), (snap) => {
+      unsubOrders = onSnapshot(query(collection(db, 'orders'), where('customerId', '==', order.customerId), limit(50)), (snap) => {
         const ordersList = snap.docs.filter(d => d.id !== id).map(d => ({
           id: d.id,
           ...d.data() as any,
@@ -1417,7 +1411,7 @@ export default function OrderDetail() {
         handleFirestoreError(err, OperationType.LIST, 'orders_activity', false);
       });
 
-      unsubTasks = onSnapshot(query(collection(db, 'tasks'), where('customerId', '==', order.customerId)), (snap) => {
+      unsubTasks = onSnapshot(query(collection(db, 'tasks'), where('customerId', '==', order.customerId), limit(50)), (snap) => {
         const tasksList = snap.docs.map(d => ({
           id: d.id,
           ...d.data() as any,

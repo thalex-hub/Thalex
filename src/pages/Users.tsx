@@ -1,6 +1,6 @@
 import React from 'react';
 import { db, storage } from '../lib/firebase';
-import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, setDoc, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Shield, Mail, Phone, MapPin, Briefcase, BadgeCheck, Users as UsersIcon, Plus, Edit2, Trash2, X, Settings2, Calendar, FileText, Download, Clock, FileSpreadsheet, Upload, FileUp, Camera } from 'lucide-react';
 import { cn, formatCurrencyInput, parseCurrencyInput, withTimeout } from '../lib/utils';
@@ -110,7 +110,7 @@ export default function Users() {
   React.useEffect(() => {
     if (!authUser) return;
 
-    const qUsers = query(collection(db, 'users'));
+    const qUsers = query(collection(db, 'users'), limit(500));
     const unsubscribeUsers = onSnapshot(qUsers, (snap) => {
       const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
       setUsers(dbUsers.filter(u => u.roleId !== 'SuperAdmin'));
@@ -118,7 +118,7 @@ export default function Users() {
       handleFirestoreError(err, OperationType.GET, 'users');
     });
 
-    const qDepts = query(collection(db, 'departments'));
+    const qDepts = query(collection(db, 'departments'), limit(100));
     const unsubscribeDepts = onSnapshot(qDepts, (snap) => {
       setDepartments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
@@ -135,7 +135,7 @@ export default function Users() {
       console.error("Error reading roles_config settings stream:", err);
     });
 
-    const qPositions = query(collection(db, 'positions'));
+    const qPositions = query(collection(db, 'positions'), limit(100));
     const unsubscribePositions = onSnapshot(qPositions, (snap) => {
       setPositions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {

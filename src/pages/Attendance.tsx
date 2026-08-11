@@ -13,7 +13,7 @@ import { useAuth } from '../lib/authContext';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
 export default function Attendance() {
-  const { user, isManager, isAdmin, isHR, isAccountant, appUser, isDirector } = useAuth();
+  const { user, isManager, isAdmin, isHR, isAccountant, appUser, isDirector, allUsers: usersFromContext } = useAuth();
   const canSeeTeam = isManager || isAdmin || isHR || isAccountant;
   const [loading, setLoading] = React.useState(false);
   const [locating, setLocating] = React.useState(false);
@@ -27,6 +27,13 @@ export default function Attendance() {
   const [allAttendance, setAllAttendance] = React.useState<any[]>([]);
   const [teamMonthData, setTeamMonthData] = React.useState<any[]>([]);
   const [allUsers, setAllUsers] = React.useState<any[]>([]);
+
+  // Sync users from context
+  React.useEffect(() => {
+    if (usersFromContext && usersFromContext.length > 0) {
+      setAllUsers(usersFromContext);
+    }
+  }, [usersFromContext]);
   const [orders, setOrders] = React.useState<any[]>([]);
   const [departments, setDepartments] = React.useState<any[]>([]);
   const [leaveUsed, setLeaveUsed] = React.useState(0);
@@ -128,12 +135,12 @@ export default function Attendance() {
       
       let ordersData: any[] = [];
       if (canSeeAllOrders) {
-        const snap = await getDocs(query(collection(db, 'orders')));
+        const snap = await getDocs(query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(200)));
         ordersData = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
       } else {
         const [snap1, snap2] = await Promise.all([
-          getDocs(query(collection(db, 'orders'), where('responsibleUserId', '==', user.uid))),
-          getDocs(query(collection(db, 'orders'), where('followers', 'array-contains', user.uid)))
+          getDocs(query(collection(db, 'orders'), where('responsibleUserId', '==', user.uid), orderBy('createdAt', 'desc'), limit(100))),
+          getDocs(query(collection(db, 'orders'), where('followers', 'array-contains', user.uid), orderBy('createdAt', 'desc'), limit(100)))
         ]);
         const map = new Map();
         snap1.docs.forEach((d: any) => map.set(d.id, { id: d.id, ...d.data() }));
@@ -174,21 +181,18 @@ export default function Attendance() {
           collection(db, 'attendance'),
           where('workDate', '>=', start),
           where('workDate', '<=', end),
-          orderBy('workDate', 'asc')
+          orderBy('workDate', 'asc'),
+          limit(1000)
         );
         const teamSnap = await getDocs(teamQ);
         let allTeamData = teamSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        // Filter by department if manager
+        // Use allUsers from context instead of re-fetching
         if (!isAdmin && !isHR && !isAccountant && isManager && appUser?.departmentId) {
-          const usersQ = query(collection(db, 'users'), where('departmentId', '==', appUser.departmentId));
-          const usersSnap = await getDocs(usersQ);
-          const deptUserIds = usersSnap.docs.map(d => d.id);
-          allTeamData = allTeamData.filter((r: any) => deptUserIds.includes(r.userId));
-          setAllUsers(usersSnap.docs.map(d => ({ uid: d.id, ...d.data() })));
-        } else if (isAdmin || isHR || isAccountant) {
-          const usersSnap = await getDocs(collection(db, 'users'));
-          setAllUsers(usersSnap.docs.map(d => ({ uid: d.id, ...d.data() })));
+          allTeamData = allTeamData.filter((r: any) => {
+            const u = allUsers.find(usr => usr.id === r.userId);
+            return u && u.departmentId === appUser.departmentId;
+          });
         }
         
         setTeamMonthData(allTeamData);

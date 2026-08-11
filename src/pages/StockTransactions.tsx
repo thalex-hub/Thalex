@@ -13,7 +13,8 @@ import {
   getDocs,
   where,
   orderBy,
-  runTransaction
+  runTransaction,
+  limit
 } from 'firebase/firestore';
 import { 
   History, 
@@ -254,7 +255,7 @@ export default function StockTransactions() {
       }
     };
 
-    const q = query(collection(db, 'stock_transactions'), orderBy('transactionDate', 'desc'));
+    const q = query(collection(db, 'stock_transactions'), orderBy('transactionDate', 'desc'), limit(1000));
     const unsubTx = onSnapshot(q, (snap) => {
       setTransactions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as StockTransaction)));
       txDone = true;
@@ -265,7 +266,7 @@ export default function StockTransactions() {
       checkAllDone();
     });
 
-    const unsubProducts = onSnapshot(collection(db, 'products'), (snap) => {
+    const unsubProducts = onSnapshot(query(collection(db, 'products'), limit(1000)), (snap) => {
       setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
       productsDone = true;
       checkAllDone();
@@ -275,7 +276,7 @@ export default function StockTransactions() {
       checkAllDone();
     });
 
-    const unsubWarehouses = onSnapshot(collection(db, 'warehouses'), (snap) => {
+    const unsubWarehouses = onSnapshot(query(collection(db, 'warehouses'), limit(100)), (snap) => {
       setWarehouses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Warehouse)));
       warehousesDone = true;
       checkAllDone();
@@ -285,7 +286,7 @@ export default function StockTransactions() {
       checkAllDone();
     });
 
-    const unsubInventory = onSnapshot(collection(db, 'inventory'), (snap) => {
+    const unsubInventory = onSnapshot(query(collection(db, 'inventory'), limit(500)), (snap) => {
       setInventory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
       inventoryDone = true;
       checkAllDone();
@@ -295,7 +296,7 @@ export default function StockTransactions() {
       checkAllDone();
     });
 
-    const unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(500)), (snap) => {
       setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       ordersDone = true;
       checkAllDone();
@@ -305,7 +306,7 @@ export default function StockTransactions() {
       checkAllDone();
     });
 
-    const unsubStockItems = onSnapshot(collection(db, 'stock_items'), (snap) => {
+    const unsubStockItems = onSnapshot(query(collection(db, 'stock_items'), limit(1000)), (snap) => {
       setStockItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       stockItemsDone = true;
       checkAllDone();

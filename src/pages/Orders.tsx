@@ -138,7 +138,7 @@ export default function Orders() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const PAGE_SIZE = 12;
 
-  const { user, appUser, isAdmin, isManager, isDirector, isFinanceStaff, isHR, hasPermission, isSuperAdmin } = useAuth();
+  const { user, appUser, isAdmin, isManager, isDirector, isFinanceStaff, isHR, hasPermission, isSuperAdmin, allUsers } = useAuth();
   const canSeeAll = isAdmin || isManager || isDirector || isFinanceStaff || isHR || isSuperAdmin || hasPermission('view_orders') || hasPermission('menu_orders_view');
 
   const [showFilterDropdown, setShowFilterDropdown] = React.useState(false);
@@ -149,14 +149,8 @@ export default function Orders() {
   const [users, setUsers] = React.useState<any[]>([]);
 
   React.useEffect(() => {
-    return onSnapshot(collection(db, 'users'), (snap) => {
-      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setUsers(list);
-      sessionStorage.setItem('app_users_list', JSON.stringify(list));
-    }, (err) => {
-      console.error("Error loading users:", err);
-    });
-  }, []);
+    setUsers(allUsers);
+  }, [allUsers]);
 
   const newOrders = React.useMemo(() => 
     orders.filter(o => o.status === 'contract_signed' || !o.status), 
@@ -278,7 +272,9 @@ export default function Orders() {
     let unsub = () => {};
 
     if (canSeeAll) {
-      unsub = onSnapshot(collection(db, "orders"), (snap) => {
+      // Optimization: Add limit to reduce read quota usage
+      const q = query(collection(db, "orders"), orderBy("startDate", "desc"), limit(1000));
+      unsub = onSnapshot(q, (snap) => {
         const list = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
         processOrders(list);
       }, (error) => {

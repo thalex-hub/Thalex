@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, onSnapshot, getDoc, setDoc, deleteDoc, collection } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, deleteDoc, collection, query, limit, getDocs } from 'firebase/firestore';
 import { AppUser, UserRole } from '../types';
 import { handleFirestoreError, OperationType } from './firestoreUtils';
 
@@ -444,6 +444,7 @@ interface AuthContextType {
   canEditSalaries: boolean;
   hasPermission: (permissionId: string) => boolean;
   rolePermissions: Record<string, string[]>;
+  allUsers: AppUser[];
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -462,7 +463,8 @@ const AuthContext = createContext<AuthContextType>({
   canViewSalaries: false,
   canEditSalaries: false,
   hasPermission: () => false,
-  rolePermissions: {}
+  rolePermissions: {},
+  allUsers: []
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -505,7 +507,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const email = u.email || data.email || '';
               const expectedLegacyId = email ? email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
               
-              const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn' || u.email === 'thangcd11@gmail.com';
+              const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn' || u.email === 'thangcd11@gmail.com' || u.email === 'vanquy@thalex.com.vn';
               const isNgocVan = u.email === 'ngocvan@thalex.com.vn' || u.email === 'ngocvan@thalex.vn';
               
               if (isSystemAdminEmail && (data.accountStatus !== 'active' || (u.email === 'info.vinasglobal@gmail.com' && data.roleId !== 'SuperAdmin') || !data.legacyId)) {
@@ -555,14 +557,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setLoading(false);
             } else {
               // User document not found. If system admin, self-heal immediately!
-              const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn' || u.email === 'thangcd11@gmail.com';
+              const isSystemAdminEmail = u.email === 'info.vinasglobal@gmail.com' || u.email === 'vietnhan@thalex.com.vn' || u.email === 'vietnhan@thalex.vn' || u.email === 'thangcd11@gmail.com' || u.email === 'vanquy@thalex.com.vn';
               if (isSystemAdminEmail) {
                 const expectedLegacyId = u.email ? u.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
                 const newUser = {
                   uid: u.uid,
-                  fullName: u.email === 'info.vinasglobal@gmail.com' ? 'Super Admin' : 'Nguyễn Việt Nhân',
+                  fullName: u.email === 'info.vinasglobal@gmail.com' ? 'Super Admin' : (u.email === 'vanquy@thalex.com.vn' ? 'Văn Quý' : 'Nguyễn Việt Nhân'),
                   email: u.email,
-                  avatar: `https://ui-avatars.com/api/?name=${u.email === 'info.vinasglobal@gmail.com' ? 'Super+Admin' : 'Viet+Nhan'}&background=random`,
+                  avatar: `https://ui-avatars.com/api/?name=${u.email === 'info.vinasglobal@gmail.com' ? 'Super+Admin' : (u.email === 'vanquy@thalex.com.vn' ? 'Van+Quy' : 'Viet+Nhan')}&background=random`,
                   roleId: u.email === 'info.vinasglobal@gmail.com' ? 'SuperAdmin' : 'Director',
                   workStatus: 'official',
                   accountStatus: 'active',
@@ -705,45 +707,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
+  const [allUsers, setAllUsers] = useState<AppUser[]>([]);
 
   useEffect(() => {
     if (!user) {
       setRolePermissions({});
+      setAllUsers([]);
       return;
     }
 
-    // Try to load from cache first
-    const cachedPerms = sessionStorage.getItem('app_role_permissions');
-    if (cachedPerms) {
+    const fetchAllData = async () => {
       try {
-        setRolePermissions(JSON.parse(cachedPerms));
-      } catch (e) {
-        console.error("Failed to parse cached role permissions", e);
+        const [usersSnap, permsSnap] = await Promise.all([
+          getDocs(query(collection(db, 'users'), limit(1000))),
+          getDocs(query(collection(db, 'role_permissions'), limit(100)))
+        ]);
+
+        setAllUsers(usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+
+        const perms: Record<string, string[]> = {};
+        permsSnap.docs.forEach(doc => {
+          perms[doc.id] = doc.data().permissions || [];
+        });
+        setRolePermissions(perms);
+        sessionStorage.setItem('app_role_permissions', JSON.stringify(perms));
+      } catch (error) {
+        console.error("Error loading auth data:", error);
       }
-    }
-
-    const unsubRolePerms = onSnapshot(collection(db, 'role_permissions'), (snap) => {
-      const perms: Record<string, string[]> = {};
-      snap.docs.forEach(doc => {
-        perms[doc.id] = doc.data().permissions || [];
-      });
-      setRolePermissions(perms);
-      sessionStorage.setItem('app_role_permissions', JSON.stringify(perms));
-    }, (error) => {
-      console.error("Error loading role permissions:", error);
-      handleFirestoreError(error, OperationType.LIST, 'role_permissions', false);
-    });
-
-    return () => {
-      unsubRolePerms();
     };
+
+    fetchAllData();
   }, [user]);
 
   const role = (appUser?.roleId || 'Staff');
   const roleLower = role.toLowerCase();
 
   const hasPermission = (permissionId: string): boolean => {
-    const isSuperUser = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn' || user?.email === 'ngocvan@thalex.vn' || roleLower === 'superadmin' || roleLower === 'admin';
+    const isSuperUser = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn' || user?.email === 'ngocvan@thalex.vn' || user?.email === 'vanquy@thalex.com.vn' || roleLower === 'superadmin' || roleLower === 'admin';
     if (isSuperUser) return true;
     
     // Check direct user permissions first
@@ -827,7 +827,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       canViewSalaries,
       canEditSalaries,
       hasPermission,
-      rolePermissions
+      rolePermissions,
+      allUsers
     }}>
       {children}
     </AuthContext.Provider>

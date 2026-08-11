@@ -1,6 +1,6 @@
 import React from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, orderBy, onSnapshot, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, getDocs, updateDoc, doc, limit } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import { 
   BarChart3, 
@@ -78,7 +78,7 @@ export default function SalesManagement() {
       }
     };
 
-    const unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(1000)), (snap) => {
       setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       ordersDone = true;
       checkAllDone();
@@ -89,7 +89,7 @@ export default function SalesManagement() {
       checkAllDone();
     });
 
-    const unsubProposals = onSnapshot(collection(db, 'order_proposals'), (snap) => {
+    const unsubProposals = onSnapshot(query(collection(db, 'order_proposals'), limit(1000)), (snap) => {
       setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       proposalsDone = true;
       checkAllDone();

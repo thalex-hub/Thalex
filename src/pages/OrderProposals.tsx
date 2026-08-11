@@ -1,6 +1,6 @@
 import React from 'react';
 import { db, storage } from '../lib/firebase';
-import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, or, getDoc, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, or, getDoc, getDocs, deleteDoc, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
@@ -56,7 +56,7 @@ export default function OrderProposals() {
   const [rejectionReasonInput, setRejectionReasonInput] = React.useState('');
   const [customers, setCustomers] = React.useState<any[]>([]);
   const [showGuide, setShowGuide] = React.useState(true);
-  const { appUser, isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user, isSuperAdmin, hasPermission } = useAuth();
+  const { appUser, isAdmin, isManager, isDirector, isAccountant, isHR, isFinanceStaff, user, isSuperAdmin, hasPermission, allUsers } = useAuth();
   const location = useLocation();
   const hasViewOrdersPerm = hasPermission('view_orders') || 
                             hasPermission('menu_orders_view');
@@ -193,28 +193,20 @@ export default function OrderProposals() {
     setRefreshing(true);
     
     // Real-time customers
-    const unsubCustomers = onSnapshot(collection(db, 'customers'), (snap) => {
+    const unsubCustomers = onSnapshot(query(collection(db, 'customers'), limit(1000)), (snap) => {
       const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCustomers(list);
       sessionStorage.setItem('app_customers_list', JSON.stringify(list));
     });
 
     // Real-time users
-    let unsubUsers = () => {};
-    if (canSeeAll) {
-      unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setUsers(list);
-        sessionStorage.setItem('app_users_list', JSON.stringify(list));
-      });
-    } else {
-      setUsers([{ id: user.uid, fullName: appUser?.fullName || user.displayName || 'Self', email: user.email }]);
-    }
+    setUsers(allUsers);
+    sessionStorage.setItem('app_users_list', JSON.stringify(allUsers));
 
     // Real-time proposals
     let unsubProposals = () => {};
     if (canSeeAll) {
-      const q = query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'), limit(1000));
       unsubProposals = onSnapshot(q, (snap) => {
         setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setRefreshing(false);
@@ -238,26 +230,26 @@ export default function OrderProposals() {
         setRefreshing(false);
       };
 
-      const u1 = onSnapshot(query(collection(db, 'order_proposals'), where('createdBy', '==', user.uid)), (snap) => {
+      const u1 = onSnapshot(query(collection(db, 'order_proposals'), where('createdBy', '==', user.uid), limit(200)), (snap) => {
         results.q1 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         combine();
       });
-      const u2 = onSnapshot(query(collection(db, 'order_proposals'), where('followers', 'array-contains', user.uid)), (snap) => {
+      const u2 = onSnapshot(query(collection(db, 'order_proposals'), where('followers', 'array-contains', user.uid), limit(200)), (snap) => {
         results.q2 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         combine();
       });
-      const uResp = onSnapshot(query(collection(db, 'order_proposals'), where('responsibleUserId', '==', user.uid)), (snap) => {
+      const uResp = onSnapshot(query(collection(db, 'order_proposals'), where('responsibleUserId', '==', user.uid), limit(200)), (snap) => {
         results.qResp = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         combine();
       });
 
       let uL1 = () => {}, uL2 = () => {};
       if (appUser?.legacyId) {
-        uL1 = onSnapshot(query(collection(db, 'order_proposals'), where('createdBy', '==', appUser.legacyId)), (snap) => {
+        uL1 = onSnapshot(query(collection(db, 'order_proposals'), where('createdBy', '==', appUser.legacyId), limit(200)), (snap) => {
           results.qL1 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           combine();
         });
-        uL2 = onSnapshot(query(collection(db, 'order_proposals'), where('followers', 'array-contains', appUser.legacyId)), (snap) => {
+        uL2 = onSnapshot(query(collection(db, 'order_proposals'), where('followers', 'array-contains', appUser.legacyId), limit(200)), (snap) => {
           results.qL2 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           combine();
         });
@@ -268,10 +260,9 @@ export default function OrderProposals() {
 
     return () => {
       unsubCustomers();
-      unsubUsers();
       unsubProposals();
     };
-  }, [canSeeAll, user, appUser]);
+  }, [canSeeAll, user, appUser, allUsers]);
 
   // Removed automatic healDatabase to save quota. It should be a manual admin action if needed.
 

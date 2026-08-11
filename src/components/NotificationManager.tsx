@@ -1,6 +1,6 @@
 import React from 'react';
 import { db, auth } from '../lib/firebase';
-import { collection, query, where, onSnapshot, or, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, or, updateDoc, doc, limit, orderBy, Timestamp } from 'firebase/firestore';
 import { isBefore, addHours, parseISO, format } from 'date-fns';
 import { Bell, BellOff, AlertTriangle, Clock, X, ExternalLink, RefreshCcw, FileCheck, Search, MessageCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -269,11 +269,15 @@ export default function NotificationManager() {
   React.useEffect(() => {
     if (!currentUser || !isLoaded) return;
 
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const timeStr = twoDaysAgo.toISOString();
+
     // Listen strictly to tasks where I am actually involved
-    const q1 = query(collection(db, 'tasks'), where('assigneeId', '==', currentUser.uid));
-    const q2 = query(collection(db, 'tasks'), where('assignerId', '==', currentUser.uid));
-    const q3 = query(collection(db, 'tasks'), where('responsibleUserId', '==', currentUser.uid));
-    const q4 = query(collection(db, 'tasks'), where('followers', 'array-contains', currentUser.uid));
+    const q1 = query(collection(db, 'tasks'), where('assigneeId', '==', currentUser.uid), where('updatedAt', '>=', timeStr), limit(50));
+    const q2 = query(collection(db, 'tasks'), where('assignerId', '==', currentUser.uid), where('updatedAt', '>=', timeStr), limit(50));
+    const q3 = query(collection(db, 'tasks'), where('responsibleUserId', '==', currentUser.uid), where('updatedAt', '>=', timeStr), limit(50));
+    const q4 = query(collection(db, 'tasks'), where('followers', 'array-contains', currentUser.uid), where('updatedAt', '>=', timeStr), limit(50));
 
     let tasksMap = new Map();
     const handleTasksSnap = (changeType: 'added'|'modified'|'removed', doc: any) => {
@@ -325,7 +329,9 @@ export default function NotificationManager() {
     const qLeave = query(
       collection(db, 'leave_requests'),
       where('userId', '==', currentUser.uid),
-      where('status', '==', 'returned')
+      where('status', '==', 'returned'),
+      where('updatedAt', '>=', timeStr),
+      limit(20)
     );
 
     const unsubscribeLeave = onSnapshot(qLeave, (snapshot) => {
@@ -381,13 +387,22 @@ export default function NotificationManager() {
 
         let qApprovals: any[] = [];
         if (showAllThisType) {
-          qApprovals = [query(collection(db, colName))];
+          // Optimization: Only watch for actionable statuses to reduce read quota usage
+          // And limit to last 50 recent ones
+          qApprovals = [
+            query(
+              collection(db, colName), 
+              where('status', 'in', ['pending', 'pending_finance', 'pending_director', 'approved', 'accountant_verified', 'returned']),
+              where('updatedAt', '>=', timeStr),
+              limit(50)
+            )
+          ];
         } else if (isManager) {
           const field = colName === 'order_proposals' ? 'createdBy' : 'userId';
           qApprovals = [
-            query(collection(db, colName), where(field, '==', currentUser.uid)),
-            query(collection(db, colName), where('departmentId', '==', appUser?.departmentId || 'none')),
-            query(collection(db, colName), where('followers', 'array-contains', currentUser.uid))
+            query(collection(db, colName), where(field, '==', currentUser.uid), where('updatedAt', '>=', timeStr), limit(20)),
+            query(collection(db, colName), where('departmentId', '==', appUser?.departmentId || 'none'), where('status', '==', 'pending'), where('updatedAt', '>=', timeStr), limit(20)),
+            query(collection(db, colName), where('followers', 'array-contains', currentUser.uid), where('updatedAt', '>=', timeStr), limit(20))
           ];
         } else {
           return;

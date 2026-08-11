@@ -2,7 +2,9 @@ import admin from 'firebase-admin';
 
 async function run() {
   console.log("Initializing admin...");
-  admin.initializeApp();
+  admin.initializeApp({
+    projectId: 'gen-lang-client-0900315510'
+  });
   const db = admin.firestore();
   db.settings({ databaseId: 'ai-studio-6bab7731-3b08-4fdc-8b7d-051f569a2dc7' });
   

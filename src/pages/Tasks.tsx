@@ -1,6 +1,6 @@
 import React from 'react';
 import { db, auth, storage } from '../lib/firebase';
-import { collection, addDoc, query, where, getDocs, getDoc, onSnapshot, doc, updateDoc, deleteDoc, orderBy, or } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, getDoc, onSnapshot, doc, updateDoc, deleteDoc, orderBy, or, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Plus, ListFilter, CheckCircle, Clock, AlertCircle, ClipboardList, FileDown, BarChart3, Calendar, Trash2, ShieldCheck, CornerUpLeft, LayoutDashboard, List as ListIcon, User, UserCheck, Edit3, CheckSquare, Square, PlusCircle, ChevronRight, GitMerge, Paperclip, FileText, XCircle, FileSpreadsheet, Search, UserPlus, MessageSquare, MessageCircle, Send, Download } from 'lucide-react';
 import { DragDropContext, Droppable as DroppableBase, Draggable as DraggableBase } from '@hello-pangea/dnd';
@@ -19,7 +19,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Ba
 import { exportToExcel } from '../lib/excel';
 
 export default function Tasks() {
-  const { user: currentUser, appUser, isAdmin, isSuperAdmin, isManager, isDirector, isHR, isLeader, isAccountant } = useAuth();
+  const { user: currentUser, appUser, isAdmin, isSuperAdmin, isManager, isDirector, isHR, isLeader, isAccountant, allUsers } = useAuth();
   const [tasks, setTasks] = React.useState<Task[]>([]);
   const [users, setUsers] = React.useState<AppUser[]>([]);
   const [showAddModal, setShowAddModal] = React.useState(false);
@@ -179,27 +179,13 @@ export default function Tasks() {
     if (!currentUser) return;
     
     // Fetch users for assignment if authorized
-    const canSeeUsers = isAdmin || isDirector || isHR || isManager || isAccountant;
-    let unsubUsers = () => {};
+    setUsers(allUsers as any);
 
-    if (canSeeUsers) {
-      const usersQ = query(collection(db, 'users'));
-      unsubUsers = onSnapshot(usersQ, (snap) => {
-        setUsers(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as any)));
-      }, (err) => {
-        handleFirestoreError(err, OperationType.GET, 'users', false);
-      });
-    }
-
-    // Use local appUser as a lone entry in users list if not privileged
-    if (!canSeeUsers && appUser) {
-      setUsers([{ uid: currentUser.uid, ...appUser }]);
-    }
     let unsubTasks: () => void;
     const canSeeAll = isAdmin || isDirector;
     
     if (canSeeAll) {
-       const tasksQ = query(collection(db, 'tasks'));
+       const tasksQ = query(collection(db, 'tasks'), limit(1000));
        unsubTasks = onSnapshot(tasksQ, (snap) => {
          let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)).filter(t => !t.orderId);
          data.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
@@ -236,8 +222,6 @@ export default function Tasks() {
          };
 
          const handleSnap = (snap: any) => {
-           // We don't clear map, we just update existing or add new.
-           // Actually, onSnapshot sends docChanges! It's better to process docChanges to handle removals.
            snap.docChanges().forEach((change: any) => {
              if (change.type === 'removed') {
                tasksMap.delete(change.doc.id);
@@ -253,10 +237,10 @@ export default function Tasks() {
          
          const errHandler = (err: any) => handleFirestoreError(err, OperationType.GET, 'tasks', false);
 
-         const q1 = query(collection(db, 'tasks'), where('assigneeId', 'in', idsArray));
-         const q2 = query(collection(db, 'tasks'), where('assignerId', 'in', idsArray));
-         const q3 = query(collection(db, 'tasks'), where('responsibleUserId', 'in', idsArray));
-         const q4 = query(collection(db, 'tasks'), where('followers', 'array-contains-any', idsArray));
+         const q1 = query(collection(db, 'tasks'), where('assigneeId', 'in', idsArray), limit(300));
+         const q2 = query(collection(db, 'tasks'), where('assignerId', 'in', idsArray), limit(300));
+         const q3 = query(collection(db, 'tasks'), where('responsibleUserId', 'in', idsArray), limit(300));
+         const q4 = query(collection(db, 'tasks'), where('followers', 'array-contains-any', idsArray), limit(300));
          
          unsubs.push(onSnapshot(q1, handleSnap, errHandler));
          unsubs.push(onSnapshot(q2, handleSnap, errHandler));
@@ -268,10 +252,9 @@ export default function Tasks() {
     }
 
     return () => {
-      unsubUsers();
       unsubTasks();
     };
-  }, [isAdmin, isManager, isHR, isLeader, currentUser, appUser]);
+  }, [isAdmin, isManager, isHR, isLeader, currentUser, appUser, allUsers]);
 
   // Subscribe to comments and subtasks when editing/viewing a task
   React.useEffect(() => {

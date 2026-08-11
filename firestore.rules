@@ -142,6 +142,7 @@ service cloud.firestore {
         request.auth.token.email.lower() == 'ngocvan@thalex.vn'.lower() || 
         request.auth.token.email.lower() == 'ngocvan@thalex.com.vn'.lower() || 
         request.auth.token.email.lower() == 'ngocvan@thalex.com'.lower() || 
+        request.auth.token.email.lower() == 'vanquy@thalex.com.vn'.lower() || 
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (existsUserDoc() && (
           isDirectorRole(getUserRole()) || 
@@ -156,7 +157,7 @@ service cloud.firestore {
       let email = ('email' in request.auth.token) ? request.auth.token.email.lower() : '';
       return isSignedIn() && (
         request.auth.uid == 'vnN51rJHpdgaHtEaeCf5gxJrqLu2' ||
-        email in ['thangcd11@gmail.com', 'info.vinasglobal@gmail.com', 'vietnhan@thalex.vn', 'vietnhan@thalex.com.vn', 'tuyetmai@thalex.vn', 'tuyetmai@thalex.com.vn', 'ngocvan@thalex.vn', 'ngocvan@thalex.com.vn', 'ngocvan@thalex.com'] || 
+        email in ['thangcd11@gmail.com', 'info.vinasglobal@gmail.com', 'vietnhan@thalex.vn', 'vietnhan@thalex.com.vn', 'tuyetmai@thalex.vn', 'tuyetmai@thalex.com.vn', 'ngocvan@thalex.vn', 'ngocvan@thalex.com.vn', 'ngocvan@thalex.com', 'vanquy@thalex.com.vn'] || 
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (existsUserDoc() && isDirectorRole(getUserRole()))
       );

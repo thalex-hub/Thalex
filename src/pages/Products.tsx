@@ -9,7 +9,8 @@ import {
   deleteDoc, 
   doc, 
   where,
-  getDocs 
+  getDocs,
+  limit
 } from 'firebase/firestore';
 import { 
   Plus, 
@@ -85,7 +86,7 @@ export default function Products() {
       }
     };
 
-    const unsubProducts = onSnapshot(collection(db, 'products'), (snap) => {
+    const unsubProducts = onSnapshot(query(collection(db, 'products'), limit(1000)), (snap) => {
       setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
       productsDone = true;
       checkAllDone();
@@ -105,7 +106,7 @@ export default function Products() {
       checkAllDone();
     });
 
-    const unsubInventory = onSnapshot(collection(db, 'inventory'), (snap) => {
+    const unsubInventory = onSnapshot(query(collection(db, 'inventory'), limit(2000)), (snap) => {
       setInventory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
       inventoryDone = true;
       checkAllDone();
@@ -115,7 +116,7 @@ export default function Products() {
       checkAllDone();
     });
 
-    const unsubStockItems = onSnapshot(collection(db, 'stock_items'), (snap) => {
+    const unsubStockItems = onSnapshot(query(collection(db, 'stock_items'), limit(2000)), (snap) => {
       setStockItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as StockItem)));
       stockItemsDone = true;
       checkAllDone();

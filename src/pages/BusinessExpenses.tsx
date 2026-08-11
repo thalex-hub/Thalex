@@ -1,6 +1,6 @@
 import React from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, onSnapshot, getDocs, where, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, getDocs, where, orderBy, limit } from 'firebase/firestore';
 import { 
   DollarSign, Zap, Droplets, Building2, Truck, PenTool, Tags, 
   Wallet, TrendingDown, ArrowUpRight, ArrowDownRight, 
@@ -37,7 +37,7 @@ interface MonthlyExpense {
 }
 
 export default function BusinessExpenses() {
-  const { isDirector, isAccountant, appUser, hasPermission } = useAuth();
+  const { isDirector, isAccountant, appUser, hasPermission, allUsers } = useAuth();
   const [currentDate, setCurrentDate] = React.useState(new Date());
   const [viewMode, setViewMode] = React.useState<'month' | 'year'>('month');
   const [loading, setLoading] = React.useState(true);
@@ -55,19 +55,32 @@ export default function BusinessExpenses() {
 
     setLoading(true);
 
-    const canSeeAllOrders = isDirector || isAccountant || hasPermission('menu_business_expenses');
-    const ordersQ = canSeeAllOrders
-      ? query(collection(db, 'orders'))
-      : query(collection(db, 'orders'), where('responsibleUserId', '==', appUser?.uid || 'none'));
+    const currentYear = currentDate.getFullYear();
+    const yearStart = format(startOfYear(currentDate), 'yyyy-MM-dd');
+    const yearEnd = format(endOfYear(currentDate), 'yyyy-MM-dd');
 
-    // Sub to users (excluding SuperAdmin and inactive users)
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      const fetchedUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-      setUsers(fetchedUsers.filter((u: any) => u.isActive !== false && u.roleId !== 'SuperAdmin'));
-      setSuperAdminIds(fetchedUsers.filter((u: any) => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'users', false);
-    });
+    const canSeeAllOrders = isDirector || isAccountant || hasPermission('menu_business_expenses');
+    
+    // Optimization: Filter orders by date range
+    let ordersQ;
+    if (canSeeAllOrders) {
+      ordersQ = query(
+        collection(db, 'orders'),
+        where('startDate', '>=', `${currentYear}-01-01`),
+        limit(2000)
+      );
+    } else {
+      ordersQ = query(
+        collection(db, 'orders'), 
+        where('responsibleUserId', '==', appUser?.uid || 'none'),
+        limit(500)
+      );
+    }
+
+    // Use shared allUsers
+    const fetchedUsers = allUsers;
+    setUsers(fetchedUsers.filter((u: any) => u.isActive !== false && u.roleId !== 'SuperAdmin'));
+    setSuperAdminIds(fetchedUsers.filter((u: any) => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
 
     // Sub to departments
     const unsubDepts = onSnapshot(collection(db, 'departments'), (snap) => {
@@ -87,7 +100,8 @@ export default function BusinessExpenses() {
     const unsubPayments = onSnapshot(
       query(
         collection(db, 'payment_requests'), 
-        where('status', 'in', ['approved', 'paid'])
+        where('status', 'in', ['approved', 'paid']),
+        limit(1000)
       ), 
       (snap) => {
         setPaymentRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -97,29 +111,35 @@ export default function BusinessExpenses() {
       }
     );
 
-    // Sub to advance requests
-    const unsubAdvances = onSnapshot(collection(db, 'advance_requests'), (snap) => {
-      setAdvanceRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'advance_requests', false);
-    });
+    // Sub to advance requests (filtered by date to reduce quota)
+    const unsubAdvances = onSnapshot(
+      query(collection(db, 'advance_requests'), limit(1000)), 
+      (snap) => {
+        setAdvanceRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, 
+      (err) => {
+        handleFirestoreError(err, OperationType.GET, 'advance_requests', false);
+      }
+    );
 
-    // Sub to reimbursement requests
-    const unsubReimbursements = onSnapshot(collection(db, 'reimbursement_requests'), (snap) => {
-      setReimbursementRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'reimbursement_requests', false);
-    });
+    // Sub to reimbursement requests (filtered by date to reduce quota)
+    const unsubReimbursements = onSnapshot(
+      query(collection(db, 'reimbursement_requests'), limit(1000)), 
+      (snap) => {
+        setReimbursementRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, 
+      (err) => {
+        handleFirestoreError(err, OperationType.GET, 'reimbursement_requests', false);
+      }
+    );
 
     // Listen to attendance for the whole current year to calculate multi-month data
-    const yearStart = format(startOfYear(currentDate), 'yyyy-MM-dd');
-    const yearEnd = format(endOfYear(currentDate), 'yyyy-MM-dd');
-    
     const unsubAttendance = onSnapshot(
       query(
         collection(db, 'attendance'),
         where('workDate', '>=', yearStart),
-        where('workDate', '<=', yearEnd)
+        where('workDate', '<=', yearEnd),
+        limit(5000)
       ),
       (snap) => {
         setAttendance(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -131,7 +151,6 @@ export default function BusinessExpenses() {
     );
 
     return () => {
-      unsubUsers();
       unsubDepts();
       unsubOrders();
       unsubPayments();
@@ -139,7 +158,7 @@ export default function BusinessExpenses() {
       unsubReimbursements();
       unsubAttendance();
     };
-  }, [currentDate.getFullYear(), appUser, isDirector, isAccountant, hasPermission]); // Refetch when year or user permissions change
+  }, [currentDate.getFullYear(), appUser, isDirector, isAccountant, hasPermission, allUsers]); // Refetch when year or user permissions change
 
   const calculateSalaryForUserAndMonth = React.useCallback((user: any, month: Date, userAttendance: any[]) => {
     const userAdvances = advanceRequests.filter(r => r.userId === user.uid);

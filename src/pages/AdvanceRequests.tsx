@@ -38,6 +38,19 @@ export default function AdvanceRequests() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [editingRequest, setEditingRequest] = React.useState<any>(null);
+  const [editForm, setEditForm] = React.useState({
+    title: '',
+    amount: '',
+    purpose: '',
+    relatedOrderId: '',
+    approvalLevel: 'Director',
+    paymentMethod: 'cash' as 'cash' | 'transfer',
+    accountName: '',
+    accountNumber: '',
+    bankName: '',
+    followers: [] as string[]
+  });
   const [showOrderDropdown, setShowOrderDropdown] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [newRequest, setNewRequest] = React.useState({
@@ -57,7 +70,7 @@ export default function AdvanceRequests() {
   const [showFollowerDropdown, setShowFollowerDropdown] = React.useState(false);
   const [users, setUsers] = React.useState<any[]>([]);
 
-  const { isAdmin, isFinanceStaff, user, appUser, isManager, isAccountant, isSuperAdmin, isDirector, hasPermission } = useAuth();
+  const { isAdmin, isFinanceStaff, user, appUser, isManager, isAccountant, isSuperAdmin, isDirector, hasPermission, allUsers } = useAuth();
   
   // Can approve if Admin, Director, or has permission
   const canApprove = isDirector || hasPermission('approve_advances');
@@ -67,13 +80,11 @@ export default function AdvanceRequests() {
   React.useEffect(() => {
     if (!user) return;
 
-    let unsubUsers = () => {};
-    unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      setUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      console.error("Error loading users:", err);
-      setUsers([]);
-    });
+    setUsers(allUsers);
+  }, [allUsers, user]);
+
+  React.useEffect(() => {
+    if (!user) return;
 
     // Fetch orders for the selection
     const fetchOrders = async () => {
@@ -100,10 +111,10 @@ export default function AdvanceRequests() {
     
     let unsubRequests = () => {};
     if (isDirector || isFinanceStaff || hasPermission('view_advances') || hasPermission('menu_proposals_view')) {
-      const q = query(collection(db, 'advance_requests'));
+      // Optimization: Add limit and filter to reduce quota usage
+      const q = query(collection(db, 'advance_requests'), orderBy('requestDate', 'desc'), limit(500));
       unsubRequests = onSnapshot(q, (snap) => {
         let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((r: any) => r.requestType === 'advance');
-        data.sort((a: any, b: any) => new Date(b.requestDate || b.createdAt).getTime() - new Date(a.requestDate || a.createdAt).getTime());
         setRequests(data);
       }, (error) => {
         console.error("Firestore read error:", error);
@@ -121,8 +132,9 @@ export default function AdvanceRequests() {
         setRequests(mergedList);
       };
 
-      const q1 = query(collection(db, 'advance_requests'), where('userId', '==', user.uid));
-      const q2 = query(collection(db, 'advance_requests'), where('followers', 'array-contains', user.uid));
+      // Optimization: Add limits for regular users too
+      const q1 = query(collection(db, 'advance_requests'), where('userId', '==', user.uid), orderBy('requestDate', 'desc'), limit(100));
+      const q2 = query(collection(db, 'advance_requests'), where('followers', 'array-contains', user.uid), orderBy('requestDate', 'desc'), limit(100));
 
       const unsub1 = onSnapshot(q1, (snap) => {
         listCreated = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -157,7 +169,6 @@ export default function AdvanceRequests() {
     });
 
     return () => {
-      unsubUsers();
       unsubRequests();
       unsubReimbursements();
     };
@@ -284,7 +295,75 @@ export default function AdvanceRequests() {
     }
   };
 
-   const handleApprove = async (id: string, action: 'approve_finance' | 'approve_director' | 'reject' | 'disbursed', providedReason?: string) => {
+   const handleOpenEdit = (req: any) => {
+    setEditingRequest(req);
+    setEditForm({
+      title: req.title || '',
+      amount: req.amount.toString(),
+      purpose: req.purpose || '',
+      relatedOrderId: req.relatedOrderId || '',
+      approvalLevel: req.approvalLevel || 'Director',
+      paymentMethod: req.paymentMethod || 'cash',
+      accountName: req.accountName || '',
+      accountNumber: req.accountNumber || '',
+      bankName: req.bankName || '',
+      followers: req.followers || []
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRequest || !auth.currentUser || !appUser) return;
+    setLoading(true);
+
+    try {
+      const amount = parseFloat(parseCurrencyInput(editForm.amount));
+      if (isNaN(amount) || amount <= 0) {
+        alert("Vui lòng nhập số tiền hợp lệ");
+        setLoading(false);
+        return;
+      }
+
+      const updateData: any = {
+        title: editForm.title,
+        amount: amount,
+        purpose: editForm.purpose,
+        relatedOrderId: editForm.relatedOrderId,
+        approvalLevel: editForm.approvalLevel,
+        paymentMethod: editForm.paymentMethod,
+        accountName: editForm.accountName,
+        accountNumber: editForm.accountNumber,
+        bankName: editForm.bankName,
+        followers: editForm.followers,
+        status: 'pending', // Reset to pending
+        updatedAt: new Date().toISOString()
+      };
+
+      await updateDoc(doc(db, 'advance_requests', editingRequest.id), updateData);
+      
+      // Notification logic (similar to create)
+      sendProposalEmailNotification({
+        proposalType: 'advance_requests',
+        status: 'pending',
+        requesterName: editingRequest.userName || appUser.fullName || 'Nhân viên',
+        departmentId: editingRequest.departmentId || appUser.departmentId || '',
+        approvalLevel: editForm.approvalLevel === 'Director' ? 'director' : 'department',
+        details: `[Cập nhật: ${editForm.title}] Số tiền: ${formatCurrency(amount)}. Lý do: ${editForm.purpose}`
+      }).catch(err => console.error("Error sending notification:", err));
+
+      setEditingRequest(null);
+      if (showDetailModal?.id === editingRequest.id) {
+        setShowDetailModal(null);
+      }
+    } catch (err) {
+      console.error("Error updating advance request:", err);
+      alert("Có lỗi xảy ra khi cập nhật đề xuất.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApprove = async (id: string, action: 'approve_finance' | 'approve_director' | 'reject' | 'disbursed', providedReason?: string) => {
     try {
       const request = requests.find(r => r.id === id);
       if (!request) {
@@ -598,19 +677,35 @@ export default function AdvanceRequests() {
                <div className="flex items-center gap-2">
                   <StatusBadge status={req.status} />
                   
-                  {(isSuperAdmin || isDirector) && (
-                    <button 
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDeleteConfirmId(req.id);
-                      }}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50 text-base"
-                      title="Xóa yêu cầu (Superadmin)"
-                    >
-                      <Trash2 size={20} />
-                    </button>
+                  {((req.userId === auth.currentUser?.uid || req.userEmail === auth.currentUser?.email) && req.status === 'pending' || isSuperAdmin || isDirector) && (
+                    <div className="flex items-center gap-1">
+                      {(req.status === 'pending' || isSuperAdmin || isDirector) && (
+                        <button 
+                          type="button"
+                          title="Chỉnh sửa đề xuất"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleOpenEdit(req);
+                          }}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                        </button>
+                      )}
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDeleteConfirmId(req.id);
+                        }}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50 text-base"
+                        title={req.userId === auth.currentUser?.uid ? "Xóa yêu cầu" : "Xóa yêu cầu (Superadmin)"}
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
                   )}
                </div>
                
@@ -1002,12 +1097,43 @@ export default function AdvanceRequests() {
                     <p className="text-sm text-gray-500 font-mono">ID: {showDetailModal.id}</p>
                   </div>
                 </div>
-                <button onClick={() => {
-                  setShowDetailModal(null);
-                  setSearchParams({});
-                }} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                  <XCircle size={24} className="text-gray-400" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {((showDetailModal.userId === auth.currentUser?.uid || showDetailModal.userEmail === auth.currentUser?.email) && showDetailModal.status === 'pending' || isSuperAdmin || isDirector) && (
+                    <>
+                      <button
+                        onClick={() => {
+                          const reqToEdit = showDetailModal;
+                          setShowDetailModal(null);
+                          setSearchParams({});
+                          handleOpenEdit(reqToEdit);
+                        }}
+                        className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center gap-1.5 transition-colors"
+                        title="Sửa đề xuất"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                        Sửa
+                      </button>
+                      <button
+                        onClick={() => {
+                          const idToDelete = showDetailModal.id;
+                          setShowDetailModal(null);
+                          setSearchParams({});
+                          setDeleteConfirmId(idToDelete);
+                        }}
+                        className="px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl flex items-center gap-1.5 transition-colors"
+                        title="Xóa đề xuất"
+                      >
+                        <Trash2 size={14} /> Xóa
+                      </button>
+                    </>
+                  )}
+                  <button onClick={() => {
+                    setShowDetailModal(null);
+                    setSearchParams({});
+                  }} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <XCircle size={24} className="text-gray-400" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-6 overflow-y-auto pr-2 pb-4">
@@ -1264,6 +1390,228 @@ export default function AdvanceRequests() {
                   Xác nhận Từ chối
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Modal */}
+      <AnimatePresence>
+        {editingRequest && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 text-left">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setEditingRequest(null)} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                <form onSubmit={handleSaveEdit} className="p-8 overflow-y-auto custom-scrollbar">
+                  <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight">Chỉnh sửa yêu cầu tạm ứng</h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Tiêu đề đề xuất</label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder="Ví dụ: Tạm ứng đi công tác TP.HCM"
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-bold focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                        value={editForm.title}
+                        onChange={e => setEditForm({...editForm, title: e.target.value})}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Số tiền tạm ứng</label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder="0"
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-black text-blue-600 text-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        value={editForm.amount}
+                        onChange={e => setEditForm({...editForm, amount: formatCurrencyInput(e.target.value)})}
+                      />
+                    </div>
+
+                    <div className="relative">
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Đơn hàng liên quan (Nếu có)</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowOrderDropdown(!showOrderDropdown)}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-left font-bold flex items-center justify-between hover:bg-gray-100 transition-colors"
+                      >
+                        <span className={editForm.relatedOrderId ? "text-blue-600" : "text-gray-400"}>
+                          {editForm.relatedOrderId ? orders.find(o => o.id === editForm.relatedOrderId)?.code : 'Chọn đơn hàng...'}
+                        </span>
+                        <FileStack size={18} className="text-gray-400" />
+                      </button>
+                      
+                      {showOrderDropdown && (
+                        <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden max-h-48 overflow-y-auto">
+                          <div 
+                            className="p-3 hover:bg-gray-50 cursor-pointer text-sm text-gray-500 italic"
+                            onClick={() => {
+                              setEditForm({...editForm, relatedOrderId: ''});
+                              setShowOrderDropdown(false);
+                            }}
+                          >
+                            Không có đơn hàng liên quan
+                          </div>
+                          {orders.map(order => (
+                            <div 
+                              key={order.id}
+                              className="p-3 hover:bg-blue-50 cursor-pointer text-sm font-bold border-t border-gray-50 flex flex-col"
+                              onClick={() => {
+                                setEditForm({...editForm, relatedOrderId: order.id});
+                                setShowOrderDropdown(false);
+                              }}
+                            >
+                              <span className="text-blue-600">{order.code}</span>
+                              <span className="text-gray-500 font-normal text-xs">{order.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Cấp phê duyệt</label>
+                      <select 
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-bold text-purple-600 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all appearance-none"
+                        value={editForm.approvalLevel}
+                        onChange={e => setEditForm({...editForm, approvalLevel: e.target.value})}
+                      >
+                        <option value="Director">Giám đốc phê duyệt</option>
+                        <option value="Manager">Lãnh đạo phòng phê duyệt</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Phương thức nhận tiền</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setEditForm({...editForm, paymentMethod: 'cash'})}
+                          className={cn(
+                            "py-3 rounded-xl font-bold border transition-all text-sm uppercase tracking-tighter",
+                            editForm.paymentMethod === 'cash' ? "bg-orange-50 border-orange-200 text-orange-600" : "bg-gray-50 border-gray-100 text-gray-400"
+                          )}
+                        >
+                          Tiền mặt
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditForm({...editForm, paymentMethod: 'transfer'})}
+                          className={cn(
+                            "py-3 rounded-xl font-bold border transition-all text-sm uppercase tracking-tighter",
+                            editForm.paymentMethod === 'transfer' ? "bg-indigo-50 border-indigo-200 text-indigo-600" : "bg-gray-50 border-gray-100 text-gray-400"
+                          )}
+                        >
+                          Chuyển khoản
+                        </button>
+                      </div>
+                    </div>
+
+                    {editForm.paymentMethod === 'transfer' && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-4 pt-2">
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Số tài khoản</label>
+                          <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-bold focus:border-blue-300 transition-all" value={editForm.accountNumber} onChange={e => setEditForm({...editForm, accountNumber: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Chủ tài khoản</label>
+                          <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-bold uppercase focus:border-blue-300 transition-all" value={editForm.accountName} onChange={e => setEditForm({...editForm, accountName: e.target.value.toUpperCase()})} />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Ngân hàng</label>
+                          <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-bold focus:border-blue-300 transition-all" value={editForm.bankName} onChange={e => setEditForm({...editForm, bankName: e.target.value})} />
+                        </div>
+                      </motion.div>
+                    )}
+
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Người theo dõi ({editForm.followers.length})</label>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {editForm.followers.map(fId => {
+                          const u = users.find(user => user.id === fId);
+                          return (
+                            <span key={fId} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase border border-blue-100">
+                              {u?.fullName || u?.email}
+                              <button type="button" onClick={() => setEditForm({...editForm, followers: editForm.followers.filter(id => id !== fId)})} className="hover:text-red-500">
+                                <XCircle size={12} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div className="relative">
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="Tìm nhân viên..."
+                            className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-xs font-bold"
+                            value={followerSearch}
+                            onChange={(e) => {
+                              setFollowerSearch(e.target.value);
+                              setShowFollowerDropdown(true);
+                            }}
+                            onFocus={() => setShowFollowerDropdown(true)}
+                          />
+                        </div>
+                        
+                        {showFollowerDropdown && followerSearch && (
+                          <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-40 overflow-y-auto">
+                            {users
+                              .filter(u => 
+                                !editForm.followers.includes(u.id) && 
+                                (u.fullName?.toLowerCase().includes(followerSearch.toLowerCase()) || 
+                                 u.email?.toLowerCase().includes(followerSearch.toLowerCase()))
+                              )
+                              .map(u => (
+                                <div 
+                                  key={u.id}
+                                  className="p-2 hover:bg-blue-50 cursor-pointer text-[10px] font-black flex flex-col border-b border-gray-50 uppercase"
+                                  onClick={() => {
+                                    setEditForm({...editForm, followers: [...editForm.followers, u.id]});
+                                    setFollowerSearch('');
+                                    setShowFollowerDropdown(false);
+                                  }}
+                                >
+                                  <span>{u.fullName}</span>
+                                  <span className="text-gray-400 font-bold lowercase italic">{u.email}</span>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Lý do / Mục đích tạm ứng</label>
+                      <textarea 
+                        required 
+                        rows={3}
+                        placeholder="Vui lòng nhập lý do tạm ứng chi tiết..."
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none font-bold text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                        value={editForm.purpose}
+                        onChange={e => setEditForm({...editForm, purpose: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-8 flex gap-3 sticky bottom-0 bg-white pt-4">
+                    <button 
+                      type="button" 
+                      onClick={() => setEditingRequest(null)} 
+                      className="flex-1 py-3 rounded-xl font-black text-gray-400 hover:bg-gray-50 uppercase tracking-widest text-xs"
+                    >
+                      Hủy
+                    </button>
+                    <button 
+                      type="submit" 
+                      disabled={loading}
+                      className="flex-1 bg-orange-600 text-white py-3 rounded-xl font-black shadow-lg shadow-orange-100 hover:bg-orange-700 transition-all disabled:opacity-50 uppercase tracking-widest text-xs"
+                    >
+                      {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
+                    </button>
+                  </div>
+                </form>
             </motion.div>
           </div>
         )}

@@ -10,7 +10,9 @@ import {
   doc, 
   getDocs,
   where,
-  deleteDoc
+  deleteDoc,
+  limit,
+  orderBy
 } from 'firebase/firestore';
 import { 
   Building2, 
@@ -116,11 +118,11 @@ export default function WarehouseManagement() {
       setLoading(true);
       try {
         const [invSnap, stockSnap, prodSnap, whSnap, txSnap] = await Promise.all([
-          getDocs(collection(db, 'inventory')),
-          getDocs(collection(db, 'stock_items')),
-          getDocs(collection(db, 'products')),
+          getDocs(query(collection(db, 'inventory'), limit(2000))),
+          getDocs(query(collection(db, 'stock_items'), limit(2000))),
+          getDocs(query(collection(db, 'products'), limit(1000))),
           getDocs(collection(db, 'warehouses')),
-          getDocs(collection(db, 'stock_transactions'))
+          getDocs(query(collection(db, 'stock_transactions'), orderBy('transactionDate', 'desc'), limit(500)))
         ]);
 
         setInventory(invSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));

@@ -134,26 +134,23 @@ export default function PaymentRequests() {
     { id: 'other', label: 'Chi phí khác', icon: Tags, color: 'text-gray-600', bg: 'bg-gray-50' }
   ];
 
-  const { isAdmin, isFinanceStaff, user, appUser, isManager, isAccountant, isSuperAdmin, isDirector, hasPermission } = useAuth();
+  const { isAdmin, isFinanceStaff, user, appUser, isManager, isAccountant, isSuperAdmin, isDirector, hasPermission, allUsers } = useAuth();
   const canApprove = isDirector || hasPermission('approve_payment_requests');
 
   const canDisburse = isSuperAdmin || isDirector || isAccountant || hasPermission('disburse_payment_requests') || hasPermission('approve_disbursements') || appUser?.roleId === 'ChiefAccountant' || appUser?.roleId === 'Accountant' || appUser?.roleId === 'AccountantStaff';
 
   React.useEffect(() => {
     if (!user) return;
+    setUsers(allUsers.map(u => ({ id: u.id, ...u })));
+  }, [allUsers, user]);
 
-    let unsubUsers = () => {};
-    unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      setUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      console.error("Error loading users:", err);
-      setUsers([]);
-    });
+  React.useEffect(() => {
+    if (!user) return;
 
     const fetchOrders = async () => {
       let qO;
       if (isAdmin || isDirector || isFinanceStaff || hasPermission('view_orders') || hasPermission('menu_orders_view')) {
-        qO = query(collection(db, 'orders'), orderBy('startDate', 'desc'), limit(1000));
+        qO = query(collection(db, 'orders'), orderBy('startDate', 'desc'), limit(200));
       } else {
         qO = query(
           collection(db, 'orders'), 
@@ -161,7 +158,8 @@ export default function PaymentRequests() {
             where('responsibleUserId', '==', user.uid),
             where('followers', 'array-contains', user.uid)
           ),
-          orderBy('startDate', 'desc')
+          orderBy('startDate', 'desc'),
+          limit(100)
         );
       }
       const snap = await getDocs(qO);
@@ -174,10 +172,9 @@ export default function PaymentRequests() {
     
     let unsubRequests = () => {};
     if (isDirector || isFinanceStaff || hasPermission('view_payment_requests') || hasPermission('menu_proposals_view')) {
-      const q = query(collection(db, 'payment_requests'));
+      const q = query(collection(db, 'payment_requests'), orderBy('requestDate', 'desc'), limit(500));
       unsubRequests = onSnapshot(q, (snap) => {
         const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        data.sort((a: any, b: any) => new Date(b.requestDate || b.createdAt).getTime() - new Date(a.requestDate || a.createdAt).getTime());
         setRequests(data);
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, 'payment_requests');
@@ -195,8 +192,8 @@ export default function PaymentRequests() {
         setRequests(mergedList);
       };
 
-      const q1 = query(collection(db, 'payment_requests'), where('userId', '==', user.uid));
-      const q2 = query(collection(db, 'payment_requests'), where('followers', 'array-contains', user.uid));
+      const q1 = query(collection(db, 'payment_requests'), where('userId', '==', user.uid), orderBy('requestDate', 'desc'), limit(100));
+      const q2 = query(collection(db, 'payment_requests'), where('followers', 'array-contains', user.uid), orderBy('requestDate', 'desc'), limit(100));
 
       const unsub1 = onSnapshot(q1, (snap) => {
         listCreated = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -215,10 +212,9 @@ export default function PaymentRequests() {
     }
 
     return () => {
-      unsubUsers();
       unsubRequests();
     };
-  }, [canApprove, isFinanceStaff, user, isDirector]);
+  }, [canApprove, isFinanceStaff, user, isDirector, isAdmin, hasPermission]);
 
   React.useEffect(() => {
     const requestId = searchParams.get('id');

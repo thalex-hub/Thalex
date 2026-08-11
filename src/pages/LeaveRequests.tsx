@@ -11,10 +11,15 @@ import { exportToExcel } from '../lib/excel';
 import { sendProposalEmailNotification } from '../lib/proposalEmail';
 
 export default function LeaveRequests() {
-  const { appUser, isAdmin, isManager, isDirector, isSuperAdmin } = useAuth();
+  const { appUser, isAdmin, isManager, isDirector, isSuperAdmin, allUsers: usersFromContext } = useAuth();
   const [requests, setRequests] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [selectedUserForStats, setSelectedUserForStats] = useState<string>(auth.currentUser?.uid || '');
+
+  useEffect(() => {
+    setAllUsers(usersFromContext.map(u => ({ id: u.id, ...u })));
+  }, [usersFromContext]);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [rejectingRequest, setRejectingRequest] = useState<{ req: any, action: 'rejected' | 'returned' } | null>(null);
@@ -22,12 +27,23 @@ export default function LeaveRequests() {
   const [viewingRequest, setViewingRequest] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingRequest, setEditingRequest] = useState<any>(null);
   const [newRequest, setNewRequest] = useState({
+    title: '',
     type: 'annual',
     startDate: '',
     endDate: '',
     reason: '',
     approvalLevel: 'director' // Default to director
+  });
+
+  const [editForm, setEditForm] = useState({
+    title: '',
+    type: 'annual',
+    startDate: '',
+    endDate: '',
+    reason: '',
+    approvalLevel: 'director'
   });
 
   const filteredRequests = useMemo(() => {
@@ -52,12 +68,6 @@ export default function LeaveRequests() {
 
   useEffect(() => {
     if (!auth.currentUser || !appUser) return;
-
-    if (isAdmin || isManager || isDirector) {
-      getDocs(collection(db, 'users')).then(snap => {
-        setAllUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      });
-    }
     
     const processSnapshots = (docsLists: any[][]) => {
       const map = new Map();
@@ -68,7 +78,7 @@ export default function LeaveRequests() {
     };
 
     if (isAdmin || isDirector) {
-      const q = query(collection(db, 'leave_requests'));
+      const q = query(collection(db, 'leave_requests'), orderBy('startDate', 'desc'), limit(500));
       return onSnapshot(q, (snap) => {
         processSnapshots([snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))]);
       });
@@ -76,8 +86,8 @@ export default function LeaveRequests() {
       let l1: any[] = [];
       let l2: any[] = [];
       
-      const q1 = query(collection(db, 'leave_requests'), where('userId', '==', auth.currentUser?.uid));
-      const q2 = query(collection(db, 'leave_requests'), where('departmentId', '==', appUser?.departmentId || 'none'));
+      const q1 = query(collection(db, 'leave_requests'), where('userId', '==', auth.currentUser?.uid), orderBy('startDate', 'desc'), limit(100));
+      const q2 = query(collection(db, 'leave_requests'), where('departmentId', '==', appUser?.departmentId || 'none'), orderBy('startDate', 'desc'), limit(100));
       
       const unsub1 = onSnapshot(q1, snap => {
         l1 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -90,12 +100,12 @@ export default function LeaveRequests() {
       
       return () => { unsub1(); unsub2(); };
     } else {
-      const q = query(collection(db, 'leave_requests'), where('userId', '==', auth.currentUser?.uid));
+      const q = query(collection(db, 'leave_requests'), where('userId', '==', auth.currentUser?.uid), orderBy('startDate', 'desc'), limit(100));
       return onSnapshot(q, (snap) => {
         processSnapshots([snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))]);
       });
     }
-  }, [isAdmin, appUser]);
+  }, [isAdmin, isDirector, isManager, appUser]);
 
   const currentUserForStats = allUsers.find(u => u.id === selectedUserForStats) || (selectedUserForStats === auth.currentUser?.uid ? appUser : null);
   
@@ -134,6 +144,7 @@ export default function LeaveRequests() {
         userEmail: auth.currentUser.email,
         userName: appUser.fullName || 'Nhân viên',
         departmentId: appUser.departmentId || '',
+        title: newRequest.title,
         type: newRequest.type,
         startDate: new Date(newRequest.startDate).toISOString(),
         endDate: new Date(newRequest.endDate).toISOString(),
@@ -149,7 +160,7 @@ export default function LeaveRequests() {
       // Trigger proposal email notification
       const typeLabel = newRequest.type === 'annual' ? 'Nghỉ phép năm' : 
                         newRequest.type === 'unpaid' ? 'Nghỉ không lương' : 'Nghỉ việc riêng/ốm';
-      const detailStr = `Nghỉ phép từ ngày ${format(start, 'dd/MM/yyyy')} đến ngày ${format(end, 'dd/MM/yyyy')} (${days > 0 ? days : 1} ngày). Lý do: ${newRequest.reason || 'Không ghi'}`;
+      const detailStr = `[${newRequest.title}] Nghỉ phép từ ngày ${format(start, 'dd/MM/yyyy')} đến ngày ${format(end, 'dd/MM/yyyy')} (${days > 0 ? days : 1} ngày). Lý do: ${newRequest.reason || 'Không ghi'}`;
       
       sendProposalEmailNotification({
         proposalType: 'leave_requests',
@@ -161,7 +172,7 @@ export default function LeaveRequests() {
       }).catch(err => console.error("Error sending proposal notification email:", err));
 
       setShowAddModal(false);
-      setNewRequest({ type: 'annual', startDate: '', endDate: '', reason: '', approvalLevel: 'director' });
+      setNewRequest({ title: '', type: 'annual', startDate: '', endDate: '', reason: '', approvalLevel: 'director' });
     } finally {
       setLoading(false);
     }
@@ -261,6 +272,7 @@ export default function LeaveRequests() {
 
   const handleExportExcel = () => {
     const exportData = requests.map(req => ({
+      'Tiêu đề': req.title || '',
       'Họ tên': req.userName || req.userEmail,
       'Loại nghỉ': req.type === 'annual' ? 'Phép năm' : 
                    req.type === 'sick' ? 'Nghỉ ốm' : 
@@ -274,6 +286,65 @@ export default function LeaveRequests() {
       'Lý do': req.reason || ''
     }));
     exportToExcel(exportData, `NghiPhep_${format(new Date(), 'dd_MM_yyyy')}`, 'Nghỉ phép');
+  };
+
+  const handleOpenEdit = (req: any) => {
+    setEditingRequest(req);
+    setEditForm({
+      title: req.title || '',
+      type: req.type || 'annual',
+      startDate: req.startDate ? format(new Date(req.startDate), 'yyyy-MM-dd') : '',
+      endDate: req.endDate ? format(new Date(req.endDate), 'yyyy-MM-dd') : '',
+      reason: req.reason || '',
+      approvalLevel: req.approvalLevel || 'director'
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRequest || !auth.currentUser || !appUser) return;
+    setLoading(true);
+
+    try {
+      const start = new Date(editForm.startDate);
+      const end = new Date(editForm.endDate);
+      const days = differenceInDays(end, start) + 1;
+
+      const updateData: any = {
+        title: editForm.title,
+        type: editForm.type,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+        totalDays: days > 0 ? days : 1,
+        reason: editForm.reason,
+        approvalLevel: editForm.approvalLevel,
+        status: 'pending', // Reset to pending when updated
+        updatedAt: new Date().toISOString()
+      };
+
+      await updateDoc(doc(db, 'leave_requests', editingRequest.id), updateData);
+      await logActivity('Update Leave Request', 'Leave', editingRequest.id, { type: editForm.type });
+
+      // Notification
+      sendProposalEmailNotification({
+        proposalType: 'leave_requests',
+        status: 'pending',
+        requesterName: editingRequest.userName || appUser.fullName || 'Nhân viên',
+        departmentId: editingRequest.departmentId || appUser.departmentId || '',
+        approvalLevel: editForm.approvalLevel,
+        details: `[Cập nhật: ${editForm.title}] Nghỉ phép từ ngày ${format(start, 'dd/MM/yyyy')} đến ngày ${format(end, 'dd/MM/yyyy')} (${days > 0 ? days : 1} ngày). Lý do: ${editForm.reason || 'Không ghi'}`
+      }).catch(err => console.error("Error sending notification:", err));
+
+      setEditingRequest(null);
+      if (viewingRequest?.id === editingRequest.id) {
+        setViewingRequest(null);
+      }
+    } catch (err) {
+      console.error("Error updating leave request:", err);
+      alert("Có lỗi xảy ra khi cập nhật đề xuất.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -369,111 +440,134 @@ export default function LeaveRequests() {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {filteredRequests.map((req) => (
-          <div 
-            key={req.id} 
-            onClick={() => setViewingRequest(req)}
-            className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:border-orange-300 hover:shadow-md transition-all group"
-          >
-            <div className="flex items-center gap-4">
-               <div className={cn(
-                 "w-12 h-12 rounded-2xl flex items-center justify-center text-xl",
-                 req.status === 'approved' ? "bg-green-50 text-green-600" : req.status === 'rejected' ? "bg-red-50 text-red-600" : "bg-gray-50 text-gray-400"
-               )}>
-                 <FileText size={20} />
-               </div>
-               <div>
-                  <div className="flex items-center gap-2 text-wrap">
-                    <p className="font-bold text-gray-800">{req.userName || req.userEmail}</p>
-                    <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded font-bold uppercase">
-                      {req.type === 'annual' ? 'Phép năm' : 
-                       req.type === 'sick' ? 'Nghỉ ốm' : 
-                       req.type === 'unpaid' ? 'Nghỉ không lương' :
-                       req.type === 'late_arrival' ? 'Xin đi muộn' :
-                       req.type === 'early_leave' ? 'Xin về sớm' : 'Việc riêng'}
-                    </span>
-                    {req.approvalLevel && (
-                       <span className={cn(
-                         "text-[10px] px-2 py-0.5 rounded font-bold uppercase",
-                         req.approvalLevel === 'director' ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"
-                       )}>
-                         {req.approvalLevel === 'director' ? 'GĐ Phê duyệt' : 'LĐ Phòng'}
-                       </span>
-                     )}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">
-                    Thời gian: <span className="font-semibold text-gray-700">{format(new Date(req.startDate), 'dd/MM/yyyy')}</span> đến <span className="font-semibold text-gray-700">{format(new Date(req.endDate), 'dd/MM/yyyy')}</span>
-                    <span className="ml-2 font-bold text-blue-600">({req.totalDays} ngày)</span>
-                    <br/>
-                    Tạo: {req.createdAt ? format(new Date(req.createdAt), 'dd/MM/yyyy HH:mm') : 'N/A'}
-                    {req.updatedAt && ` | Cập nhật: ${format(new Date(req.updatedAt), 'dd/MM/yyyy HH:mm')}`}
-                  </p>
-                  {req.approverName && (
-                     <p className="text-[10px] text-green-600 font-bold mt-1 uppercase flex items-center gap-1">
-                       <UserCheck size={12} /> Đã duyệt bởi: {req.approverName}
-                     </p>
-                  )}
-                  {req.rejectionReason && (
-                    <div className="mt-2 text-xs font-medium text-red-600 bg-red-50 p-2 rounded border border-red-100 flex gap-1">
-                      <AlertCircle size={14}/> <span>Lý do từ chối: {req.rejectionReason}</span>
-                    </div>
-                  )}
-                  <p className="text-xs text-gray-400 mt-1 italic">Lý do: {req.reason}</p>
-               </div>
-            </div>
+        {filteredRequests.map((req) => {
+          const isOwner = req.userId === auth.currentUser?.uid || req.userEmail === auth.currentUser?.email;
+          const isNotApproved = req.status !== 'approved';
+          const canEdit = (isOwner && isNotApproved) || isSuperAdmin || isAdmin;
+          const canDelete = (isOwner && isNotApproved) || isSuperAdmin || isAdmin;
 
-               <div className="flex items-center gap-3">
-               <div className="flex items-center gap-2">
-                  <StatusBadge status={req.status} />
-                  {isSuperAdmin && (
-                    <button 
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDeleteConfirmId(req.id);
-                      }}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50 text-base"
-                      title="Xóa đơn (Superadmin)"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  )}
-               </div>
-               
-               {req.status === 'pending' && (
-                 <div className="flex gap-2">
-                    {/* Only show approval buttons if they have permission */}
-                     {((isAdmin || isDirector) || (isManager && appUser?.departmentId === req.departmentId && req.approvalLevel === 'department')) && (
-                      <>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleApprove(req, 'approved'); }}
-                          className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
-                          title="Duyệt"
-                        >
-                          <CheckCircle size={20} />
-                        </button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleApprove(req, 'returned'); }}
-                          className="p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors"
-                          title="Yêu cầu bổ sung"
-                        >
-                          <RefreshCcw size={20} />
-                        </button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleApprove(req, 'rejected'); }}
-                          className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-                          title="Từ chối"
-                        >
-                          <XCircle size={20} />
-                        </button>
-                      </>
+          return (
+            <div 
+              key={req.id} 
+              onClick={() => setViewingRequest(req)}
+              className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:border-orange-300 hover:shadow-md transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  "w-12 h-12 rounded-2xl flex items-center justify-center text-xl",
+                  req.status === 'approved' ? "bg-green-50 text-green-600" : req.status === 'rejected' ? "bg-red-50 text-red-600" : "bg-gray-50 text-gray-400"
+                )}>
+                  <FileText size={20} />
+                </div>
+                <div>
+                    <div className="flex items-center gap-2 text-wrap">
+                      <p className="font-bold text-gray-800">{req.title || req.userName || req.userEmail}</p>
+                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded font-bold uppercase">
+                        {req.type === 'annual' ? 'Phép năm' : 
+                        req.type === 'sick' ? 'Nghỉ ốm' : 
+                        req.type === 'unpaid' ? 'Nghỉ không lương' :
+                        req.type === 'late_arrival' ? 'Xin đi muộn' :
+                        req.type === 'early_leave' ? 'Xin về sớm' : 'Việc riêng'}
+                      </span>
+                      {req.approvalLevel && (
+                        <span className={cn(
+                          "text-[10px] px-2 py-0.5 rounded font-bold uppercase",
+                          req.approvalLevel === 'director' ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"
+                        )}>
+                          {req.approvalLevel === 'director' ? 'GĐ Phê duyệt' : 'LĐ Phòng'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">
+                      Người nghỉ: <span className="font-bold text-gray-700">{req.userName}</span>
+                      <br/>
+                      Thời gian: <span className="font-semibold text-gray-700">{format(new Date(req.startDate), 'dd/MM/yyyy')}</span> đến <span className="font-semibold text-gray-700">{format(new Date(req.endDate), 'dd/MM/yyyy')}</span>
+                      <span className="ml-2 font-bold text-blue-600">({req.totalDays} ngày)</span>
+                      <br/>
+                      Tạo: {req.createdAt ? format(new Date(req.createdAt), 'dd/MM/yyyy HH:mm') : 'N/A'}
+                    </p>
+                    {req.approverName && (
+                      <p className="text-[10px] text-green-600 font-bold mt-1 uppercase flex items-center gap-1">
+                        <UserCheck size={12} /> Đã duyệt bởi: {req.approverName}
+                      </p>
                     )}
-                 </div>
-               )}
+                    {req.rejectionReason && (
+                      <div className="mt-2 text-xs font-medium text-red-600 bg-red-50 p-2 rounded border border-red-100 flex gap-1">
+                        <AlertCircle size={14}/> <span>Lý do từ chối: {req.rejectionReason}</span>
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1 italic">Lý do: {req.reason}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                    <StatusBadge status={req.status} />
+                    {canEdit && (
+                      <button 
+                        type="button"
+                        title="Chỉnh sửa đề xuất"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleOpenEdit(req);
+                        }}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={20} className="hidden" /> {/* dummy for spacing consistency with delete */}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDeleteConfirmId(req.id);
+                        }}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50 text-base"
+                        title="Xóa đơn"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    )}
+                </div>
+                
+                {req.status === 'pending' && (
+                  <div className="flex gap-2">
+                      {/* Only show approval buttons if they have permission */}
+                      {((isAdmin || isDirector) || (isManager && appUser?.departmentId === req.departmentId && req.approvalLevel === 'department')) && (
+                        <>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleApprove(req, 'approved'); }}
+                            className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
+                            title="Duyệt"
+                          >
+                            <CheckCircle size={20} />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleApprove(req, 'returned'); }}
+                            className="p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors"
+                            title="Yêu cầu bổ sung"
+                          >
+                            <RefreshCcw size={20} />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleApprove(req, 'rejected'); }}
+                            className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                            title="Từ chối"
+                          >
+                            <XCircle size={20} />
+                          </button>
+                        </>
+                      )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {requests.length === 0 && (
           <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
@@ -491,6 +585,10 @@ export default function LeaveRequests() {
                <form onSubmit={handleSubmit} className="p-8">
                   <h3 className="text-xl font-bold text-gray-900 mb-6">Gửi yêu cầu nghỉ phép</h3>
                   <div className="space-y-4">
+                     <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Tiêu đề nghỉ phép</label>
+                        <input type="text" required placeholder="Ví dụ: Nghỉ phép năm giải quyết việc gia đình" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none" value={newRequest.title} onChange={e => setNewRequest({...newRequest, title: e.target.value})} />
+                     </div>
                      <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Loại nghỉ</label>
                         <select 
@@ -553,17 +651,46 @@ export default function LeaveRequests() {
                       Đề xuất nghỉ phép
                     </span>
                     <h3 className="text-xl font-extrabold text-gray-900 mt-2">
-                      {viewingRequest.userName || viewingRequest.userEmail}
+                      {viewingRequest.title || viewingRequest.userName || viewingRequest.userEmail}
                     </h3>
-                    <p className="text-xs text-gray-400 font-medium mt-0.5">{viewingRequest.userEmail}</p>
+                    <p className="text-xs text-gray-400 font-bold mt-1 uppercase">Người nghỉ: {viewingRequest.userName}</p>
                   </div>
-                  <button 
-                    type="button" 
-                    onClick={() => setViewingRequest(null)} 
-                    className="p-1 px-2 text-xs font-black text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer font-sans"
-                  >
-                    Đóng
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {((viewingRequest.userId === auth.currentUser?.uid || viewingRequest.userEmail === auth.currentUser?.email) && viewingRequest.status !== 'approved' || isSuperAdmin || isAdmin) && (
+                      <button
+                        onClick={() => {
+                          const reqToEdit = viewingRequest;
+                          setViewingRequest(null);
+                          handleOpenEdit(reqToEdit);
+                        }}
+                        className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center gap-1.5 transition-colors"
+                        title="Sửa đề xuất"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                        Sửa
+                      </button>
+                    )}
+                    {((viewingRequest.userId === auth.currentUser?.uid || viewingRequest.userEmail === auth.currentUser?.email) && viewingRequest.status !== 'approved' || isSuperAdmin || isAdmin) && (
+                      <button
+                        onClick={() => {
+                          const idToDelete = viewingRequest.id;
+                          setViewingRequest(null);
+                          setDeleteConfirmId(idToDelete);
+                        }}
+                        className="px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl flex items-center gap-1.5 transition-colors"
+                        title="Xóa đề xuất"
+                      >
+                        <Trash2 size={14} /> Xóa
+                      </button>
+                    )}
+                    <button 
+                      type="button" 
+                      onClick={() => setViewingRequest(null)} 
+                      className="p-1 px-2 text-xs font-black text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer font-sans"
+                    >
+                      Đóng
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-6">

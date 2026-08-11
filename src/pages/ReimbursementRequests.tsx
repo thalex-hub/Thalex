@@ -71,26 +71,23 @@ export default function ReimbursementRequests() {
   const [showFollowerDropdown, setShowFollowerDropdown] = React.useState(false);
   const [users, setUsers] = React.useState<any[]>([]);
 
-  const { isAdmin, isFinanceStaff, user, appUser, isManager, isAccountant, isSuperAdmin, isDirector, hasPermission } = useAuth();
+  const { isAdmin, isFinanceStaff, user, appUser, isManager, isAccountant, isSuperAdmin, isDirector, hasPermission, allUsers } = useAuth();
   const canApprove = isDirector || hasPermission('approve_reimbursements');
   const canDisburse = isSuperAdmin || isDirector || isAccountant || hasPermission('disburse_reimbursements') || hasPermission('approve_disbursements') || appUser?.roleId === 'ChiefAccountant' || appUser?.roleId === 'Accountant' || appUser?.roleId === 'AccountantStaff';
 
   React.useEffect(() => {
     if (!user) return;
+    setUsers(allUsers);
+  }, [allUsers, user]);
 
-    let unsubUsers = () => {};
-    unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      setUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      console.error("Error loading users:", err);
-      setUsers([]);
-    });
+  React.useEffect(() => {
+    if (!user) return;
 
     // Fetch orders for selection
     const fetchOrders = async () => {
       let qO;
       if (isAdmin || isDirector || isFinanceStaff || hasPermission('view_orders') || hasPermission('menu_orders_view')) {
-        qO = query(collection(db, 'orders'), orderBy('startDate', 'desc'), limit(1000));
+        qO = query(collection(db, 'orders'), orderBy('startDate', 'desc'), limit(200));
       } else {
         qO = query(
           collection(db, 'orders'), 
@@ -98,7 +95,8 @@ export default function ReimbursementRequests() {
             where('responsibleUserId', '==', user.uid),
             where('followers', 'array-contains', user.uid)
           ),
-          orderBy('startDate', 'desc')
+          orderBy('startDate', 'desc'),
+          limit(100)
         );
       }
       const snap = await getDocs(qO);
@@ -108,8 +106,8 @@ export default function ReimbursementRequests() {
 
     // Fetch user's advances to settle
     const qAdv = (isDirector || isFinanceStaff || hasPermission('view_reimbursements') || hasPermission('menu_proposals_view'))
-      ? query(collection(db, 'advance_requests'), where('status', '==', 'disbursed'))
-      : query(collection(db, 'advance_requests'), where('userId', '==', user.uid), where('status', '==', 'disbursed'));
+      ? query(collection(db, 'advance_requests'), where('status', '==', 'disbursed'), limit(500))
+      : query(collection(db, 'advance_requests'), where('userId', '==', user.uid), where('status', '==', 'disbursed'), limit(100));
 
     const unsubAdvances = onSnapshot(qAdv, (snap) => {
       // Store all advances to check isSettled status for any request
@@ -119,10 +117,9 @@ export default function ReimbursementRequests() {
     // Viewing logic: Staff sees their own + settlements for their advances + followers, Accountant/Director sees all
     let unsubRequests = () => {};
     if (isDirector || isFinanceStaff || hasPermission('view_reimbursements') || hasPermission('menu_proposals_view')) {
-      const q = query(collection(db, 'reimbursement_requests'));
+      const q = query(collection(db, 'reimbursement_requests'), orderBy('requestDate', 'desc'), limit(500));
       unsubRequests = onSnapshot(q, (snap) => {
         let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        data.sort((a: any, b: any) => new Date(b.requestDate || b.createdAt).getTime() - new Date(a.requestDate || a.createdAt).getTime());
         setRequests(data);
       }, (error) => {
         console.error("Firestore read error:", error);
@@ -145,9 +142,11 @@ export default function ReimbursementRequests() {
         or(
           where('userId', '==', user.uid),
           where('advanceOwnerId', '==', user.uid)
-        )
+        ),
+        orderBy('requestDate', 'desc'),
+        limit(100)
       );
-      const q2 = query(collection(db, 'reimbursement_requests'), where('followers', 'array-contains', user.uid));
+      const q2 = query(collection(db, 'reimbursement_requests'), where('followers', 'array-contains', user.uid), orderBy('requestDate', 'desc'), limit(100));
 
       const unsub1 = onSnapshot(q1, (snap) => {
         listCreatedOrOwned = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -166,7 +165,6 @@ export default function ReimbursementRequests() {
     }
 
     return () => {
-      unsubUsers();
       unsubAdvances();
       unsubRequests();
     };

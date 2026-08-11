@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../lib/authContext';
 import { db } from '../lib/firebase';
-import { collection, query, getDocs, updateDoc, doc, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, getDocs, updateDoc, doc, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { AppUser } from '../types';
 import { DollarSign, Save, Search, Building2, UserCircle, Briefcase } from 'lucide-react';
@@ -134,21 +134,21 @@ export default function SalarySettings() {
 
     setLoading(true);
     
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('fullName', 'asc')), (snap) => {
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('fullName', 'asc'), limit(500)), (snap) => {
       const dbUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() } as AppUser));
       setUsers(dbUsers.filter(u => u.roleId !== 'SuperAdmin'));
       setLoading(false);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'users'));
 
-    const unsubDepts = onSnapshot(collection(db, 'departments'), (snap) => {
+    const unsubDepts = onSnapshot(query(collection(db, 'departments'), limit(100)), (snap) => {
       setDepartments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'departments'));
 
-    const unsubPos = onSnapshot(collection(db, 'positions'), (snap) => {
+    const unsubPos = onSnapshot(query(collection(db, 'positions'), limit(100)), (snap) => {
       setPositions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'positions'));
 
-    const unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(500)), (snap) => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
 

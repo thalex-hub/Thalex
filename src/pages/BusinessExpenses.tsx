@@ -101,7 +101,7 @@ export default function BusinessExpenses() {
       query(
         collection(db, 'payment_requests'), 
         where('status', 'in', ['approved', 'paid']),
-        limit(1000)
+        limit(300)
       ), 
       (snap) => {
         setPaymentRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -113,7 +113,7 @@ export default function BusinessExpenses() {
 
     // Sub to advance requests (filtered by date to reduce quota)
     const unsubAdvances = onSnapshot(
-      query(collection(db, 'advance_requests'), limit(1000)), 
+      query(collection(db, 'advance_requests'), limit(300)), 
       (snap) => {
         setAdvanceRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }, 
@@ -124,7 +124,7 @@ export default function BusinessExpenses() {
 
     // Sub to reimbursement requests (filtered by date to reduce quota)
     const unsubReimbursements = onSnapshot(
-      query(collection(db, 'reimbursement_requests'), limit(1000)), 
+      query(collection(db, 'reimbursement_requests'), limit(300)), 
       (snap) => {
         setReimbursementRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }, 

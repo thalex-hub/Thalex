@@ -173,21 +173,21 @@ export default function Dashboard() {
       try {
         // 2. Orders
         const ordersQ = canSeeAll
-          ? query(collection(db, 'orders'), limit(500))
+          ? query(collection(db, 'orders'), limit(200))
           : query(
               collection(db, 'orders'),
               or(
                 where('responsibleUserId', '==', user.uid),
                 where('followers', 'array-contains', user.uid)
               ),
-              limit(100)
+              limit(50)
             );
         const ordersSnap = await getDocs(ordersQ);
         setOrders(ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
         // 3. Tasks
         const tasksQ = (isAdmin || isDirector)
-          ? query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(500))
+          ? query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(200))
           : query(
               collection(db, 'tasks'),
               or(
@@ -197,7 +197,7 @@ export default function Dashboard() {
                 where('followers', 'array-contains', user.uid)
               ),
               orderBy('createdAt', 'desc'),
-              limit(100)
+              limit(50)
             );
         const tasksSnap = await getDocs(tasksQ);
         const allTasks = tasksSnap.docs
@@ -220,23 +220,23 @@ export default function Dashboard() {
         );
 
         // 4. Payments
-        const paymentsSnap = await getDocs(query(collection(db, 'payments'), limit(200)));
+        const paymentsSnap = await getDocs(query(collection(db, 'payments'), limit(100)));
         setPayments(paymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
         // 5. Business Expenses
-        const busExpSnap = await getDocs(query(collection(db, 'business_expenses'), limit(200)));
+        const busExpSnap = await getDocs(query(collection(db, 'business_expenses'), limit(100)));
         setBusinessExpenses(busExpSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
         // 6. Payment Requests
-        const payReqSnap = await getDocs(query(collection(db, 'payment_requests'), limit(200)));
+        const payReqSnap = await getDocs(query(collection(db, 'payment_requests'), limit(100)));
         setPaymentRequests(payReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
         // 7. Advance Requests
-        const advReqSnap = await getDocs(query(collection(db, 'advance_requests'), limit(200)));
+        const advReqSnap = await getDocs(query(collection(db, 'advance_requests'), limit(100)));
         setAdvanceRequests(advReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
         // 8. Reimbursement Requests
-        const reimReqSnap = await getDocs(query(collection(db, 'reimbursement_requests'), limit(200)));
+        const reimReqSnap = await getDocs(query(collection(db, 'reimbursement_requests'), limit(100)));
         setReimbursementRequests(reimReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
         // 9. Departments
@@ -248,7 +248,7 @@ export default function Dashboard() {
           collection(db, 'attendance'),
           where('workDate', '>=', yearStart),
           where('workDate', '<=', yearEnd),
-          limit(1000)
+          limit(500)
         );
         const attendanceSnap = await getDocs(attendanceQ);
         setAttendance(attendanceSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));

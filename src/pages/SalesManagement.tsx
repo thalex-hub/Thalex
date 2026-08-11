@@ -78,7 +78,7 @@ export default function SalesManagement() {
       }
     };
 
-    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(1000)), (snap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(300)), (snap) => {
       setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       ordersDone = true;
       checkAllDone();
@@ -89,7 +89,7 @@ export default function SalesManagement() {
       checkAllDone();
     });
 
-    const unsubProposals = onSnapshot(query(collection(db, 'order_proposals'), limit(1000)), (snap) => {
+    const unsubProposals = onSnapshot(query(collection(db, 'order_proposals'), limit(300)), (snap) => {
       setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       proposalsDone = true;
       checkAllDone();

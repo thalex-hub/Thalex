@@ -188,7 +188,7 @@ export default function Tasks() {
     const canSeeAll = isAdmin || isDirector;
     
     if (canSeeAll) {
-       const tasksQ = query(collection(db, 'tasks'), limit(1000));
+       const tasksQ = query(collection(db, 'tasks'), limit(300));
        unsubTasks = onSnapshot(tasksQ, (snap) => {
          let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)).filter(t => !t.orderId);
          data.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
@@ -240,17 +240,27 @@ export default function Tasks() {
          
          const errHandler = (err: any) => handleFirestoreError(err, OperationType.GET, 'tasks', false);
 
-         const q1 = query(collection(db, 'tasks'), where('assigneeId', 'in', idsArray), limit(300));
-         const q2 = query(collection(db, 'tasks'), where('assignerId', 'in', idsArray), limit(300));
-         const q3 = query(collection(db, 'tasks'), where('responsibleUserId', 'in', idsArray), limit(300));
-         const q4 = query(collection(db, 'tasks'), where('followers', 'array-contains-any', idsArray), limit(300));
+         const qCombined = query(
+           collection(db, 'tasks'),
+           or(
+             where('assigneeId', 'in', idsArray),
+             where('assignerId', 'in', idsArray),
+             where('responsibleUserId', 'in', idsArray),
+             where('followers', 'array-contains-any', idsArray)
+           ),
+           limit(300)
+         );
          
-         unsubs.push(onSnapshot(q1, handleSnap, errHandler));
-         unsubs.push(onSnapshot(q2, handleSnap, errHandler));
-         unsubs.push(onSnapshot(q3, handleSnap, errHandler));
-         unsubs.push(onSnapshot(q4, handleSnap, errHandler));
-         
-         unsubTasks = () => unsubs.forEach(fn => fn());
+         unsubTasks = onSnapshot(qCombined, (snap) => {
+           snap.docChanges().forEach((change: any) => {
+             if (change.type === 'removed') {
+               tasksMap.delete(change.doc.id);
+             } else {
+               tasksMap.set(change.doc.id, { id: change.doc.id, ...change.doc.data() } as Task);
+             }
+           });
+           updateTasks();
+         }, errHandler);
        }
     }
 
@@ -266,7 +276,8 @@ export default function Tasks() {
       const qComments = query(
         collection(db, 'task_comments'),
         where('taskId', '==', editingTask.id),
-        orderBy('createdAt', 'asc')
+        orderBy('createdAt', 'asc'),
+        limit(50)
       );
       const unsubComments = onSnapshot(qComments, (snap) => {
         setTaskComments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -278,7 +289,8 @@ export default function Tasks() {
       const qSubtasks = query(
         collection(db, 'tasks'),
         where('parentId', '==', editingTask.id),
-        orderBy('createdAt', 'asc')
+        orderBy('createdAt', 'asc'),
+        limit(50)
       );
       const unsubSubtasks = onSnapshot(qSubtasks, (snap) => {
         setTaskSubtasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));

@@ -273,7 +273,7 @@ export default function Orders() {
 
     if (canSeeAll) {
       // Optimization: Add limit to reduce read quota usage
-      const q = query(collection(db, "orders"), orderBy("startDate", "desc"), limit(1000));
+      const q = query(collection(db, "orders"), orderBy("startDate", "desc"), limit(300));
       unsub = onSnapshot(q, (snap) => {
         const list = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
         processOrders(list);
@@ -282,46 +282,25 @@ export default function Orders() {
         setLoading(false);
       });
     } else {
-      let list1: any[] = [];
-      let listLegacy1: any[] = [];
-      let list2: any[] = [];
-      let listLegacy2: any[] = [];
+      const ids = [user.uid];
+      if (appUser?.legacyId) ids.push(appUser.legacyId);
 
-      const combine = () => {
-        const map = new Map();
-        [...list1, ...listLegacy1, ...list2, ...listLegacy2].forEach(i => map.set(i.id, i));
-        processOrders(Array.from(map.values()));
-      };
+      const q = query(
+        collection(db, "orders"),
+        or(
+          where("responsibleUserId", "in", ids),
+          where("followers", "array-contains-any", ids)
+        ),
+        limit(100)
+      );
 
-      const q1 = query(collection(db, "orders"), where("responsibleUserId", "==", user.uid));
-      const q2 = query(collection(db, "orders"), where("followers", "array-contains", user.uid));
-
-      const u1 = onSnapshot(q1, (snap) => {
-        list1 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
-        combine();
-      }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/responsible_uid"));
-
-      const u2 = onSnapshot(q2, (snap) => {
-        list2 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
-        combine();
-      }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/followers_uid"));
-
-      let uL1 = () => {}, uL2 = () => {};
-      if (appUser?.legacyId) {
-        const qLegacy1 = query(collection(db, "orders"), where("responsibleUserId", "==", appUser.legacyId));
-        uL1 = onSnapshot(qLegacy1, (snap) => {
-          listLegacy1 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
-          combine();
-        }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/responsible_legacy"));
-
-        const qLegacy2 = query(collection(db, "orders"), where("followers", "array-contains", appUser.legacyId));
-        uL2 = onSnapshot(qLegacy2, (snap) => {
-          listLegacy2 = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
-          combine();
-        }, (err) => handleFirestoreError(err, OperationType.LIST, "orders/followers_legacy"));
-      }
-
-      unsub = () => { u1(); u2(); uL1(); uL2(); };
+      unsub = onSnapshot(q, (snap) => {
+        const list = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+        processOrders(list);
+      }, (err) => {
+        handleFirestoreError(err, OperationType.LIST, "orders_combined");
+        setLoading(false);
+      });
     }
 
     return () => unsub();

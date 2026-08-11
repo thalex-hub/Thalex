@@ -255,7 +255,7 @@ export default function StockTransactions() {
       }
     };
 
-    const q = query(collection(db, 'stock_transactions'), orderBy('transactionDate', 'desc'), limit(1000));
+    const q = query(collection(db, 'stock_transactions'), orderBy('transactionDate', 'desc'), limit(300));
     const unsubTx = onSnapshot(q, (snap) => {
       setTransactions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as StockTransaction)));
       txDone = true;
@@ -266,7 +266,7 @@ export default function StockTransactions() {
       checkAllDone();
     });
 
-    const unsubProducts = onSnapshot(query(collection(db, 'products'), limit(1000)), (snap) => {
+    const unsubProducts = onSnapshot(query(collection(db, 'products'), limit(300)), (snap) => {
       setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
       productsDone = true;
       checkAllDone();
@@ -306,7 +306,7 @@ export default function StockTransactions() {
       checkAllDone();
     });
 
-    const unsubStockItems = onSnapshot(query(collection(db, 'stock_items'), limit(1000)), (snap) => {
+    const unsubStockItems = onSnapshot(query(collection(db, 'stock_items'), limit(300)), (snap) => {
       setStockItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       stockItemsDone = true;
       checkAllDone();

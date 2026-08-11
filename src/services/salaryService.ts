@@ -411,7 +411,7 @@ export function calculateSalary(
   currentMonth: Date,
   paymentRequests: any[] = []
 ): SalaryStats {
-  let startCalculationMonth = subMonths(startOfMonth(currentMonth), 12); // Calculate rolling debt up to 12 months back
+  let startCalculationMonth = subMonths(startOfMonth(currentMonth), 3); // Calculate rolling debt up to 3 months back to save quota
 
   if (targetUser?.startDate) {
     const startObj = new Date(targetUser.startDate);

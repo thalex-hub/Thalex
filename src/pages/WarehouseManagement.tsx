@@ -71,7 +71,7 @@ interface Warehouse {
 }
 
 export default function WarehouseManagement() {
-  const { isAdmin, isManager, isHR, isAccountant, hasPermission } = useAuth();
+  const { user, isAdmin, isManager, isHR, isAccountant, hasPermission } = useAuth();
   const canManage = isAdmin || isManager || isHR || isAccountant || hasPermission('manage_warehouse') || hasPermission('menu_warehouse_edit');
   const [inventory, setInventory] = React.useState<InventoryItem[]>([]);
   const [stockItems, setStockItems] = React.useState<StockItem[]>([]);
@@ -99,48 +99,53 @@ export default function WarehouseManagement() {
     }
   };
 
-  React.useEffect(() => {
-    // Basic bootstrap for warehouses if empty
-    const bootstrapWarehouses = async () => {
-      const snap = await getDocs(collection(db, 'warehouses'));
-      if (snap.empty && (isAdmin || isManager || isHR || isAccountant)) {
-        await addDoc(collection(db, 'warehouses'), {
-          name: 'Kho Chính',
-          address: 'Hà Nội',
-          status: 'active',
-          createdAt: new Date().toISOString()
-        });
-      }
-    };
-    bootstrapWarehouses();
+    React.useEffect(() => {
+      if (!user) return;
 
-    const fetchData = async () => {
+      // Basic bootstrap for warehouses if empty
+      const bootstrapWarehouses = async () => {
+        const snap = await getDocs(collection(db, 'warehouses'));
+        if (snap.empty && (isAdmin || isManager || isHR || isAccountant)) {
+          await addDoc(collection(db, 'warehouses'), {
+            name: 'Kho Chính',
+            address: 'Hà Nội',
+            status: 'active',
+            createdAt: new Date().toISOString()
+          });
+        }
+      };
+      bootstrapWarehouses();
+
       setLoading(true);
-      try {
-        const [invSnap, stockSnap, prodSnap, whSnap, txSnap] = await Promise.all([
-          getDocs(query(collection(db, 'inventory'), limit(2000))),
-          getDocs(query(collection(db, 'stock_items'), limit(2000))),
-          getDocs(query(collection(db, 'products'), limit(1000))),
-          getDocs(collection(db, 'warehouses')),
-          getDocs(query(collection(db, 'stock_transactions'), orderBy('transactionDate', 'desc'), limit(500)))
-        ]);
-
-        setInventory(invSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
-        setStockItems(stockSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
-        setProducts(prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
-        setWarehouses(whSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Warehouse)));
-        setTransactions(txSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        console.error("Error loading warehouse data:", error);
-      } finally {
+      const unsubInv = onSnapshot(query(collection(db, 'inventory'), limit(200)), (snap) => {
+        setInventory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
         setLoading(false);
-      }
-    };
+      });
 
-    fetchData();
+      const unsubStock = onSnapshot(query(collection(db, 'stock_items'), limit(300)), (snap) => {
+        setStockItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+      });
 
-    return () => {};
-  }, [isAdmin, isManager, isHR, isAccountant]);
+      const unsubProd = onSnapshot(query(collection(db, 'products'), limit(200)), (snap) => {
+        setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+      });
+
+      const unsubWh = onSnapshot(query(collection(db, 'warehouses'), limit(50)), (snap) => {
+        setWarehouses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Warehouse)));
+      });
+
+      const unsubTx = onSnapshot(query(collection(db, 'stock_transactions'), orderBy('transactionDate', 'desc'), limit(100)), (snap) => {
+        setTransactions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+
+      return () => {
+        unsubInv();
+        unsubStock();
+        unsubProd();
+        unsubWh();
+        unsubTx();
+      };
+    }, [user, isAdmin, isManager, isHR, isAccountant]);
 
   const handleSaveWarehouse = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

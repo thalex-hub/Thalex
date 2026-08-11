@@ -1,6 +1,6 @@
 import React from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, onSnapshot, updateDoc, doc, addDoc, getDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, updateDoc, doc, addDoc, getDoc, limit } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import { 
   FileSpreadsheet, 
@@ -78,7 +78,7 @@ export default function Disbursements() {
       }
     };
 
-    const unsubAdvances = onSnapshot(collection(db, 'advance_requests'), (snap) => {
+    const unsubAdvances = onSnapshot(query(collection(db, 'advance_requests'), limit(500)), (snap) => {
       setAdvances(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       advancesDone = true;
       checkAllDone();
@@ -88,7 +88,7 @@ export default function Disbursements() {
       checkAllDone();
     });
 
-    const unsubReimbursements = onSnapshot(collection(db, 'reimbursement_requests'), (snap) => {
+    const unsubReimbursements = onSnapshot(query(collection(db, 'reimbursement_requests'), limit(500)), (snap) => {
       setReimbursements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       reimbursementsDone = true;
       checkAllDone();
@@ -98,7 +98,7 @@ export default function Disbursements() {
       checkAllDone();
     });
 
-    const unsubPaymentReqs = onSnapshot(collection(db, 'payment_requests'), (snap) => {
+    const unsubPaymentReqs = onSnapshot(query(collection(db, 'payment_requests'), limit(500)), (snap) => {
       setPaymentRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       paymentReqsDone = true;
       checkAllDone();
@@ -108,7 +108,7 @@ export default function Disbursements() {
       checkAllDone();
     });
 
-    const unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(500)), (snap) => {
       setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       ordersDone = true;
       checkAllDone();

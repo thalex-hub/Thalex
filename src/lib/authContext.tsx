@@ -718,19 +718,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchAllData = async () => {
       try {
+        // Try to load from cache first to show something immediately and save quota
+        const cachedUsers = sessionStorage.getItem('app_users_list');
+        const cachedPerms = sessionStorage.getItem('app_role_permissions');
+        const lastFetch = sessionStorage.getItem('app_auth_last_fetch');
+        
+        if (cachedUsers && cachedPerms && lastFetch) {
+          const age = Date.now() - Number(lastFetch);
+          if (age < 300000) { // 5 minutes fresh
+            setAllUsers(JSON.parse(cachedUsers));
+            setRolePermissions(JSON.parse(cachedPerms));
+            return;
+          }
+        }
+
         const [usersSnap, permsSnap] = await Promise.all([
-          getDocs(query(collection(db, 'users'), limit(1000))),
+          getDocs(query(collection(db, 'users'), limit(300))),
           getDocs(query(collection(db, 'role_permissions'), limit(100)))
         ]);
 
-        setAllUsers(usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+        const usersList = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        setAllUsers(usersList);
 
         const perms: Record<string, string[]> = {};
         permsSnap.docs.forEach(doc => {
           perms[doc.id] = doc.data().permissions || [];
         });
         setRolePermissions(perms);
+        
+        // Update cache
+        sessionStorage.setItem('app_users_list', JSON.stringify(usersList));
         sessionStorage.setItem('app_role_permissions', JSON.stringify(perms));
+        sessionStorage.setItem('app_auth_last_fetch', Date.now().toString());
       } catch (error) {
         console.error("Error loading auth data:", error);
       }

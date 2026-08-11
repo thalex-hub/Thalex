@@ -193,7 +193,7 @@ export default function OrderProposals() {
     setRefreshing(true);
     
     // Real-time customers
-    const unsubCustomers = onSnapshot(query(collection(db, 'customers'), limit(1000)), (snap) => {
+    const unsubCustomers = onSnapshot(query(collection(db, 'customers'), limit(300)), (snap) => {
       const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCustomers(list);
       sessionStorage.setItem('app_customers_list', JSON.stringify(list));
@@ -206,7 +206,7 @@ export default function OrderProposals() {
     // Real-time proposals
     let unsubProposals = () => {};
     if (canSeeAll) {
-      const q = query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'), limit(1000));
+      const q = query(collection(db, 'order_proposals'), orderBy('createdAt', 'desc'), limit(300));
       unsubProposals = onSnapshot(q, (snap) => {
         setProposals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setRefreshing(false);
@@ -230,26 +230,26 @@ export default function OrderProposals() {
         setRefreshing(false);
       };
 
-      const u1 = onSnapshot(query(collection(db, 'order_proposals'), where('createdBy', '==', user.uid), limit(200)), (snap) => {
+      const u1 = onSnapshot(query(collection(db, 'order_proposals'), where('createdBy', '==', user.uid), limit(100)), (snap) => {
         results.q1 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         combine();
       });
-      const u2 = onSnapshot(query(collection(db, 'order_proposals'), where('followers', 'array-contains', user.uid), limit(200)), (snap) => {
+      const u2 = onSnapshot(query(collection(db, 'order_proposals'), where('followers', 'array-contains', user.uid), limit(100)), (snap) => {
         results.q2 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         combine();
       });
-      const uResp = onSnapshot(query(collection(db, 'order_proposals'), where('responsibleUserId', '==', user.uid), limit(200)), (snap) => {
+      const uResp = onSnapshot(query(collection(db, 'order_proposals'), where('responsibleUserId', '==', user.uid), limit(100)), (snap) => {
         results.qResp = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         combine();
       });
 
       let uL1 = () => {}, uL2 = () => {};
       if (appUser?.legacyId) {
-        uL1 = onSnapshot(query(collection(db, 'order_proposals'), where('createdBy', '==', appUser.legacyId), limit(200)), (snap) => {
+        uL1 = onSnapshot(query(collection(db, 'order_proposals'), where('createdBy', '==', appUser.legacyId), limit(100)), (snap) => {
           results.qL1 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           combine();
         });
-        uL2 = onSnapshot(query(collection(db, 'order_proposals'), where('followers', 'array-contains', appUser.legacyId), limit(200)), (snap) => {
+        uL2 = onSnapshot(query(collection(db, 'order_proposals'), where('followers', 'array-contains', appUser.legacyId), limit(100)), (snap) => {
           results.qL2 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           combine();
         });

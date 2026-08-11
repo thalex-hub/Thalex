@@ -1,6 +1,6 @@
 import React from 'react';
 import { db, auth } from '../lib/firebase';
-import { collection, query, where, onSnapshot, or, updateDoc, doc, limit, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, or, and, updateDoc, doc, limit, orderBy, Timestamp } from 'firebase/firestore';
 import { isBefore, addHours, parseISO, format } from 'date-fns';
 import { Bell, BellOff, AlertTriangle, Clock, X, ExternalLink, RefreshCcw, FileCheck, Search, MessageCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -269,15 +269,23 @@ export default function NotificationManager() {
   React.useEffect(() => {
     if (!currentUser || !isLoaded) return;
 
-    const twoDaysAgo = new Date();
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-    const timeStr = twoDaysAgo.toISOString();
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+    const timeStr = sixHoursAgo.toISOString();
 
     // Listen strictly to tasks where I am actually involved
-    const q1 = query(collection(db, 'tasks'), where('assigneeId', '==', currentUser.uid), where('updatedAt', '>=', timeStr), limit(50));
-    const q2 = query(collection(db, 'tasks'), where('assignerId', '==', currentUser.uid), where('updatedAt', '>=', timeStr), limit(50));
-    const q3 = query(collection(db, 'tasks'), where('responsibleUserId', '==', currentUser.uid), where('updatedAt', '>=', timeStr), limit(50));
-    const q4 = query(collection(db, 'tasks'), where('followers', 'array-contains', currentUser.uid), where('updatedAt', '>=', timeStr), limit(50));
+    const qTasksCombined = query(
+      collection(db, 'tasks'),
+      and(
+        or(
+          where('assigneeId', '==', currentUser.uid),
+          where('assignerId', '==', currentUser.uid),
+          where('responsibleUserId', '==', currentUser.uid),
+          where('followers', 'array-contains', currentUser.uid)
+        ),
+        where('updatedAt', '>=', timeStr)
+      ),
+      limit(20)
+    );
 
     let tasksMap = new Map();
     const handleTasksSnap = (changeType: 'added'|'modified'|'removed', doc: any) => {
@@ -319,19 +327,20 @@ export default function NotificationManager() {
         processTasksList();
     };
 
-    const unsubT1 = onSnapshot(q1, taskSnapHandler, (err) => console.error(err));
-    const unsubT2 = onSnapshot(q2, taskSnapHandler, (err) => console.error(err));
-    const unsubT3 = onSnapshot(q3, taskSnapHandler, (err) => console.error(err));
-    const unsubT4 = onSnapshot(q4, taskSnapHandler, (err) => console.error(err));
-    const unsubscribeTasks = () => { unsubT1(); unsubT2(); unsubT3(); unsubT4(); };
+    const unsubTasks = onSnapshot(qTasksCombined, taskSnapHandler, (err) => {
+      // If 'or' query fails (e.g. index missing), fallback to simple one or just log
+      console.error("Tasks combined snapshot error:", err);
+    });
 
     // Listen to MY leave requests that are returned
     const qLeave = query(
       collection(db, 'leave_requests'),
-      where('userId', '==', currentUser.uid),
-      where('status', '==', 'returned'),
-      where('updatedAt', '>=', timeStr),
-      limit(20)
+      and(
+        where('userId', '==', currentUser.uid),
+        where('status', '==', 'returned'),
+        where('updatedAt', '>=', timeStr)
+      ),
+      limit(10)
     );
 
     const unsubscribeLeave = onSnapshot(qLeave, (snapshot) => {
@@ -385,97 +394,92 @@ export default function NotificationManager() {
                                (isHR && colName === 'leave_requests') || 
                                ((isAccountant || isFinanceStaff) && ['payment_requests', 'advance_requests', 'reimbursement_requests', 'order_proposals'].includes(colName));
 
-        let qApprovals: any[] = [];
+        let qApproval: any = null;
         if (showAllThisType) {
           // Optimization: Only watch for actionable statuses to reduce read quota usage
-          // And limit to last 50 recent ones
-          qApprovals = [
-            query(
-              collection(db, colName), 
+          // And limit to last 10 recent ones
+          qApproval = query(
+            collection(db, colName), 
+            and(
               where('status', 'in', ['pending', 'pending_finance', 'pending_director', 'approved', 'accountant_verified', 'returned']),
-              where('updatedAt', '>=', timeStr),
-              limit(50)
-            )
-          ];
+              where('updatedAt', '>=', timeStr)
+            ),
+            limit(10)
+          );
         } else if (isManager) {
           const field = colName === 'order_proposals' ? 'createdBy' : 'userId';
-          qApprovals = [
-            query(collection(db, colName), where(field, '==', currentUser.uid), where('updatedAt', '>=', timeStr), limit(20)),
-            query(collection(db, colName), where('departmentId', '==', appUser?.departmentId || 'none'), where('status', '==', 'pending'), where('updatedAt', '>=', timeStr), limit(20)),
-            query(collection(db, colName), where('followers', 'array-contains', currentUser.uid), where('updatedAt', '>=', timeStr), limit(20))
-          ];
+          qApproval = query(
+            collection(db, colName), 
+            and(
+              or(
+                where(field, '==', currentUser.uid),
+                and(where('departmentId', '==', appUser?.departmentId || 'none'), where('status', '==', 'pending')),
+                where('followers', 'array-contains', currentUser.uid)
+              ),
+              where('updatedAt', '>=', timeStr)
+            ), 
+            limit(20)
+          );
         } else {
           return;
         }
 
-        const activeIdsMap = new Map<number, Set<string>>();
-
-        qApprovals.forEach((qApproval, idx) => {
-          activeIdsMap.set(idx, new Set());
-          const unsub = onSnapshot(qApproval, (snapshot) => {
-            const currentActive = new Set<string>(snapshot.docs.map(doc => doc.id));
-            activeIdsMap.set(idx, currentActive);
-            
-            // Combine all active IDs across all queries for this collection
-            const allActiveIds = new Set<string>();
-            activeIdsMap.forEach(ids => {
-              ids.forEach(id => allActiveIds.add(id));
+        const unsub = onSnapshot(qApproval, (snapshot) => {
+          const allActiveIds = new Set<string>(snapshot.docs.map(doc => doc.id));
+          
+          setNotifications(prev => {
+            const filtered = prev.filter(n => {
+              if (n.type === 'approval' && n.colName === colName && n.docId) {
+                if (!allActiveIds.has(n.docId)) return false;
+              }
+              return true;
             });
-            
-            setNotifications(prev => {
-              const filtered = prev.filter(n => {
-                if (n.type === 'approval' && n.colName === colName && n.docId) {
-                  if (!allActiveIds.has(n.docId)) return false;
-                }
-                return true;
-              });
-              return filtered;
-            });
+            return filtered;
+          });
 
-            snapshot.docChanges().forEach((change) => {
-              const id = change.doc.id;
-              if (change.type === 'added' || change.type === 'modified') {
-                const data = change.doc.data();
-                
-                if (checkNeedsAction(colName, data)) {
-                  const uniqueKey = `${colName}_${id}_${data.status || 'pending'}`;
+          snapshot.docChanges().forEach((change) => {
+            const id = change.doc.id;
+            if (change.type === 'added' || change.type === 'modified') {
+              const data = change.doc.data();
+              
+              if (checkNeedsAction(colName, data)) {
+                const uniqueKey = `${colName}_${id}_${data.status || 'pending'}`;
 
-                  if (!notifiedApprovalsRef.current.has(uniqueKey)) {
-                    let title = `Phê duyệt mới: ${col.label}`;
-                    const subject = data.name || data.reason || data.purpose || 'Yêu cầu mới';
-                    let body = `Yêu cầu "${subject}" từ ${data.userName || data.fullName || 'nhân viên'}. Đang chờ bạn phê duyệt.`;
-                    let path = col.path;
+                if (!notifiedApprovalsRef.current.has(uniqueKey)) {
+                  let title = `Phê duyệt mới: ${col.label}`;
+                  const subject = data.name || data.reason || data.purpose || 'Yêu cầu mới';
+                  let body = `Yêu cầu "${subject}" từ ${data.userName || data.fullName || 'nhân viên'}. Đang chờ bạn phê duyệt.`;
+                  let path = col.path;
 
-                    if (data.status === 'approved') {
-                      title = `Chi tiền/Giải ngân: ${col.label}`;
-                      body = `Yêu cầu "${subject}" từ ${data.userName || data.fullName || 'nhân viên'} đã được duyệt. Vui lòng thực hiện chi tiền.`;
-                      path = '/disbursements';
-                    }
-                    
-                    sendNotification(title, body, 'approval');
-                    addHistoricalNotification(title, body, 'approval', undefined, path, id, colName);
-
-                    notifiedApprovalsRef.current.add(uniqueKey);
-                    setNotifiedApprovals(new Set(notifiedApprovalsRef.current));
+                  if (data.status === 'approved') {
+                    title = `Chi tiền/Giải ngân: ${col.label}`;
+                    body = `Yêu cầu "${subject}" từ ${data.userName || data.fullName || 'nhân viên'} đã được duyệt. Vui lòng thực hiện chi tiền.`;
+                    path = '/disbursements';
                   }
-                } else {
-                  setNotifications(prev => prev.filter(n => !shouldRemoveNotification(n, id, colName, data)));
+                  
+                  sendNotification(title, body, 'approval');
+                  addHistoricalNotification(title, body, 'approval', undefined, path, id, colName);
+
+                  notifiedApprovalsRef.current.add(uniqueKey);
+                  setNotifiedApprovals(new Set(notifiedApprovalsRef.current));
                 }
-              } else if (change.type === 'removed') {
-                const data = change.doc.data();
+              } else {
                 setNotifications(prev => prev.filter(n => !shouldRemoveNotification(n, id, colName, data)));
               }
-            });
-          }, (err) => {
-            console.error(`Error in approval notification watch for ${colName}:`, err);
+            } else if (change.type === 'removed') {
+              const data = change.doc.data();
+              setNotifications(prev => prev.filter(n => !shouldRemoveNotification(n, id, colName, data)));
+            }
           });
-          unsubs.push(unsub);
+        }, (err) => {
+          console.error(`Error in approval notification watch for ${colName}:`, err);
         });
+        unsubs.push(unsub);
       });
     }
 
     return () => {
-      unsubscribeTasks();
+      unsubTasks();
       unsubscribeLeave();
       unsubs.forEach(u => u());
     };

@@ -86,7 +86,7 @@ export default function Products() {
       }
     };
 
-    const unsubProducts = onSnapshot(query(collection(db, 'products'), limit(1000)), (snap) => {
+    const unsubProducts = onSnapshot(query(collection(db, 'products'), limit(300)), (snap) => {
       setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
       productsDone = true;
       checkAllDone();
@@ -96,7 +96,7 @@ export default function Products() {
       checkAllDone();
     });
 
-    const unsubCategories = onSnapshot(collection(db, 'product_categories'), (snap) => {
+    const unsubCategories = onSnapshot(query(collection(db, 'product_categories'), limit(100)), (snap) => {
       setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category)));
       categoriesDone = true;
       checkAllDone();
@@ -106,7 +106,7 @@ export default function Products() {
       checkAllDone();
     });
 
-    const unsubInventory = onSnapshot(query(collection(db, 'inventory'), limit(2000)), (snap) => {
+    const unsubInventory = onSnapshot(query(collection(db, 'inventory'), limit(300)), (snap) => {
       setInventory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
       inventoryDone = true;
       checkAllDone();
@@ -116,7 +116,7 @@ export default function Products() {
       checkAllDone();
     });
 
-    const unsubStockItems = onSnapshot(query(collection(db, 'stock_items'), limit(2000)), (snap) => {
+    const unsubStockItems = onSnapshot(query(collection(db, 'stock_items'), limit(300)), (snap) => {
       setStockItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as StockItem)));
       stockItemsDone = true;
       checkAllDone();

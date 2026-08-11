@@ -182,7 +182,7 @@ export default function Attendance() {
           where('workDate', '>=', start),
           where('workDate', '<=', end),
           orderBy('workDate', 'asc'),
-          limit(1000)
+          limit(300)
         );
         const teamSnap = await getDocs(teamQ);
         let allTeamData = teamSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));

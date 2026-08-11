@@ -90,7 +90,7 @@ export default function AdvanceRequests() {
     const fetchOrders = async () => {
       let qO;
       if (isAdmin || isDirector || isFinanceStaff || hasPermission('view_orders') || hasPermission('menu_orders_view')) {
-        qO = query(collection(db, 'orders'), orderBy('startDate', 'desc'), limit(1000));
+        qO = query(collection(db, 'orders'), orderBy('startDate', 'desc'), limit(300));
       } else {
         qO = query(
           collection(db, 'orders'), 

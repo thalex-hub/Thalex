@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../lib/authContext';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, orderBy, or, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, or, onSnapshot, limit } from 'firebase/firestore';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from 'date-fns';
 import { isHoliday } from '../lib/holidays';
 import { Wallet, TrendingUp, AlertTriangle, Calendar, ChevronLeft, ChevronRight, FileSpreadsheet, Shield } from 'lucide-react';
@@ -76,11 +76,11 @@ export default function Payroll() {
     if (!user) return;
     
     setLoading(true);
-    const startForQuery = format(subMonths(startOfMonth(currentMonth), 12), 'yyyy-MM-dd');
+    const startForQuery = format(subMonths(startOfMonth(currentMonth), 3), 'yyyy-MM-dd');
     const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
     
     // 1. Snapshot for Users (Ensures real-time bonus/KPI updates)
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('fullName', 'asc')), (snap) => {
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('fullName', 'asc'), limit(500)), (snap) => {
       const users = snap.docs
         .map(d => ({ uid: d.id, ...d.data() }))
         .filter((u: any) => u.roleId !== 'SuperAdmin');
@@ -90,8 +90,8 @@ export default function Payroll() {
     // 2. Snapshot for Orders (Ensures real-time revenue/commission updates)
     const canSeeAllOrders = isDirector || isAccountant || isHR || isManager || canViewSalaries;
     const ordersQ = canSeeAllOrders 
-      ? query(collection(db, 'orders'))
-      : query(collection(db, 'orders'), or(where('responsibleUserId', '==', user.uid), where('followers', 'array-contains', user.uid)));
+      ? query(collection(db, 'orders'), limit(300))
+      : query(collection(db, 'orders'), or(where('responsibleUserId', '==', user.uid), where('followers', 'array-contains', user.uid)), limit(500));
     
     const unsubOrders = onSnapshot(ordersQ, (snap) => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));

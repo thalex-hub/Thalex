@@ -118,19 +118,17 @@ export default function CashFlowManagement() {
       ];
 
       for (const col of collectionsToCheck) {
-        const snap = await getDocs(collection(db, col.name));
+        const q = query(collection(db, col.name), where('amount', '==', 1500000), limit(100));
+        const snap = await getDocs(q);
         snap.docs.forEach((docRef) => {
           const data = docRef.data();
-          const amt = Number(data.amount) || 0;
-          if (amt === 1500000) {
-            found.push({
-              id: docRef.id,
-              collection: col.name,
-              label: col.label,
-              note: data.note || data.title || data.purpose || 'Không có mô tả chi tiết',
-              date: data.paymentDate || data.requestDate || data.createdAt || data.month || 'Không rõ ngày'
-            });
-          }
+          found.push({
+            id: docRef.id,
+            collection: col.name,
+            label: col.label,
+            note: data.note || data.title || data.purpose || 'Không có mô tả chi tiết',
+            date: data.paymentDate || data.requestDate || data.createdAt || data.month || 'Không rõ ngày'
+          });
         });
       }
       setStale15MRecords(found);
@@ -213,7 +211,7 @@ export default function CashFlowManagement() {
     };
 
     // Set up real-time listeners
-    const unsubAdvances = onSnapshot(query(collection(db, 'advance_requests'), limit(500)), (snap) => {
+    const unsubAdvances = onSnapshot(query(collection(db, 'advance_requests'), limit(300)), (snap) => {
       setAdvances(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       advancesDone = true;
       checkAllDone();
@@ -223,7 +221,7 @@ export default function CashFlowManagement() {
       checkAllDone();
     });
 
-    const unsubReimbursements = onSnapshot(query(collection(db, 'reimbursement_requests'), limit(500)), (snap) => {
+    const unsubReimbursements = onSnapshot(query(collection(db, 'reimbursement_requests'), limit(300)), (snap) => {
       setReimbursements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       reimbursementsDone = true;
       checkAllDone();
@@ -233,7 +231,7 @@ export default function CashFlowManagement() {
       checkAllDone();
     });
 
-    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(1000)), (snap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(300)), (snap) => {
       setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       ordersDone = true;
       checkAllDone();
@@ -243,7 +241,7 @@ export default function CashFlowManagement() {
       checkAllDone();
     });
 
-    const unsubPayments = onSnapshot(query(collection(db, 'payments'), limit(2000)), (snap) => {
+    const unsubPayments = onSnapshot(query(collection(db, 'payments'), limit(300)), (snap) => {
       setPayments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       paymentsDone = true;
       checkAllDone();
@@ -253,7 +251,7 @@ export default function CashFlowManagement() {
       checkAllDone();
     });
 
-    const unsubPaymentReqs = onSnapshot(query(collection(db, 'payment_requests'), limit(1000)), (snap) => {
+    const unsubPaymentReqs = onSnapshot(query(collection(db, 'payment_requests'), limit(500)), (snap) => {
       setPaymentRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       paymentReqsDone = true;
       checkAllDone();
@@ -263,7 +261,7 @@ export default function CashFlowManagement() {
       checkAllDone();
     });
 
-    const unsubBusinessExpenses = onSnapshot(query(collection(db, 'business_expenses'), limit(1000)), (snap) => {
+    const unsubBusinessExpenses = onSnapshot(query(collection(db, 'business_expenses'), limit(500)), (snap) => {
       setBusinessExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       businessExpensesDone = true;
       checkAllDone();

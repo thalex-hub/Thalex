@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../lib/authContext';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, orderBy, or, onSnapshot, limit } from 'firebase/firestore';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, subMonths, addMonths } from 'date-fns';
 import { isHoliday } from '../lib/holidays';
 import { Wallet, TrendingUp, AlertTriangle, Calendar, ChevronLeft, ChevronRight, FileSpreadsheet, Shield } from 'lucide-react';
 import { exportToExcel } from '../lib/excel';
@@ -763,14 +763,4 @@ export default function Payroll() {
   );
 }
 
-function subMonths(date: Date, amount: number) {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() - amount);
-  return d;
-}
 
-function addMonths(date: Date, amount: number) {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + amount);
-  return d;
-}

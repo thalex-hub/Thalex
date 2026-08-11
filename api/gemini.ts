@@ -33,10 +33,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
     contents.push({ role: "user", parts: [{ text: prompt }] });
+
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.6-flash",
       contents,
     });
+
     return res.json({ response: response.text });
   } catch (error: any) {
     console.error("Gemini route error:", error);

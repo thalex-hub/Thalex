@@ -168,11 +168,6 @@ export default function Dashboard() {
     const yearStart = `${selectedYear}-01-01`;
     const yearEnd = `${selectedYear}-12-31`;
 
-    // 1. Users & SuperAdmins
-    const fetchedUsers = allUsers;
-    setUsers(fetchedUsers.filter(u => u.roleId !== 'SuperAdmin'));
-    setSuperAdminIds(fetchedUsers.filter((u: any) => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
-
     const fetchData = async () => {
       setRefreshing(true);
       try {
@@ -266,7 +261,14 @@ export default function Dashboard() {
     };
 
     fetchData();
-  }, [user, canSeeAll, selectedYear, isAdmin, isDirector, allUsers]);
+  }, [user, canSeeAll, selectedYear, isAdmin, isDirector]); // Removed allUsers
+
+  useEffect(() => {
+    // Users & SuperAdmins
+    const fetchedUsers = allUsers;
+    setUsers(fetchedUsers.filter(u => u.roleId !== 'SuperAdmin'));
+    setSuperAdminIds(fetchedUsers.filter((u: any) => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
+  }, [allUsers]);
 
   // 3. Memoized derived statistics
   const activeOrdersForYear = useMemo(() => {

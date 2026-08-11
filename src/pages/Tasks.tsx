@@ -176,12 +176,15 @@ export default function Tasks() {
   };
 
   React.useEffect(() => {
+    if (allUsers.length > 0) {
+      setUsers(allUsers as any);
+    }
+  }, [allUsers]);
+
+  React.useEffect(() => {
     if (!currentUser) return;
     
-    // Fetch users for assignment if authorized
-    setUsers(allUsers as any);
-
-    let unsubTasks: () => void;
+    let unsubTasks: () => void = () => {};
     const canSeeAll = isAdmin || isDirector;
     
     if (canSeeAll) {
@@ -254,7 +257,7 @@ export default function Tasks() {
     return () => {
       unsubTasks();
     };
-  }, [isAdmin, isManager, isHR, isLeader, currentUser, appUser, allUsers]);
+  }, [isAdmin, isDirector, isManager, isHR, isLeader, currentUser?.uid, appUser?.uid]);
 
   // Subscribe to comments and subtasks when editing/viewing a task
   React.useEffect(() => {

@@ -213,14 +213,14 @@ service cloud.firestore {
       function isTaskInvolved() {
         return isSignedIn() && (
           isTaskLeader() || 
-          (resource.data.assigneeId == request.auth.uid) || 
-          (existsUserDoc() && resource.data.assigneeId == getUserLegacyId()) ||
-          (resource.data.assignerId == request.auth.uid) ||
-          (existsUserDoc() && resource.data.assignerId == getUserLegacyId()) ||
-          (resource.data.responsibleUserId == request.auth.uid) ||
-          (existsUserDoc() && resource.data.responsibleUserId == getUserLegacyId()) ||
-          request.auth.uid in resource.data.followers ||
-          (existsUserDoc() && getUserLegacyId() in resource.data.followers)
+          (resource.data.get('assigneeId', '') == request.auth.uid) || 
+          (existsUserDoc() && resource.data.get('assigneeId', '') == getUserLegacyId()) ||
+          (resource.data.get('assignerId', '') == request.auth.uid) ||
+          (existsUserDoc() && resource.data.get('assignerId', '') == getUserLegacyId()) ||
+          (resource.data.get('responsibleUserId', '') == request.auth.uid) ||
+          (existsUserDoc() && resource.data.get('responsibleUserId', '') == getUserLegacyId()) ||
+          (request.auth.uid in resource.data.get('followers', [])) ||
+          (existsUserDoc() && getUserLegacyId() in resource.data.get('followers', []))
         );
       }
       
@@ -250,12 +250,12 @@ service cloud.firestore {
     match /leave_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_leave_requests') || hasPermission('menu_proposals_view') ||
-                   (isSignedIn() && request.auth.uid in resource.data.followers) ||
-                   (isSignedIn() && resource.data.userId == request.auth.uid);
+                   (isSignedIn() && request.auth.uid in resource.data.get('followers', [])) ||
+                   (isSignedIn() && resource.data.get('userId', '') == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isManager() || isOwner(existing()) || 
                    hasPermission('approve_leave_requests') ||
-                   (isSignedIn() && request.auth.uid in resource.data.followers);
+                   (isSignedIn() && request.auth.uid in resource.data.get('followers', []));
       allow delete: if isDirector() || isHR() || isOwner(existing());
     }
 
@@ -263,11 +263,11 @@ service cloud.firestore {
     match /business_trip_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('menu_proposals_view') ||
-                   (isSignedIn() && request.auth.uid in resource.data.followers) ||
-                   (isSignedIn() && resource.data.userId == request.auth.uid);
+                   (isSignedIn() && request.auth.uid in resource.data.get('followers', [])) ||
+                   (isSignedIn() && resource.data.get('userId', '') == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isOwner(existing()) || 
-                   (isSignedIn() && request.auth.uid in resource.data.followers);
+                   (isSignedIn() && request.auth.uid in resource.data.get('followers', []));
       allow delete: if isDirector() || isHR() || isOwner(existing());
     }
 
@@ -275,37 +275,37 @@ service cloud.firestore {
     match /advance_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_advances') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
-                   (isSignedIn() && request.auth.uid in resource.data.followers) ||
-                   (isSignedIn() && resource.data.userId == request.auth.uid);
+                   (isSignedIn() && request.auth.uid in resource.data.get('followers', [])) ||
+                   (isSignedIn() && resource.data.get('userId', '') == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_advances') || hasPermission('disburse_advances') ||
-                   (isSignedIn() && request.auth.uid in resource.data.followers);
+                   (isSignedIn() && request.auth.uid in resource.data.get('followers', []));
       allow delete: if isDirector() || isFinanceStaff() || isOwner(existing());
     }
     
     match /payment_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_payment_requests') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
-                   (isSignedIn() && request.auth.uid in resource.data.followers) ||
-                   (isSignedIn() && resource.data.userId == request.auth.uid);
+                   (isSignedIn() && request.auth.uid in resource.data.get('followers', [])) ||
+                   (isSignedIn() && resource.data.get('userId', '') == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_payment_requests') || hasPermission('disburse_payment_requests') ||
-                   (isSignedIn() && request.auth.uid in resource.data.followers);
+                   (isSignedIn() && request.auth.uid in resource.data.get('followers', []));
       allow delete: if isDirector() || isFinanceStaff() || isOwner(existing());
     }
 
     match /reimbursement_requests/{id} {
       allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('view_reimbursements') || hasPermission('menu_proposals_view') || hasPermission('view_salaries') ||
-                   (isSignedIn() && request.auth.uid in resource.data.followers) ||
-                   (isSignedIn() && resource.data.userId == request.auth.uid) ||
-                   (isSignedIn() && resource.data.advanceOwnerId == request.auth.uid);
+                   (isSignedIn() && request.auth.uid in resource.data.get('followers', [])) ||
+                   (isSignedIn() && resource.data.get('userId', '') == request.auth.uid) ||
+                   (isSignedIn() && resource.data.get('advanceOwnerId', '') == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || isManager() || 
                    hasPermission('approve_reimbursements') || hasPermission('disburse_reimbursements') ||
-                   (isSignedIn() && request.auth.uid in resource.data.followers);
+                   (isSignedIn() && request.auth.uid in resource.data.get('followers', []));
       allow delete: if isDirector() || isFinanceStaff() || isOwner(existing());
     }
 
@@ -417,10 +417,10 @@ service cloud.firestore {
     // Files & Folders
     match /stored_files/{id} {
       allow read: if isDirector() || isHR() || (isSignedIn() && (
-        ('type' in resource.data ? resource.data.type : '') == 'company' || 
-        resource.data.ownerId == request.auth.uid || 
-        ('sharedWith' in resource.data && request.auth.uid in resource.data.sharedWith) ||
-        ('sharedWith' in resource.data && 'all' in resource.data.sharedWith)
+        (resource.data.get('type', '') == 'company') || 
+        (resource.data.get('ownerId', '') == request.auth.uid) || 
+        (request.auth.uid in resource.data.get('sharedWith', [])) ||
+        ('all' in resource.data.get('sharedWith', []))
       ));
       allow create: if isSignedIn();
       allow update, delete: if isDirector() || isHR() || (isSignedIn() && ('ownerId' in existing() ? existing().ownerId : '') == request.auth.uid);
@@ -428,10 +428,10 @@ service cloud.firestore {
 
     match /folders/{id} {
       allow read: if isDirector() || isHR() || (isSignedIn() && (
-        ('type' in resource.data ? resource.data.type : '') == 'company' || 
-        resource.data.ownerId == request.auth.uid || 
-        ('sharedWith' in resource.data && request.auth.uid in resource.data.sharedWith) ||
-        ('sharedWith' in resource.data && 'all' in resource.data.sharedWith)
+        (resource.data.get('type', '') == 'company') || 
+        (resource.data.get('ownerId', '') == request.auth.uid) || 
+        (request.auth.uid in resource.data.get('sharedWith', [])) ||
+        ('all' in resource.data.get('sharedWith', []))
       ));
       allow create: if isSignedIn();
       allow update, delete: if isDirector() || isHR() || (isSignedIn() && ('ownerId' in existing() ? existing().ownerId : '') == request.auth.uid);

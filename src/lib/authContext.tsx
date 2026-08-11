@@ -742,7 +742,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const role = (appUser?.roleId || 'Staff');
   const roleLower = role.toLowerCase();
 
-  const hasPermission = (permissionId: string): boolean => {
+  const hasPermission = React.useCallback((permissionId: string): boolean => {
     const isSuperUser = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn' || user?.email === 'ngocvan@thalex.vn' || user?.email === 'vanquy@thalex.com.vn' || roleLower === 'superadmin' || roleLower === 'admin';
     if (isSuperUser) return true;
     
@@ -792,44 +792,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     return false;
-  };
+  }, [user?.email, roleLower, appUser?.permissions, rolePermissions, role]);
 
   const isSuperAdmin = user?.email === 'info.vinasglobal@gmail.com' || user?.email === 'thangcd11@gmail.com' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn' || user?.email === 'ngocvan@thalex.vn' || roleLower === 'superadmin' || roleLower === 'admin' || roleLower === 'tổng giám đốc';
   // Admin is SuperAdmin, Director, or anyone with manage_users
-  const isAdmin = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || roleLower === 'giám đốc' || roleLower === 'phó giám đốc' || roleLower === 'tổng giám đốc' || hasPermission('manage_users') || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn';
+  const isAdmin = React.useMemo(() => isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || roleLower === 'giám đốc' || roleLower === 'phó giám đốc' || roleLower === 'tổng giám đốc' || hasPermission('manage_users') || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn', [isSuperAdmin, roleLower, hasPermission, user?.email]);
   // Director has top administrative authority or isDirector role directly
-  const isDirector = isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || roleLower === 'giám đốc' || roleLower === 'phó giám đốc' || roleLower === 'tổng giám đốc' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn' || user?.email === 'ngocvan@thalex.vn' || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn';
+  const isDirector = React.useMemo(() => isSuperAdmin || roleLower === 'director' || roleLower === 'vicedirector' || roleLower === 'giám đốc' || roleLower === 'phó giám đốc' || roleLower === 'tổng giám đốc' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn' || user?.email === 'ngocvan@thalex.vn' || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn', [isSuperAdmin, roleLower, user?.email]);
   
-  const isManager = roleLower === 'manager' || roleLower === 'generalmanager' || roleLower === 'hrmanager' || roleLower === 'chiefaccountant' || roleLower === 'salesmanager' || roleLower === 'technicalmanager' || roleLower.endsWith('_manager') || roleLower === 'ketoantruong' || roleLower === 'trưởng phòng' || roleLower === 'quản lý' || roleLower.includes('trưởng phòng') || roleLower.includes('quản lý') || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn';
-  const isAccountant = roleLower === 'accountant' || roleLower === 'chiefaccountant' || roleLower === 'accountantstaff' || roleLower.endsWith('_accountant') || roleLower === 'ketoantruong' || roleLower === 'ketoan' || roleLower === 'kế toán' || roleLower === 'kế toán trưởng' || roleLower.includes('kế toán') || roleLower.includes('thủ quỹ') || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn';
-  const isHR = roleLower === 'hr' || roleLower === 'hrmanager' || roleLower === 'hrstaff' || roleLower === 'nhansu' || roleLower === 'nhân sự' || roleLower.includes('nhân sự') || roleLower.includes('hành chính') || roleLower.endsWith('_hr') || roleLower.endsWith('_nhansu') || hasPermission('manage_users') || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn';
-  const isGeneral = roleLower === 'generalmanager' || roleLower === 'generalstaff' || appUser?.departmentId === 'phong-tong-hop' || roleLower.includes('general') || (appUser?.departmentName || '').toLowerCase().includes('tổng hợp');
+  const isManager = React.useMemo(() => roleLower === 'manager' || roleLower === 'generalmanager' || roleLower === 'hrmanager' || roleLower === 'chiefaccountant' || roleLower === 'salesmanager' || roleLower === 'technicalmanager' || roleLower.endsWith('_manager') || roleLower === 'ketoantruong' || roleLower === 'trưởng phòng' || roleLower === 'quản lý' || roleLower.includes('trưởng phòng') || roleLower.includes('quản lý') || hasPermission('approve_leave_requests') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn', [roleLower, hasPermission, user?.email]);
+  const isAccountant = React.useMemo(() => roleLower === 'accountant' || roleLower === 'chiefaccountant' || roleLower === 'accountantstaff' || roleLower.endsWith('_accountant') || roleLower === 'ketoantruong' || roleLower === 'ketoan' || roleLower === 'kế toán' || roleLower === 'kế toán trưởng' || roleLower.includes('kế toán') || roleLower.includes('thủ quỹ') || hasPermission('manage_cashflow') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn' || user?.email === 'vietnhan@thalex.com.vn' || user?.email === 'vietnhan@thalex.vn' || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn', [roleLower, hasPermission, user?.email]);
+  const isHR = React.useMemo(() => roleLower === 'hr' || roleLower === 'hrmanager' || roleLower === 'hrstaff' || roleLower === 'nhansu' || roleLower === 'nhân sự' || roleLower.includes('nhân sự') || roleLower.includes('hành chính') || roleLower.endsWith('_hr') || roleLower.endsWith('_nhansu') || hasPermission('manage_users') || user?.email === 'ngocvan@thalex.vn' || user?.email === 'ngocvan@thalex.com.vn', [roleLower, hasPermission, user?.email]);
+  const isGeneral = React.useMemo(() => roleLower === 'generalmanager' || roleLower === 'generalstaff' || appUser?.departmentId === 'phong-tong-hop' || roleLower.includes('general') || (appUser?.departmentName || '').toLowerCase().includes('tổng hợp'), [roleLower, appUser?.departmentId, appUser?.departmentName]);
   
-  const canViewSalaries = isSuperAdmin || isDirector || hasPermission('view_salaries') || hasPermission('manage_users') || hasPermission('view_financial_reports') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn';
-  const canEditSalaries = isSuperAdmin || isDirector || hasPermission('manage_salaries') || hasPermission('manage_users');
-  const isFinanceStaff = isSuperAdmin || isDirector || isAccountant || hasPermission('manage_cashflow') || hasPermission('view_cashflow');
-  const isLeader = isAdmin || isManager || isHR || hasPermission('approve_leave_requests');
+  const canViewSalaries = React.useMemo(() => isSuperAdmin || isDirector || hasPermission('view_salaries') || hasPermission('manage_users') || hasPermission('view_financial_reports') || user?.email === 'tuyetmai@thalex.vn' || user?.email === 'tuyetmai@thalex.com.vn', [isSuperAdmin, isDirector, hasPermission, user?.email]);
+  const canEditSalaries = React.useMemo(() => isSuperAdmin || isDirector || hasPermission('manage_salaries') || hasPermission('manage_users'), [isSuperAdmin, isDirector, hasPermission]);
+  const isFinanceStaff = React.useMemo(() => isSuperAdmin || isDirector || isAccountant || hasPermission('manage_cashflow') || hasPermission('view_cashflow'), [isSuperAdmin, isDirector, isAccountant, hasPermission]);
+  const isLeader = React.useMemo(() => isAdmin || isManager || isHR || hasPermission('approve_leave_requests'), [isAdmin, isManager, isHR, hasPermission]);
+
+  const value = React.useMemo(() => ({
+    user, 
+    appUser, 
+    loading, 
+    isAdmin, 
+    isSuperAdmin,
+    isDirector,
+    isManager, 
+    isAccountant,
+    isHR,
+    isGeneral,
+    isLeader,
+    isFinanceStaff,
+    canViewSalaries,
+    canEditSalaries,
+    hasPermission,
+    rolePermissions,
+    allUsers
+  }), [
+    user, appUser, loading, isAdmin, isSuperAdmin, isDirector, isManager, isAccountant, isHR, isGeneral, isLeader, isFinanceStaff, canViewSalaries, canEditSalaries, hasPermission, rolePermissions, allUsers
+  ]);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      appUser, 
-      loading, 
-      isAdmin, 
-      isSuperAdmin,
-      isDirector,
-      isManager, 
-      isAccountant,
-      isHR,
-      isGeneral,
-      isLeader,
-      isFinanceStaff,
-      canViewSalaries,
-      canEditSalaries,
-      hasPermission,
-      rolePermissions,
-      allUsers
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

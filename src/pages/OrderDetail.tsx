@@ -1321,18 +1321,13 @@ export default function OrderDetail() {
         });
       }
     }, (err) => {
+      const errorMsg = err.code === 'resource-exhausted' 
+        ? "Lỗi: Đã hết hạn mức truy cập dữ liệu (Quota limit exceeded). Vui lòng quay lại sau hoặc nâng cấp gói."
+        : "Lỗi khi tải đơn hàng: " + (err.message || String(err));
       handleFirestoreError(err, OperationType.GET, `orders/${id}`, false);
-      setError("Lỗi khi tải đơn hàng");
+      setError(errorMsg);
       setLoading(false);
     });
-
-    const canSeeUsers = isAdmin || isDirector || isHR || isManager || isAccountant || isFinanceStaff || hasPermission('view_users') || hasPermission('manage_users');
-    if (canSeeUsers) {
-      setUsers(allUsers.map(u => ({ uid: u.id, ...u })));
-    } else if (user) {
-      // At least add current user to the list
-      setUsers([{ uid: user.uid, fullName: appUser?.fullName || user.displayName || 'Me', ...appUser }]);
-    }
 
     const unsubscribeTasks = onSnapshot(query(collection(db, 'tasks'), where('orderId', '==', id), limit(200)), (snap) => {
       setTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -1379,7 +1374,17 @@ export default function OrderDetail() {
       unsubscribeReimbursementReqs();
       unsubscribeStockTx();
     };
-  }, [id, allUsers]);
+  }, [id]); // Removed allUsers from dependency array to prevent snapshot re-registration loop
+
+  React.useEffect(() => {
+    const canSeeUsers = isAdmin || isDirector || isHR || isManager || isAccountant || isFinanceStaff || hasPermission('view_users') || hasPermission('manage_users');
+    if (canSeeUsers) {
+      setUsers(allUsers.map(u => ({ uid: u.id, ...u })));
+    } else if (user) {
+      // At least add current user to the list
+      setUsers([{ uid: user.uid, fullName: appUser?.fullName || user.displayName || 'Me', ...appUser }]);
+    }
+  }, [allUsers, user, appUser, isAdmin, isDirector, isHR, isManager, isAccountant, isFinanceStaff, hasPermission]);
 
   React.useEffect(() => {
     if (!order?.customerId) return;

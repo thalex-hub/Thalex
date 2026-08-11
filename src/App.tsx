@@ -61,60 +61,7 @@ function AppContent() {
 
   React.useEffect(() => {
     if (user && !loading && !isVerifying) {
-      if (user.email === 'info.vinasglobal@gmail.com') {
-        const runSystemFixes = async () => {
-          try {
-            const { collection, getDocs, deleteDoc, query, where, setDoc, doc } = await import('firebase/firestore');
-            
-            const ordersSnap = await getDocs(collection(db, 'orders'));
-            const validIds = new Set(ordersSnap.docs.map(d => d.id));
-            const collectionsToCheck = [
-              { name: 'tasks', field: 'orderId' },
-              { name: 'task_reports', field: 'orderId' },
-              { name: 'payments', field: 'orderId' },
-              { name: 'advance_requests', field: 'relatedOrderId' },
-              { name: 'payment_requests', field: 'relatedOrderId' },
-              { name: 'reimbursement_requests', field: 'relatedOrderId' },
-              { name: 'stock_transactions', field: 'orderId' },
-              { name: 'user_activity_logs', field: 'entityId' }
-            ];
-            let count = 0;
-            for (const col of collectionsToCheck) {
-              const snap = await getDocs(collection(db, col.name));
-              for (const d of snap.docs) {
-                const f = d.data()[col.field];
-                if (f && !validIds.has(f)) {
-                  await deleteDoc(doc(db, col.name, d.id));
-                  count++;
-                }
-              }
-            }
-            if (count > 0) console.log('Cleaned up ' + count + ' orphans');
-            
-            const vietnhanEmails = ['vietnhan@thalex.com.vn', 'vietnhan@thalex.vn'];
-            for (const email of vietnhanEmails) {
-              const vietnhanSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
-              if (vietnhanSnap.empty) {
-                const tempId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
-                await setDoc(doc(db, 'users', tempId), {
-                  fullName: 'Nguyễn Việt Nhân',
-                  email: email,
-                  roleId: 'Director',
-                  workStatus: 'official',
-                  accountStatus: 'active',
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                  tempPassword: 'Thalex@123',
-                  needsPasswordChange: true
-                });
-              }
-            }
-          } catch(e) {
-            console.error('System fix error:', e);
-          }
-        };
-        runSystemFixes();
-      }
+      // Removed automatic runSystemFixes to prevent exhausting Firestore quota
       
       // Removed automatic signOut when appUser is missing to handle Firestore Quota errors gracefully
       if (appUser && (appUser.accountStatus === 'locked' || appUser.accountStatus === 'pending')) {

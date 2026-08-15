@@ -171,88 +171,111 @@ export default function Dashboard() {
     const fetchData = async () => {
       setRefreshing(true);
       try {
-        // 2. Orders
-        const ordersQ = canSeeAll
-          ? query(collection(db, 'orders'), limit(200))
-          : query(
-              collection(db, 'orders'),
-              or(
-                where('responsibleUserId', '==', user.uid),
-                where('followers', 'array-contains', user.uid)
-              ),
-              limit(50)
+        // Run fetches in parallel with resilient error isolation
+        const ordersPromise = (async () => {
+          try {
+            const ordersQ = canSeeAll
+              ? query(collection(db, 'orders'), limit(200))
+              : query(
+                  collection(db, 'orders'),
+                  or(
+                    where('responsibleUserId', '==', user.uid),
+                    where('followers', 'array-contains', user.uid)
+                  ),
+                  limit(50)
+                );
+            const ordersSnap = await getDocs(ordersQ);
+            setOrders(ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          } catch (e) {
+            console.warn("Failed to fetch orders for dashboard:", e);
+          }
+        })();
+
+        const tasksPromise = (async () => {
+          try {
+            const tasksQ = (isAdmin || isDirector)
+              ? query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(200))
+              : query(
+                  collection(db, 'tasks'),
+                  or(
+                    where('assigneeId', '==', user.uid),
+                    where('assignerId', '==', user.uid),
+                    where('responsibleUserId', '==', user.uid),
+                    where('followers', 'array-contains', user.uid)
+                  ),
+                  orderBy('createdAt', 'desc'),
+                  limit(50)
+                );
+            const tasksSnap = await getDocs(tasksQ);
+            const allTasks = tasksSnap.docs
+              .map(doc => ({ id: doc.id, ...doc.data() }))
+              .filter((t: any) => 
+                !t.isParent && 
+                t.type !== 'parent' && 
+                !t.name?.startsWith('Triển khai –') && 
+                !t.name?.startsWith('Triển khai -') && 
+                !t.name?.toLowerCase()?.includes('triển khai đơn hàng')
+              );
+            setTasks(allTasks);
+            setRecentTasks(allTasks
+              .filter((t: any) => t.status !== 'completed')
+              .sort((a: any, b: any) => {
+                const dateA = toDate(a.createdAt);
+                const dateB = toDate(b.createdAt);
+                return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+              })
             );
-        const ordersSnap = await getDocs(ordersQ);
-        setOrders(ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          } catch (e) {
+            console.warn("Failed to fetch tasks for dashboard:", e);
+          }
+        })();
 
-        // 3. Tasks
-        const tasksQ = (isAdmin || isDirector)
-          ? query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(200))
-          : query(
-              collection(db, 'tasks'),
-              or(
-                where('assigneeId', '==', user.uid),
-                where('assignerId', '==', user.uid),
-                where('responsibleUserId', '==', user.uid),
-                where('followers', 'array-contains', user.uid)
-              ),
-              orderBy('createdAt', 'desc'),
-              limit(50)
-            );
-        const tasksSnap = await getDocs(tasksQ);
-        const allTasks = tasksSnap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter((t: any) => 
-            !t.isParent && 
-            t.type !== 'parent' && 
-            !t.name?.startsWith('Triển khai –') && 
-            !t.name?.startsWith('Triển khai -') && 
-            !t.name?.toLowerCase()?.includes('triển khai đơn hàng')
-          );
-        setTasks(allTasks);
-        setRecentTasks(allTasks
-          .filter((t: any) => t.status !== 'completed')
-          .sort((a: any, b: any) => {
-            const dateA = toDate(a.createdAt);
-            const dateB = toDate(b.createdAt);
-            return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
-          })
-        );
+        const paymentsPromise = getDocs(query(collection(db, 'payments'), limit(100)))
+          .then(snap => setPayments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
+          .catch(e => console.warn("Failed to fetch payments:", e));
 
-        // 4. Payments
-        const paymentsSnap = await getDocs(query(collection(db, 'payments'), limit(100)));
-        setPayments(paymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const busExpPromise = getDocs(query(collection(db, 'business_expenses'), limit(100)))
+          .then(snap => setBusinessExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
+          .catch(e => console.warn("Failed to fetch business expenses:", e));
 
-        // 5. Business Expenses
-        const busExpSnap = await getDocs(query(collection(db, 'business_expenses'), limit(100)));
-        setBusinessExpenses(busExpSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const payReqPromise = getDocs(query(collection(db, 'payment_requests'), limit(100)))
+          .then(snap => setPaymentRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
+          .catch(e => console.warn("Failed to fetch payment requests:", e));
 
-        // 6. Payment Requests
-        const payReqSnap = await getDocs(query(collection(db, 'payment_requests'), limit(100)));
-        setPaymentRequests(payReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const advReqPromise = getDocs(query(collection(db, 'advance_requests'), limit(100)))
+          .then(snap => setAdvanceRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
+          .catch(e => console.warn("Failed to fetch advance requests:", e));
 
-        // 7. Advance Requests
-        const advReqSnap = await getDocs(query(collection(db, 'advance_requests'), limit(100)));
-        setAdvanceRequests(advReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const reimReqPromise = getDocs(query(collection(db, 'reimbursement_requests'), limit(100)))
+          .then(snap => setReimbursementRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
+          .catch(e => console.warn("Failed to fetch reimbursement requests:", e));
 
-        // 8. Reimbursement Requests
-        const reimReqSnap = await getDocs(query(collection(db, 'reimbursement_requests'), limit(100)));
-        setReimbursementRequests(reimReqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const deptsPromise = getDocs(collection(db, 'departments'))
+          .then(snap => setDepartments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
+          .catch(e => console.warn("Failed to fetch departments:", e));
 
-        // 9. Departments
-        const deptsSnap = await getDocs(collection(db, 'departments'));
-        setDepartments(deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const attendancePromise = getDocs(
+          query(
+            collection(db, 'attendance'),
+            where('workDate', '>=', yearStart),
+            where('workDate', '<=', yearEnd),
+            limit(500)
+          )
+        )
+          .then(snap => setAttendance(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
+          .catch(e => console.warn("Failed to fetch attendance:", e));
 
-        // 10. Attendance
-        const attendanceQ = query(
-          collection(db, 'attendance'),
-          where('workDate', '>=', yearStart),
-          where('workDate', '<=', yearEnd),
-          limit(500)
-        );
-        const attendanceSnap = await getDocs(attendanceQ);
-        setAttendance(attendanceSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
+        await Promise.allSettled([
+          ordersPromise,
+          tasksPromise,
+          paymentsPromise,
+          busExpPromise,
+          payReqPromise,
+          advReqPromise,
+          reimReqPromise,
+          deptsPromise,
+          attendancePromise
+        ]);
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
       } finally {

@@ -732,23 +732,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
-        const [usersSnap, permsSnap] = await Promise.all([
-          getDocs(query(collection(db, 'users'), limit(300))),
-          getDocs(query(collection(db, 'role_permissions'), limit(100)))
-        ]);
+        const usersPromise = getDocs(query(collection(db, 'users'), limit(300)))
+          .then(usersSnap => {
+            const usersList = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+            setAllUsers(usersList);
+            sessionStorage.setItem('app_users_list', JSON.stringify(usersList));
+          })
+          .catch(err => {
+            console.warn("Failed to fetch users list in AuthContext:", err);
+          });
 
-        const usersList = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-        setAllUsers(usersList);
+        const permsPromise = getDocs(query(collection(db, 'role_permissions'), limit(100)))
+          .then(permsSnap => {
+            const perms: Record<string, string[]> = {};
+            permsSnap.docs.forEach(doc => {
+              perms[doc.id] = doc.data().permissions || [];
+            });
+            setRolePermissions(perms);
+            sessionStorage.setItem('app_role_permissions', JSON.stringify(perms));
+          })
+          .catch(err => {
+            console.warn("Failed to fetch role_permissions in AuthContext:", err);
+          });
 
-        const perms: Record<string, string[]> = {};
-        permsSnap.docs.forEach(doc => {
-          perms[doc.id] = doc.data().permissions || [];
-        });
-        setRolePermissions(perms);
-        
-        // Update cache
-        sessionStorage.setItem('app_users_list', JSON.stringify(usersList));
-        sessionStorage.setItem('app_role_permissions', JSON.stringify(perms));
+        await Promise.allSettled([usersPromise, permsPromise]);
         sessionStorage.setItem('app_auth_last_fetch', Date.now().toString());
       } catch (error) {
         console.error("Error loading auth data:", error);

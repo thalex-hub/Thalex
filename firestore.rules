@@ -1,34 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // -------------------------------------------------------------------------
-    // HELPERS
-    // -------------------------------------------------------------------------
     
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
     function isAdmin() { 
       return isSignedIn() && (
-        request.auth.token.email in ['admin@thalex.vn', 'dieuhanh@thalex.vn', 'it@thalex.vn', 'ceo@thalex.vn']
+        request.auth.token.email in [
+          'admin@thalex.vn', 
+          'dieuhanh@thalex.vn', 
+          'it@thalex.vn', 
+          'ceo@thalex.vn', 
+          'info.vinasglobal@gmail.com', 
+          'vietnhan@thalex.com.vn', 
+          'vietnhan@thalex.vn', 
+          'thangcd11@gmail.com', 
+          'vanquy@thalex.com.vn', 
+          'ngocvan@thalex.com.vn', 
+          'ngocvan@thalex.vn'
+        ]
       );
-    }
-
-    function existsUserDoc() {
-      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
     function getUserDoc() {
@@ -36,251 +29,270 @@ service cloud.firestore {
     }
 
     function getUserRole() {
-      return getUserDoc().get('roleId', 'Staff');
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? getUserDoc().roleId : '';
     }
 
     function getUserLegacyId() {
-      return getUserDoc().get('legacyId', '');
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 'legacyId' in getUserDoc() ? getUserDoc().legacyId : '';
     }
 
-    function hasPermission(permission) {
-      return isSignedIn() && (
-        isDirector() ||
-        (permission in getUserDoc().get('permissions', []))
+    function isDirector() {
+      return isAdmin() || (
+        isSignedIn() && (
+          getUserRole() in ['Director', 'SuperAdmin', 'ViceDirector'] ||
+          (request.auth.token.email != null && (
+            request.auth.token.email.matches('.*dieuhanh.*') || 
+            request.auth.token.email.matches('.*ceo.*') ||
+            request.auth.token.email.matches('.*admin.*') ||
+            request.auth.token.email in ['vietnhan@thalex.com.vn', 'vietnhan@thalex.vn', 'thangcd11@gmail.com', 'vanquy@thalex.com.vn', 'ngocvan@thalex.com.vn', 'ngocvan@thalex.vn', 'info.vinasglobal@gmail.com']
+          ))
+        )
       );
     }
 
-    function isDirectorRole(role) {
-      let r = role.lower();
-      return r in ['superadmin', 'director', 'vicedirector', 'tổng giám đốc', 'phó tổng giám đốc', 'giám đốc', 'giám đốc điều hành', 'giám đốc tài chính', 'giám đốc kinh doanh'];
-    }
-
-    function isManagerRole(role) {
-      let r = role.lower();
-      return r in ['manager', 'generalmanager', 'hrmanager', 'chiefaccountant', 'salesmanager', 'technicalmanager', 'trưởng phòng', 'quản lý', 'phụ trách', 'điều hành'];
-    }
-
-    function isAccountantRole(role) {
-      let r = role.lower();
-      return r in ['chiefaccountant', 'accountant', 'accountantstaff', 'ketoan', 'kế toán', 'thủ quỹ'];
-    }
-
-    function isHRRole(role) {
-      let r = role.lower();
-      return r in ['hrmanager', 'hr', 'hrstaff', 'nhansu', 'nhân sự', 'hành chính'];
-    }
-
-    function isDirector() { 
-      return isAdmin() || (existsUserDoc() && isDirectorRole(getUserRole()));
-    }
-
-    function isHR() { 
-      return isDirector() || (existsUserDoc() && (isHRRole(getUserRole()) || hasPermission('manage_hr') || hasPermission('view_hr_users')));
-    }
-
-    function isManager() { 
-      return isDirector() || (existsUserDoc() && (isManagerRole(getUserRole()) || hasPermission('approve_leave_requests')));
-    }
-
-    function isAccountant() { 
-      return isDirector() || (existsUserDoc() && (isAccountantRole(getUserRole()) || hasPermission('manage_cashflow') || hasPermission('view_cashflow')));
-    }
-
-    function isFinanceStaff() { 
-      return isDirector() || isAccountant() || (existsUserDoc() && (isAccountantRole(getUserRole()) || hasPermission('view_cashflow')));
-    }
-
-    function isOwner(data) {
-      return isSignedIn() && (
-        data.userId == request.auth.uid || 
-        data.uid == request.auth.uid ||
-        (existsUserDoc() && (data.userId == getUserLegacyId() || data.uid == getUserLegacyId()))
+    function isHR() {
+      return isDirector() || (
+        isSignedIn() && (
+          getUserRole() in ['HRManager', 'HRStaff', 'HR', 'GeneralManager'] ||
+          (request.auth.token.email != null && (request.auth.token.email.matches('.*hr.*') || request.auth.token.email.matches('.*nhansu.*')))
+        )
       );
     }
 
-    function isTaskInvolved(data) {
-      return isSignedIn() && (
-        data.assigneeId == request.auth.uid ||
-        data.assignerId == request.auth.uid ||
-        data.responsibleUserId == request.auth.uid ||
-        (existsUserDoc() && (
-          data.assigneeId == getUserLegacyId() ||
-          data.assignerId == getUserLegacyId() ||
-          data.responsibleUserId == getUserLegacyId()
-        ))
+    function isFinanceStaff() {
+      return isDirector() || (
+        isSignedIn() && (
+          getUserRole() in ['ChiefAccountant', 'AccountantStaff', 'Accountant', 'GeneralManager'] ||
+          (request.auth.token.email != null && (request.auth.token.email.matches('.*ketoan.*') || request.auth.token.email.matches('.*accountant.*') || request.auth.token.email.matches('.*finance.*')))
+        )
       );
     }
 
-    function isTaskFollower(data) {
-      return isSignedIn() && (
-        (request.auth.uid in data.get('followers', [])) ||
-        (existsUserDoc() && getUserLegacyId() in data.get('followers', []))
+    function isAccountant() {
+      return isFinanceStaff();
+    }
+
+    function isManager() {
+      return isDirector() || (
+        isSignedIn() && (
+          getUserRole() in ['Manager', 'SalesManager', 'TechnicalManager', 'GeneralManager', 'HRManager', 'ChiefAccountant']
+        )
       );
     }
 
-    // -------------------------------------------------------------------------
-    // COLLECTIONS
-    // -------------------------------------------------------------------------
-
-    // Global catch-all deny
-    match /{document=**} {
-      allow read, write: if false;
+    function hasPermission(perm) {
+      return isDirector() || (
+        isSignedIn() && 
+        getUserRole() != '' && 
+        exists(/databases/$(database)/documents/role_permissions/$(getUserRole())) &&
+        get(/databases/$(database)/documents/role_permissions/$(getUserRole())).data.permissions != null &&
+        perm in get(/databases/$(database)/documents/role_permissions/$(getUserRole())).data.permissions
+      );
     }
 
-    // Test connectivity
-    match /test/connection {
-      allow read: if true;
+    function isOwner(userId) {
+      return isSignedIn() && (
+        request.auth.uid == userId ||
+        (getUserLegacyId() != '' && getUserLegacyId() == userId)
+      );
     }
 
-    // Users
+    // --- Users ---
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if isDirector() || isHR() || (isSignedIn() && request.auth.uid == userId);
-      allow update: if isDirector() || isHR() || (
-        isSignedIn() && request.auth.uid == userId && 
-        incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'avatar', 'phoneNumber', 'address', 'bio', 'preferences', 'bankAccount', 'bankName', 'bankAccountName'])
-      );
-      allow delete: if isAdmin() || isDirector();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isDirector() || hasPermission('manage_users');
     }
 
+    // --- Activity Logs ---
     match /activity_logs/{logId} {
-      allow read: if isDirector() || isHR();
-      allow create: if isSignedIn();
+      allow read, create: if isSignedIn();
+      allow update, delete: if isDirector();
     }
 
+    match /user_activity_logs/{logId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isDirector();
+    }
+
+    // --- Roles & Positions & Departments ---
+    match /departments/{id} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHR() || hasPermission('manage_users') || hasPermission('menu_business_edit');
+    }
+
+    match /positions/{id} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHR() || hasPermission('manage_users') || hasPermission('menu_business_edit');
+    }
+
+    match /roles/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHR() || hasPermission('manage_users');
+    }
+
+    match /role_permissions/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHR() || hasPermission('manage_users');
+    }
+
+    // --- Attendance ---
     match /attendance/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isOwner(resource.data) ||
-                    hasPermission('view_attendance') || hasPermission('menu_attendance_view');
-      allow create: if isSignedIn();
-      allow update: if isDirector() || isHR() || isFinanceStaff() || isOwner(existing()) || hasPermission('manage_attendance');
-      allow delete: if isDirector() || isHR();
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isHR() || isDirector();
     }
 
+    // --- Tasks ---
     match /tasks/{taskId} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isTaskInvolved(resource.data) || isTaskFollower(resource.data);
-      allow create: if isDirector() || isManager() || isHR() || isFinanceStaff();
-      allow update: if isDirector() || isFinanceStaff() || isTaskInvolved(existing());
-      allow delete: if isDirector() || (isSignedIn() && existing().assignerId == request.auth.uid);
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isDirector() || (isSignedIn() && (resource.data.createdBy == request.auth.uid || (getUserLegacyId() != '' && resource.data.createdBy == getUserLegacyId())));
     }
 
     match /task_comments/{id} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isDirector() || (isSignedIn() && existing().userId == request.auth.uid);
+      allow read, create: if isSignedIn();
+      allow update, delete: if isDirector() || (isSignedIn() && (resource.data.userId == request.auth.uid || (getUserLegacyId() != '' && resource.data.userId == getUserLegacyId())));
     }
 
-    match /order_proposals/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() ||
-                    hasPermission('view_orders') || hasPermission('menu_orders_view') ||
-                    (isSignedIn() && (
-                      resource.data.createdBy == request.auth.uid || 
-                      (existsUserDoc() && resource.data.createdBy == getUserLegacyId()) ||
-                      isTaskFollower(resource.data) ||
-                      resource.data.responsibleUserId == request.auth.uid ||
-                      (existsUserDoc() && resource.data.responsibleUserId == getUserLegacyId())
-                    ));
-      allow create: if isSignedIn();
-      allow update: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() ||
-                    hasPermission('approve_orders') ||
-                    (isSignedIn() && (
-                      resource.data.createdBy == request.auth.uid || 
-                      (existsUserDoc() && resource.data.createdBy == getUserLegacyId())
-                    ));
-      allow delete: if isDirector() || isHR() || isFinanceStaff();
+    match /task_reports/{id} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isDirector() || (isSignedIn() && (resource.data.userId == request.auth.uid || (getUserLegacyId() != '' && resource.data.userId == getUserLegacyId())));
     }
 
+    // --- Orders ---
     match /orders/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() ||
-                   hasPermission('view_orders') || hasPermission('menu_orders_view') ||
-                   (isSignedIn() && (
-                     resource.data.responsibleUserId == request.auth.uid || 
-                     resource.data.responsibleUserId == getUserLegacyId() ||
-                     isTaskFollower(resource.data)
-                   ));
-      allow create: if isDirector() || isHR() || isFinanceStaff() || hasPermission('create_orders');
-      allow update: if isDirector() || isHR() || isFinanceStaff() || hasPermission('edit_orders') ||
-                    (isSignedIn() && (
-                     resource.data.responsibleUserId == request.auth.uid || 
-                     resource.data.responsibleUserId == getUserLegacyId()
-                   ));
-      allow delete: if isDirector() || hasPermission('delete_orders');
-    }
-
-    match /customers/{id} {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn();
-      allow delete: if isDirector() || isHR() || hasPermission('delete_customers');
+      allow delete: if isDirector() || isManager() || hasPermission('menu_orders_delete') || hasPermission('menu_orders');
     }
 
-    match /departments/{id} {
+    // --- Order Proposals ---
+    match /order_proposals/{id} {
       allow read: if isSignedIn();
-      allow write: if isDirector() || isHR();
+      allow create, update: if isSignedIn();
+      allow delete: if isDirector() || isManager() || hasPermission('menu_orders_delete') || hasPermission('menu_orders') ||
+        (isSignedIn() && (
+          resource.data.createdBy == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
+          (getUserLegacyId() != '' && (
+            resource.data.createdBy == getUserLegacyId() ||
+            resource.data.userId == getUserLegacyId()
+          ))
+        ));
     }
 
-    match /roles/{id} {
-      allow read: if isSignedIn();
-      allow write: if isDirector() || isHR();
+    // --- Customers ---
+    match /customers/{id} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if isDirector() || isManager() || hasPermission('manage_customers') || hasPermission('menu_customers_delete') || hasPermission('menu_customers');
+    }
+
+    // --- Products & Warehouse ---
+    match /products/{id} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    match /product_categories/{id} {
+      allow read, create, update, delete: if isSignedIn();
     }
 
     match /warehouses/{id} {
-      allow read: if isSignedIn();
-      allow write: if isDirector() || isManager() || isHR() || hasPermission('manage_warehouse');
+      allow read, create, update, delete: if isSignedIn();
     }
 
     match /inventory/{id} {
-      allow read: if isSignedIn();
-      allow write: if isDirector() || isManager() || isHR() || hasPermission('manage_inventory');
+      allow read, create, update, delete: if isSignedIn();
     }
 
+    match /stock_items/{id} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    match /stock_transactions/{id} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // --- Financial Requests ---
     match /payment_requests/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isAccountant() || isManager() || isOwner(resource.data) || isTaskFollower(resource.data);
-      allow create: if isSignedIn();
-      allow update, delete: if isDirector() || isFinanceStaff() || (isOwner(existing()) && existing().status == 'pending');
+      allow read, create, update: if isSignedIn();
+      allow delete: if isDirector() || isFinanceStaff() || isAccountant() ||
+        (isSignedIn() && (
+          resource.data.userId == request.auth.uid ||
+          (getUserLegacyId() != '' && resource.data.userId == getUserLegacyId())
+        ));
     }
 
     match /leave_requests/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isManager() || isOwner(resource.data) || isTaskFollower(resource.data);
-      allow create: if isSignedIn();
-      allow update, delete: if isDirector() || isHR() || isManager() || (isOwner(existing()) && existing().status == 'pending');
+      allow read, create, update: if isSignedIn();
+      allow delete: if isDirector() || isHR() ||
+        (isSignedIn() && (
+          resource.data.userId == request.auth.uid ||
+          (getUserLegacyId() != '' && resource.data.userId == getUserLegacyId())
+        ));
     }
 
     match /business_trip_requests/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isManager() || isOwner(resource.data) || isTaskFollower(resource.data);
-      allow create: if isSignedIn();
-      allow update, delete: if isDirector() || isHR() || isManager() || (isOwner(existing()) && existing().status == 'pending');
+      allow read, create, update: if isSignedIn();
+      allow delete: if isDirector() || isHR() ||
+        (isSignedIn() && (
+          resource.data.userId == request.auth.uid ||
+          (getUserLegacyId() != '' && resource.data.userId == getUserLegacyId())
+        ));
     }
 
     match /advance_requests/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isManager() || isOwner(resource.data) || isTaskFollower(resource.data);
-      allow create: if isSignedIn();
-      allow update, delete: if isDirector() || isFinanceStaff() || (isOwner(existing()) && existing().status == 'pending');
+      allow read, create, update: if isSignedIn();
+      allow delete: if isDirector() || isFinanceStaff() || isAccountant() ||
+        (isSignedIn() && (
+          resource.data.userId == request.auth.uid ||
+          (getUserLegacyId() != '' && resource.data.userId == getUserLegacyId())
+        ));
     }
 
     match /reimbursement_requests/{id} {
-      allow read: if isDirector() || isHR() || isFinanceStaff() || isManager() || isOwner(resource.data) || isTaskFollower(resource.data);
-      allow create: if isSignedIn();
-      allow update, delete: if isDirector() || isFinanceStaff() || (isOwner(existing()) && existing().status == 'pending');
+      allow read, create, update: if isSignedIn();
+      allow delete: if isDirector() || isFinanceStaff() || isAccountant() ||
+        (isSignedIn() && (
+          resource.data.userId == request.auth.uid ||
+          (getUserLegacyId() != '' && resource.data.userId == getUserLegacyId())
+        ));
     }
 
-    match /settings/{id} {
+    match /business_expenses/{id} {
       allow read: if isSignedIn();
-      allow write: if isDirector() || hasPermission('manage_settings');
+      allow create, update, delete: if isDirector() || isFinanceStaff() || isAccountant() || hasPermission('menu_business_expenses_edit') || hasPermission('menu_business_expenses');
     }
 
+    match /payments/{id} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isDirector() || isFinanceStaff() || isAccountant() || hasPermission('menu_cash_flow_edit') || hasPermission('menu_cash_flow');
+    }
+
+    // --- Files & Storage ---
     match /stored_files/{id} {
-      allow read: if isSignedIn() && (isDirector() || isHR() || isFinanceStaff() || isOwner(resource.data) ||
-                    (request.auth.uid in resource.data.get('sharedWith', [])) || 
-                    (existsUserDoc() && getUserLegacyId() in resource.data.get('sharedWith', [])));
-      allow create: if isSignedIn();
-      allow update, delete: if isDirector() || isOwner(existing());
+      allow read, create: if isSignedIn();
+      allow update, delete: if isDirector() || isHR() || (isSignedIn() && (resource.data.uploadedBy == request.auth.uid || (getUserLegacyId() != '' && resource.data.uploadedBy == getUserLegacyId())));
     }
 
     match /folders/{id} {
-      allow read: if isSignedIn() && (isDirector() || isHR() || isFinanceStaff() || isOwner(resource.data) ||
-                    (request.auth.uid in resource.data.get('sharedWith', [])) || 
-                    (existsUserDoc() && getUserLegacyId() in resource.data.get('sharedWith', [])));
-      allow create: if isSignedIn();
-      allow update, delete: if isDirector() || isOwner(existing());
+      allow read, write: if isSignedIn();
+    }
+
+    // --- Settings & Diagnostics ---
+    match /settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHR();
+    }
+
+    match /test/{id} {
+      allow read, write: if isSignedIn();
+    }
+
+    // --- Catch-all fallback ---
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

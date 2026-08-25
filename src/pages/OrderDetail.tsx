@@ -1329,7 +1329,7 @@ export default function OrderDetail() {
       setLoading(false);
     });
 
-    const unsubscribeTasks = onSnapshot(query(collection(db, 'tasks'), where('orderId', '==', id), limit(200)), (snap) => {
+    const unsubscribeTasks = onSnapshot(query(collection(db, 'tasks'), where('orderId', '==', id), limit(100)), (snap) => {
       setTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'tasks', false);
@@ -1359,7 +1359,7 @@ export default function OrderDetail() {
       handleFirestoreError(err, OperationType.LIST, 'reimbursement_requests', false);
     });
 
-    const unsubscribeStockTx = onSnapshot(query(collection(db, 'stock_transactions'), where('orderId', '==', id), limit(200)), (snap) => {
+    const unsubscribeStockTx = onSnapshot(query(collection(db, 'stock_transactions'), where('orderId', '==', id), limit(100)), (snap) => {
       setStockTransactions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'stock_transactions', false);

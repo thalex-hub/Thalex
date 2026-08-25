@@ -80,7 +80,7 @@ export default function Payroll() {
     const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
     
     // 1. Snapshot for Users (Ensures real-time bonus/KPI updates)
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('fullName', 'asc'), limit(500)), (snap) => {
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('fullName', 'asc'), limit(75)), (snap) => {
       const users = snap.docs
         .map(d => ({ uid: d.id, ...d.data() }))
         .filter((u: any) => u.roleId !== 'SuperAdmin');
@@ -90,8 +90,8 @@ export default function Payroll() {
     // 2. Snapshot for Orders (Ensures real-time revenue/commission updates)
     const canSeeAllOrders = isDirector || isAccountant || isHR || isManager || canViewSalaries;
     const ordersQ = canSeeAllOrders 
-      ? query(collection(db, 'orders'), limit(300))
-      : query(collection(db, 'orders'), or(where('responsibleUserId', '==', user.uid), where('followers', 'array-contains', user.uid)), limit(500));
+      ? query(collection(db, 'orders'), limit(100))
+      : query(collection(db, 'orders'), or(where('responsibleUserId', '==', user.uid), where('followers', 'array-contains', user.uid)), limit(100));
     
     const unsubOrders = onSnapshot(ordersQ, (snap) => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -102,12 +102,12 @@ export default function Payroll() {
       try {
         const canSeeAllPayments = isDirector || isAccountant || isHR || isManager || canViewSalaries;
         const paymentsQ = canSeeAllPayments
-          ? query(collection(db, 'payment_requests'), where('category', '==', 'salary'), where('status', 'in', ['approved', 'paid']))
-          : query(collection(db, 'payment_requests'), where('userId', '==', user.uid), where('category', '==', 'salary'), where('status', 'in', ['approved', 'paid']));
+          ? query(collection(db, 'payment_requests'), where('category', '==', 'salary'), where('status', 'in', ['approved', 'paid']), limit(100))
+          : query(collection(db, 'payment_requests'), where('userId', '==', user.uid), where('category', '==', 'salary'), where('status', 'in', ['approved', 'paid']), limit(50));
 
         const isSuperUser = isDirector || isAccountant || isHR || isManager || canViewSalaries;
-        const advancesQ = isSuperUser ? query(collection(db, 'advance_requests')) : query(collection(db, 'advance_requests'), where('userId', '==', user.uid));
-        const reimbQ = isSuperUser ? query(collection(db, 'reimbursement_requests')) : query(collection(db, 'reimbursement_requests'), where('userId', '==', user.uid));
+        const advancesQ = isSuperUser ? query(collection(db, 'advance_requests'), limit(100)) : query(collection(db, 'advance_requests'), where('userId', '==', user.uid), limit(50));
+        const reimbQ = isSuperUser ? query(collection(db, 'reimbursement_requests'), limit(100)) : query(collection(db, 'reimbursement_requests'), where('userId', '==', user.uid), limit(50));
 
         const [deptsSnap, paymentsSnap, advanceSnap, reimbSnap] = await Promise.all([
           getDocs(collection(db, 'departments')),
@@ -128,7 +128,8 @@ export default function Payroll() {
             where('userId', '==', user.uid),
             where('workDate', '>=', startForQuery),
             where('workDate', '<=', end),
-            orderBy('workDate', 'asc')
+            orderBy('workDate', 'asc'),
+            limit(100)
           );
           const snap = await getDocs(q);
           setMonthData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -136,7 +137,8 @@ export default function Payroll() {
           const q = query(
             collection(db, 'attendance'),
             where('workDate', '>=', startForQuery),
-            where('workDate', '<=', end)
+            where('workDate', '<=', end),
+            limit(75)
           );
           const snap = await getDocs(q);
           setMonthData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));

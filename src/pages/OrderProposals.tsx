@@ -2,7 +2,7 @@ import React from 'react';
 import { db, storage } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, or, getDoc, getDocs, deleteDoc, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search, ChevronDown, ChevronUp, RefreshCcw } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput, withTimeout } from '../lib/utils';
@@ -432,6 +432,32 @@ export default function OrderProposals() {
       note: prop.note || '',
       expectedDays: (prop.expectedDays || '30').toString()
     });
+    setShowAddModal(true);
+  };
+
+  const handleDuplicate = (prop: any) => {
+    setNewProposal({
+      name: `${prop.name || ''} (Bản sao)`,
+      customerId: prop.customerId || '',
+      sellingPrice: (prop.sellingPrice || '').toString(),
+      sellingVAT: (prop.sellingVAT || '0').toString(),
+      contractValueWithVAT: (prop.contractValueWithVAT || '0').toString(),
+      payment1Percentage: (prop.payment1Percentage || '0').toString(),
+      payment1Amount: (prop.payment1Amount || '0').toString(),
+      remainingDebt: (prop.remainingDebt || '0').toString(),
+      costPrice: (prop.costPrice || '').toString(),
+      costVAT: (prop.costVAT || '0').toString(),
+      totalCostWithVAT: (prop.totalCostWithVAT || '0').toString(),
+      financialCost: (prop.financialCost || '0').toString(),
+      warrantyCost: (prop.warrantyCost || '0').toString(),
+      contingencyCost: (prop.contingencyCost || '0').toString(),
+      customerAcquisitionCost: (prop.customerAcquisitionCost || '0').toString(),
+      otherCosts: (prop.otherCosts || '0').toString(),
+      followers: prop.followers || [],
+      note: prop.note || '',
+      expectedDays: (prop.expectedDays || '30').toString()
+    });
+    setEditingProposal(null);
     setShowAddModal(true);
   };
 
@@ -1446,6 +1472,17 @@ export default function OrderProposals() {
                       Xóa đề xuất (Director)
                     </button>
                   )}
+                  <button 
+                    onClick={() => {
+                      const propToDup = viewingProposal;
+                      setViewingProposal(null);
+                      handleDuplicate(propToDup);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
+                  >
+                    <RefreshCcw size={20} />
+                    Nhân bản đề xuất
+                  </button>
                 </div>
               </div>
               

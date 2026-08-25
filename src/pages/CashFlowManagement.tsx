@@ -251,7 +251,7 @@ export default function CashFlowManagement() {
       checkAllDone();
     });
 
-    const unsubPaymentReqs = onSnapshot(query(collection(db, 'payment_requests'), limit(500)), (snap) => {
+    const unsubPaymentReqs = onSnapshot(query(collection(db, 'payment_requests'), limit(200)), (snap) => {
       setPaymentRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       paymentReqsDone = true;
       checkAllDone();
@@ -261,7 +261,7 @@ export default function CashFlowManagement() {
       checkAllDone();
     });
 
-    const unsubBusinessExpenses = onSnapshot(query(collection(db, 'business_expenses'), limit(500)), (snap) => {
+    const unsubBusinessExpenses = onSnapshot(query(collection(db, 'business_expenses'), limit(200)), (snap) => {
       setBusinessExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       businessExpensesDone = true;
       checkAllDone();

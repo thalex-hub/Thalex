@@ -110,7 +110,7 @@ export default function Users() {
   React.useEffect(() => {
     if (!authUser) return;
 
-    const qUsers = query(collection(db, 'users'), limit(500));
+    const qUsers = query(collection(db, 'users'), limit(100));
     const unsubscribeUsers = onSnapshot(qUsers, (snap) => {
       const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
       setUsers(dbUsers.filter(u => u.roleId !== 'SuperAdmin'));

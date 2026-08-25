@@ -17,34 +17,14 @@ const app = initializeApp(firebaseConfig);
 // Set log level to 'error' to suppress verbose connection / network stream warning logs
 setLogLevel('error');
 
-// Using initializeFirestore with specialized settings for restricted network environments
+// Persistence is disabled to avoid assertion errors in iframe/sandboxed environments
+// export const db = initializeFirestore...
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
   // @ts-ignore - useFetchStreams might not be in all type definitions but is supported by the underlying WebChannel
   useFetchStreams: false,
   ignoreUndefinedProperties: true,
-}, firebaseConfigOriginal.firestoreDatabaseId?.trim()); /* CRITICAL: The app will break without this line */
-
-// Enable multi-tab offline persistence
-try {
-  enableMultiTabIndexedDbPersistence(db)
-    .then(() => {
-      console.log("Firestore offline persistence successfully enabled.");
-    })
-    .catch((err) => {
-      if (err.code === 'failed-precondition') {
-        // Multiple tabs open, persistence can only be enabled in one tab at a time.
-        console.warn("Firestore offline persistence: multiple tabs open. Enabled in another tab.");
-      } else if (err.code === 'unimplemented') {
-        // The current browser doesn't support all of the features required to enable persistence
-        console.warn("Firestore offline persistence: current browser does not support persistence.");
-      } else {
-        console.error("Firestore offline persistence failed to enable:", err);
-      }
-    });
-} catch (e) {
-  console.error("Error setting up Firestore offline persistence:", e);
-}
+}, firebaseConfigOriginal.firestoreDatabaseId?.trim());
 
 export const auth = getAuth(app);
 export const storage = getStorage(app);

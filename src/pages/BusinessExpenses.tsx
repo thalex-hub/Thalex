@@ -73,7 +73,7 @@ export default function BusinessExpenses() {
       ordersQ = query(
         collection(db, 'orders'), 
         where('responsibleUserId', '==', appUser?.uid || 'none'),
-        limit(500)
+        limit(200)
       );
     }
 

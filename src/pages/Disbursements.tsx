@@ -78,7 +78,7 @@ export default function Disbursements() {
       }
     };
 
-    const unsubAdvances = onSnapshot(query(collection(db, 'advance_requests'), limit(500)), (snap) => {
+    const unsubAdvances = onSnapshot(query(collection(db, 'advance_requests'), limit(200)), (snap) => {
       setAdvances(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       advancesDone = true;
       checkAllDone();
@@ -88,7 +88,7 @@ export default function Disbursements() {
       checkAllDone();
     });
 
-    const unsubReimbursements = onSnapshot(query(collection(db, 'reimbursement_requests'), limit(500)), (snap) => {
+    const unsubReimbursements = onSnapshot(query(collection(db, 'reimbursement_requests'), limit(200)), (snap) => {
       setReimbursements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       reimbursementsDone = true;
       checkAllDone();
@@ -98,7 +98,7 @@ export default function Disbursements() {
       checkAllDone();
     });
 
-    const unsubPaymentReqs = onSnapshot(query(collection(db, 'payment_requests'), limit(500)), (snap) => {
+    const unsubPaymentReqs = onSnapshot(query(collection(db, 'payment_requests'), limit(200)), (snap) => {
       setPaymentRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       paymentReqsDone = true;
       checkAllDone();
@@ -108,7 +108,7 @@ export default function Disbursements() {
       checkAllDone();
     });
 
-    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(500)), (snap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(200)), (snap) => {
       setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       ordersDone = true;
       checkAllDone();

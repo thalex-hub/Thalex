@@ -88,7 +88,7 @@ export default function ReimbursementRequests() {
     const fetchOrders = async () => {
       let qO;
       if (canViewAll || isAdmin) {
-        qO = query(collection(db, 'orders'), orderBy('startDate', 'desc'), limit(200));
+        qO = query(collection(db, 'orders'), orderBy('startDate', 'desc'), limit(100));
       } else {
         qO = query(
           collection(db, 'orders'), 
@@ -107,7 +107,7 @@ export default function ReimbursementRequests() {
 
     // Fetch user's advances to settle
     const qAdv = canViewAll
-      ? query(collection(db, 'advance_requests'), where('status', '==', 'disbursed'), limit(500))
+      ? query(collection(db, 'advance_requests'), where('status', '==', 'disbursed'), limit(200))
       : query(
           collection(db, 'advance_requests'), 
           and(
@@ -128,7 +128,7 @@ export default function ReimbursementRequests() {
     // Viewing logic: Staff sees their own + settlements for their advances + followers, Accountant/Director sees all
     let unsubRequests = () => {};
     if (canViewAll) {
-      const q = query(collection(db, 'reimbursement_requests'), orderBy('requestDate', 'desc'), limit(500));
+      const q = query(collection(db, 'reimbursement_requests'), orderBy('requestDate', 'desc'), limit(200));
       unsubRequests = onSnapshot(q, (snap) => {
         let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setRequests(data);
@@ -289,6 +289,18 @@ export default function ReimbursementRequests() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDuplicate = (req: any) => {
+    setNewRequest({
+      title: `${req.title || 'Đề xuất quyết toán'} (Bản sao)`,
+      amount: req.amount.toString(),
+      purpose: req.purpose || '',
+      advanceRequestId: req.advanceRequestId || '',
+      relatedOrderId: req.relatedOrderId || '',
+      followers: req.followers || []
+    });
+    setShowAddModal(true);
   };
 
     // Accountant Review: verify, return, or reject
@@ -952,6 +964,18 @@ export default function ReimbursementRequests() {
                       <DollarSign size={14} /> Giải ngân
                     </button>
                   )}
+                  <button 
+                    type="button"
+                    title="Nhân bản đề xuất"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDuplicate(req);
+                    }}
+                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                  >
+                    <RefreshCcw size={20} />
+                  </button>
                 </div>
               </div>
             ))}
@@ -1159,6 +1183,17 @@ export default function ReimbursementRequests() {
                         Đóng
                      </button>
                   )}
+                  <button 
+                    onClick={() => {
+                      const reqToDup = viewingRequest;
+                      setViewingRequest(null);
+                      handleDuplicate(reqToDup);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
+                  >
+                    <RefreshCcw size={20} />
+                    Nhân bản đề xuất
+                  </button>
                </div>
             </motion.div>
           </div>

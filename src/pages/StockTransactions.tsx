@@ -255,7 +255,7 @@ export default function StockTransactions() {
       }
     };
 
-    const q = query(collection(db, 'stock_transactions'), orderBy('transactionDate', 'desc'), limit(300));
+    const q = query(collection(db, 'stock_transactions'), orderBy('transactionDate', 'desc'), limit(75));
     const unsubTx = onSnapshot(q, (snap) => {
       setTransactions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as StockTransaction)));
       txDone = true;
@@ -266,7 +266,7 @@ export default function StockTransactions() {
       checkAllDone();
     });
 
-    const unsubProducts = onSnapshot(query(collection(db, 'products'), limit(300)), (snap) => {
+    const unsubProducts = onSnapshot(query(collection(db, 'products'), limit(75)), (snap) => {
       setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
       productsDone = true;
       checkAllDone();
@@ -286,7 +286,7 @@ export default function StockTransactions() {
       checkAllDone();
     });
 
-    const unsubInventory = onSnapshot(query(collection(db, 'inventory'), limit(500)), (snap) => {
+    const unsubInventory = onSnapshot(query(collection(db, 'inventory'), limit(100)), (snap) => {
       setInventory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
       inventoryDone = true;
       checkAllDone();
@@ -296,7 +296,7 @@ export default function StockTransactions() {
       checkAllDone();
     });
 
-    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(500)), (snap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(100)), (snap) => {
       setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       ordersDone = true;
       checkAllDone();
@@ -306,7 +306,7 @@ export default function StockTransactions() {
       checkAllDone();
     });
 
-    const unsubStockItems = onSnapshot(query(collection(db, 'stock_items'), limit(300)), (snap) => {
+    const unsubStockItems = onSnapshot(query(collection(db, 'stock_items'), limit(75)), (snap) => {
       setStockItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       stockItemsDone = true;
       checkAllDone();

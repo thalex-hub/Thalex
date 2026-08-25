@@ -87,9 +87,9 @@ export default function BusinessTripRequests() {
 
     let q;
     if (isAdmin || isDirector) {
-      q = query(collection(db, 'business_trip_requests'), limit(500));
+      q = query(collection(db, 'business_trip_requests'), limit(200));
     } else {
-      q = query(collection(db, 'business_trip_requests'), where('userId', '==', auth.currentUser.uid), limit(500));
+      q = query(collection(db, 'business_trip_requests'), where('userId', '==', auth.currentUser.uid), limit(200));
     }
 
     return onSnapshot(q, (snap) => {
@@ -186,6 +186,19 @@ export default function BusinessTripRequests() {
         ? req.estimatedExpenses.map(e => ({ ...e }))
         : [{ description: '', amount: 0 }]
     });
+  };
+
+  const handleDuplicate = (req: BusinessTripRequest) => {
+    setNewRequest({
+      title: `${req.title || 'Đề xuất công tác'} (Bản sao)`,
+      departureDate: req.departureDate ? format(new Date(req.departureDate), 'yyyy-MM-dd') : '',
+      returnDate: req.returnDate ? format(new Date(req.returnDate), 'yyyy-MM-dd') : '',
+      transportation: req.transportation || '',
+      reason: req.reason || '',
+      estimatedExpenses: req.estimatedExpenses ? req.estimatedExpenses.map((e: any) => ({ ...e })) : [{ description: '', amount: 0 }]
+    });
+    setEditingRequest(null);
+    setShowAddModal(true);
   };
 
   const handleAddEditExpense = () => {

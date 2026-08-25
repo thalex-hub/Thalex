@@ -107,7 +107,7 @@ export default function ProposalsOverview() {
       };
 
       if (showAllThisType) {
-         const q = query(collection(db, colName), limit(500));
+         const q = query(collection(db, colName), orderBy('createdAt', 'desc'), limit(100));
          const unsub = onSnapshot(q, (snap) => {
            processSnapshots([snap.docs.map(d => ({ id: d.id, ...d.data() }))]);
          }, (err) => handleFirestoreError(err, OperationType.GET, colName, false));
@@ -115,9 +115,9 @@ export default function ProposalsOverview() {
       } else if (isManager) {
          const field = colName === 'order_proposals' ? 'createdBy' : 'userId';
          let l1: any[] = []; let l2: any[] = []; let l3: any[] = [];
-         const q1 = query(collection(db, colName), where(field, '==', user.uid), limit(500));
-         const q2 = query(collection(db, colName), where('departmentId', '==', appUser?.departmentId || 'none'), limit(500));
-         const q3 = query(collection(db, colName), where('followers', 'array-contains', user.uid), limit(500));
+         const q1 = query(collection(db, colName), where(field, '==', user.uid), orderBy('createdAt', 'desc'), limit(50));
+         const q2 = query(collection(db, colName), where('departmentId', '==', appUser?.departmentId || 'none'), orderBy('createdAt', 'desc'), limit(50));
+         const q3 = query(collection(db, colName), where('followers', 'array-contains', user.uid), orderBy('createdAt', 'desc'), limit(50));
          
          const unsub1 = onSnapshot(q1, snap => { l1 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2, l3]); }, err => console.error(err));
          const unsub2 = onSnapshot(q2, snap => { l2 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2, l3]); }, err => console.error(err));
@@ -127,8 +127,8 @@ export default function ProposalsOverview() {
       } else {
          const field = colName === 'order_proposals' ? 'createdBy' : 'userId';
          let l1: any[] = []; let l2: any[] = [];
-         const q1 = query(collection(db, colName), where(field, '==', user.uid), limit(500));
-         const q2 = query(collection(db, colName), where('followers', 'array-contains', user.uid), limit(500));
+         const q1 = query(collection(db, colName), where(field, '==', user.uid), orderBy('createdAt', 'desc'), limit(50));
+         const q2 = query(collection(db, colName), where('followers', 'array-contains', user.uid), orderBy('createdAt', 'desc'), limit(50));
          
          const unsub1 = onSnapshot(q1, snap => { l1 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2]); }, err => console.error(err));
          const unsub2 = onSnapshot(q2, snap => { l2 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2]); }, err => console.error(err));

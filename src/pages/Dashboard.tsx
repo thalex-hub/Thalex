@@ -100,7 +100,7 @@ const CustomStatCard = ({ title, value, change, color = "blue", subtitle, icon: 
 };
 
 export default function Dashboard() {
-  const { isFinanceStaff, user, isAdmin, isManager, isDirector, allUsers } = useAuth();
+  const { isFinanceStaff, user, isAdmin, isManager, isDirector } = useAuth();
   const canSeeAll = isAdmin || isManager || isDirector || isFinanceStaff;
 
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -175,14 +175,14 @@ export default function Dashboard() {
         const ordersPromise = (async () => {
           try {
             const ordersQ = canSeeAll
-              ? query(collection(db, 'orders'), limit(200))
+              ? query(collection(db, 'orders'), limit(100))
               : query(
                   collection(db, 'orders'),
                   or(
                     where('responsibleUserId', '==', user.uid),
                     where('followers', 'array-contains', user.uid)
                   ),
-                  limit(50)
+                  limit(30)
                 );
             const ordersSnap = await getDocs(ordersQ);
             setOrders(ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -194,7 +194,7 @@ export default function Dashboard() {
         const tasksPromise = (async () => {
           try {
             const tasksQ = (isAdmin || isDirector)
-              ? query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(200))
+              ? query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(100))
               : query(
                   collection(db, 'tasks'),
                   or(
@@ -204,7 +204,7 @@ export default function Dashboard() {
                     where('followers', 'array-contains', user.uid)
                   ),
                   orderBy('createdAt', 'desc'),
-                  limit(50)
+                  limit(30)
                 );
             const tasksSnap = await getDocs(tasksQ);
             const allTasks = tasksSnap.docs
@@ -230,27 +230,27 @@ export default function Dashboard() {
           }
         })();
 
-        const paymentsPromise = getDocs(query(collection(db, 'payments'), limit(100)))
+        const paymentsPromise = getDocs(query(collection(db, 'payments'), limit(50)))
           .then(snap => setPayments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
           .catch(e => console.warn("Failed to fetch payments:", e));
 
-        const busExpPromise = getDocs(query(collection(db, 'business_expenses'), limit(100)))
+        const busExpPromise = getDocs(query(collection(db, 'business_expenses'), limit(50)))
           .then(snap => setBusinessExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
           .catch(e => console.warn("Failed to fetch business expenses:", e));
 
-        const payReqPromise = getDocs(query(collection(db, 'payment_requests'), limit(100)))
+        const payReqPromise = getDocs(query(collection(db, 'payment_requests'), limit(50)))
           .then(snap => setPaymentRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
           .catch(e => console.warn("Failed to fetch payment requests:", e));
 
-        const advReqPromise = getDocs(query(collection(db, 'advance_requests'), limit(100)))
+        const advReqPromise = getDocs(query(collection(db, 'advance_requests'), limit(50)))
           .then(snap => setAdvanceRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
           .catch(e => console.warn("Failed to fetch advance requests:", e));
 
-        const reimReqPromise = getDocs(query(collection(db, 'reimbursement_requests'), limit(100)))
+        const reimReqPromise = getDocs(query(collection(db, 'reimbursement_requests'), limit(50)))
           .then(snap => setReimbursementRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
           .catch(e => console.warn("Failed to fetch reimbursement requests:", e));
 
-        const deptsPromise = getDocs(collection(db, 'departments'))
+        const deptsPromise = getDocs(query(collection(db, 'departments'), limit(50)))
           .then(snap => setDepartments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
           .catch(e => console.warn("Failed to fetch departments:", e));
 
@@ -259,7 +259,7 @@ export default function Dashboard() {
             collection(db, 'attendance'),
             where('workDate', '>=', yearStart),
             where('workDate', '<=', yearEnd),
-            limit(500)
+            limit(100)
           )
         )
           .then(snap => setAttendance(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))))
@@ -287,11 +287,17 @@ export default function Dashboard() {
   }, [user, canSeeAll, selectedYear, isAdmin, isDirector]); // Removed allUsers
 
   useEffect(() => {
-    // Users & SuperAdmins
-    const fetchedUsers = allUsers;
-    setUsers(fetchedUsers.filter(u => u.roleId !== 'SuperAdmin'));
-    setSuperAdminIds(fetchedUsers.filter((u: any) => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
-  }, [allUsers]);
+    if (!user) return;
+    
+    // Fetch users locally to save quota
+    getDocs(query(collection(db, 'users'), limit(100))).then(snap => {
+      const fetchedUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as any));
+      setUsers(fetchedUsers.filter((u: any) => u.roleId !== 'SuperAdmin'));
+      setSuperAdminIds(fetchedUsers.filter((u: any) => u.roleId === 'SuperAdmin').map((u: any) => u.uid));
+    }).catch(err => {
+      console.warn("Failed to fetch users for dashboard counts:", err);
+    });
+  }, [user]);
 
   // 3. Memoized derived statistics
   const activeOrdersForYear = useMemo(() => {

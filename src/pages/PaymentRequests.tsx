@@ -2,7 +2,7 @@ import React from 'react';
 import { db, auth, storage } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or, deleteDoc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, Building2, User, ReceiptText, Zap, Droplets, Truck, PenTool, Users, Megaphone, Tags, ShieldCheck, Paperclip, FileText, Undo2, ChevronRight, FileSpreadsheet, Wallet, Search, Trash2, UserPlus } from 'lucide-react';
+import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, Building2, User, ReceiptText, Zap, Droplets, Truck, PenTool, Users, Megaphone, Tags, ShieldCheck, Paperclip, FileText, Undo2, ChevronRight, FileSpreadsheet, Wallet, Search, Trash2, UserPlus, RefreshCcw } from 'lucide-react';
 
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { format } from 'date-fns';
@@ -150,7 +150,7 @@ export default function PaymentRequests() {
     const fetchOrders = async () => {
       let qO;
       if (isAdmin || isDirector || isFinanceStaff || hasPermission('view_orders') || hasPermission('menu_orders_view')) {
-        qO = query(collection(db, 'orders'), orderBy('startDate', 'desc'), limit(200));
+        qO = query(collection(db, 'orders'), orderBy('startDate', 'desc'), limit(100));
       } else {
         qO = query(
           collection(db, 'orders'), 
@@ -172,7 +172,7 @@ export default function PaymentRequests() {
     
     let unsubRequests = () => {};
     if (isDirector || isFinanceStaff || hasPermission('view_payment_requests') || hasPermission('menu_proposals_view')) {
-      const q = query(collection(db, 'payment_requests'), orderBy('requestDate', 'desc'), limit(500));
+      const q = query(collection(db, 'payment_requests'), orderBy('requestDate', 'desc'), limit(200));
       unsubRequests = onSnapshot(q, (snap) => {
         const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setRequests(data);
@@ -393,6 +393,24 @@ export default function PaymentRequests() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDuplicate = (req: any) => {
+    setNewRequest({
+      category: req.category || 'other',
+      title: `${req.title || 'Đề xuất thanh toán'} (Bản sao)`,
+      amount: req.amount.toString(),
+      purpose: req.purpose || '',
+      relatedOrderId: req.relatedOrderId || '',
+      paymentMethod: req.paymentMethod || 'transfer',
+      accountName: req.accountName || '',
+      accountNumber: req.accountNumber || '',
+      bankName: req.bankName || '',
+      attachments: [], 
+      followers: req.followers || []
+    });
+    setEditingRequestId(null);
+    setShowAddModal(true);
   };
 
   const handleApprove = async (id: string, action: 'approve_finance' | 'return_finance' | 'approve_director' | 'reject_director' | 'disburse', providedReason?: string) => {
@@ -714,6 +732,18 @@ export default function PaymentRequests() {
                       <Trash2 size={20} />
                     </button>
                   )}
+                  <button 
+                    type="button"
+                    title="Nhân bản đề xuất"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDuplicate(req);
+                    }}
+                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                  >
+                    <RefreshCcw size={20} />
+                  </button>
                </div>
                
                {canDisburse && req.status === 'approved' && (

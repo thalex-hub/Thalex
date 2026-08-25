@@ -112,7 +112,8 @@ export default function Attendance() {
       collection(db, 'attendance'),
       where('userId', '==', user.uid),
       where('status', '==', 'leave'),
-      where('workDate', '>=', yearStart)
+      where('workDate', '>=', yearStart),
+      limit(50)
     );
     const snap = await getDocs(q);
     const docs = snap.docs.map(doc => doc.data());
@@ -135,12 +136,12 @@ export default function Attendance() {
       
       let ordersData: any[] = [];
       if (canSeeAllOrders) {
-        const snap = await getDocs(query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(200)));
+        const snap = await getDocs(query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(100)));
         ordersData = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
       } else {
         const [snap1, snap2] = await Promise.all([
-          getDocs(query(collection(db, 'orders'), where('responsibleUserId', '==', user.uid), orderBy('createdAt', 'desc'), limit(100))),
-          getDocs(query(collection(db, 'orders'), where('followers', 'array-contains', user.uid), orderBy('createdAt', 'desc'), limit(100)))
+          getDocs(query(collection(db, 'orders'), where('responsibleUserId', '==', user.uid), orderBy('createdAt', 'desc'), limit(50))),
+          getDocs(query(collection(db, 'orders'), where('followers', 'array-contains', user.uid), orderBy('createdAt', 'desc'), limit(50)))
         ]);
         const map = new Map();
         snap1.docs.forEach((d: any) => map.set(d.id, { id: d.id, ...d.data() }));
@@ -149,12 +150,13 @@ export default function Attendance() {
       }
 
       const [deptsSnap, paymentsSnap] = await Promise.all([
-        getDocs(collection(db, 'departments')),
+        getDocs(query(collection(db, 'departments'), limit(50))),
         getDocs(query(
           collection(db, 'payment_requests'), 
           where('userId', '==', user.uid),
           where('category', '==', 'salary'),
-          where('status', 'in', ['approved', 'paid'])
+          where('status', 'in', ['approved', 'paid']),
+          limit(50)
         ))
       ]);
       setOrders(ordersData);
@@ -167,7 +169,8 @@ export default function Attendance() {
         where('userId', '==', user.uid),
         where('workDate', '>=', startForQuery),
         where('workDate', '<=', end),
-        orderBy('workDate', 'desc')
+        orderBy('workDate', 'desc'),
+        limit(100)
       );
       const snap = await getDocs(q);
       const allAttSnapshot = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -182,7 +185,7 @@ export default function Attendance() {
           where('workDate', '>=', start),
           where('workDate', '<=', end),
           orderBy('workDate', 'asc'),
-          limit(300)
+          limit(100)
         );
         const teamSnap = await getDocs(teamQ);
         let allTeamData = teamSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -498,7 +501,8 @@ export default function Attendance() {
         collection(db, 'attendance'),
         where('workDate', '>=', start),
         where('workDate', '<=', end),
-        orderBy('workDate', 'asc')
+        orderBy('workDate', 'asc'),
+        limit(100)
       );
       const snap = await getDocs(q);
       let allData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));

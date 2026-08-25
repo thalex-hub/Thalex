@@ -134,7 +134,7 @@ export default function SalarySettings() {
 
     setLoading(true);
     
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('fullName', 'asc'), limit(500)), (snap) => {
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('fullName', 'asc'), limit(200)), (snap) => {
       const dbUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() } as AppUser));
       setUsers(dbUsers.filter(u => u.roleId !== 'SuperAdmin'));
       setLoading(false);
@@ -148,7 +148,7 @@ export default function SalarySettings() {
       setPositions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'positions'));
 
-    const unsubOrders = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(500)), (snap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(200)), (snap) => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
 

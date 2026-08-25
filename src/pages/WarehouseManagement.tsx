@@ -117,16 +117,16 @@ export default function WarehouseManagement() {
       bootstrapWarehouses();
 
       setLoading(true);
-      const unsubInv = onSnapshot(query(collection(db, 'inventory'), limit(200)), (snap) => {
+      const unsubInv = onSnapshot(query(collection(db, 'inventory'), limit(100)), (snap) => {
         setInventory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
         setLoading(false);
       });
 
-      const unsubStock = onSnapshot(query(collection(db, 'stock_items'), limit(300)), (snap) => {
+      const unsubStock = onSnapshot(query(collection(db, 'stock_items'), limit(75)), (snap) => {
         setStockItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
       });
 
-      const unsubProd = onSnapshot(query(collection(db, 'products'), limit(200)), (snap) => {
+      const unsubProd = onSnapshot(query(collection(db, 'products'), limit(100)), (snap) => {
         setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
       });
 

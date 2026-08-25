@@ -136,7 +136,7 @@ export default function WarehouseApprovals() {
       checkAllDone();
     });
 
-    const unsubProducts = onSnapshot(query(collection(db, 'products'), limit(500)), (snap) => {
+    const unsubProducts = onSnapshot(query(collection(db, 'products'), limit(200)), (snap) => {
       setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
       productsDone = true;
       checkAllDone();
@@ -156,7 +156,7 @@ export default function WarehouseApprovals() {
       checkAllDone();
     });
 
-    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(200)), (snap) => {
+    const unsubOrders = onSnapshot(query(collection(db, 'orders'), limit(100)), (snap) => {
       setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       ordersDone = true;
       checkAllDone();

@@ -112,7 +112,7 @@ export default function AdvanceRequests() {
     let unsubRequests = () => {};
     if (isDirector || isFinanceStaff || hasPermission('view_advances') || hasPermission('menu_proposals_view')) {
       // Optimization: Add limit and filter to reduce quota usage
-      const q = query(collection(db, 'advance_requests'), orderBy('requestDate', 'desc'), limit(500));
+      const q = query(collection(db, 'advance_requests'), orderBy('requestDate', 'desc'), limit(200));
       unsubRequests = onSnapshot(q, (snap) => {
         let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((r: any) => r.requestType === 'advance');
         setRequests(data);
@@ -309,6 +309,22 @@ export default function AdvanceRequests() {
       bankName: req.bankName || '',
       followers: req.followers || []
     });
+  };
+
+  const handleDuplicate = (req: any) => {
+    setNewRequest({
+      title: `${req.title || 'Đề xuất tạm ứng'} (Bản sao)`,
+      amount: req.amount.toString(),
+      purpose: req.purpose || '',
+      relatedOrderId: req.relatedOrderId || '',
+      approvalLevel: req.approvalLevel || 'Director',
+      paymentMethod: req.paymentMethod || 'cash',
+      accountName: req.accountName || '',
+      accountNumber: req.accountNumber || '',
+      bankName: req.bankName || '',
+      followers: req.followers || []
+    });
+    setShowAddModal(true);
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -693,6 +709,18 @@ export default function AdvanceRequests() {
                           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                         </button>
                       )}
+                      <button 
+                        type="button"
+                        title="Nhân bản đề xuất"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDuplicate(req);
+                        }}
+                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      >
+                        <RefreshCcw size={18} />
+                      </button>
                       <button 
                         type="button"
                         onClick={(e) => {
@@ -1112,6 +1140,18 @@ export default function AdvanceRequests() {
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                         Sửa
+                      </button>
+                      <button
+                        onClick={() => {
+                          const reqToDup = showDetailModal;
+                          setShowDetailModal(null);
+                          setSearchParams({});
+                          handleDuplicate(reqToDup);
+                        }}
+                        className="px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl flex items-center gap-1.5 transition-colors"
+                        title="Nhân bản đề xuất"
+                      >
+                        <RefreshCcw size={14} /> Nhân bản
                       </button>
                       <button
                         onClick={() => {

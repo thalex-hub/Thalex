@@ -11,14 +11,25 @@ import { exportToExcel } from '../lib/excel';
 import { sendProposalEmailNotification } from '../lib/proposalEmail';
 
 export default function LeaveRequests() {
-  const { appUser, isAdmin, isManager, isDirector, isSuperAdmin, allUsers: usersFromContext } = useAuth();
+  const { appUser, isAdmin, isManager, isDirector, isSuperAdmin } = useAuth();
   const [requests, setRequests] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [selectedUserForStats, setSelectedUserForStats] = useState<string>(auth.currentUser?.uid || '');
 
   useEffect(() => {
-    setAllUsers(usersFromContext.map(u => ({ id: u.id, ...u })));
-  }, [usersFromContext]);
+    if (!auth.currentUser || !appUser) return;
+    
+    // Fetch users for stats dropdown locally to save global quota
+    const fetchUsers = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'users'), limit(100)));
+        setAllUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (e) {
+        console.warn("Failed to fetch users in LeaveRequests:", e);
+      }
+    };
+    fetchUsers();
+  }, [appUser]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -78,7 +89,7 @@ export default function LeaveRequests() {
     };
 
     if (isAdmin || isDirector) {
-      const q = query(collection(db, 'leave_requests'), orderBy('startDate', 'desc'), limit(500));
+      const q = query(collection(db, 'leave_requests'), orderBy('startDate', 'desc'), limit(75));
       return onSnapshot(q, (snap) => {
         processSnapshots([snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))]);
       });
@@ -86,8 +97,8 @@ export default function LeaveRequests() {
       let l1: any[] = [];
       let l2: any[] = [];
       
-      const q1 = query(collection(db, 'leave_requests'), where('userId', '==', auth.currentUser?.uid), orderBy('startDate', 'desc'), limit(100));
-      const q2 = query(collection(db, 'leave_requests'), where('departmentId', '==', appUser?.departmentId || 'none'), orderBy('startDate', 'desc'), limit(100));
+      const q1 = query(collection(db, 'leave_requests'), where('userId', '==', auth.currentUser?.uid), orderBy('startDate', 'desc'), limit(50));
+      const q2 = query(collection(db, 'leave_requests'), where('departmentId', '==', appUser?.departmentId || 'none'), orderBy('startDate', 'desc'), limit(50));
       
       const unsub1 = onSnapshot(q1, snap => {
         l1 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -298,6 +309,18 @@ export default function LeaveRequests() {
       reason: req.reason || '',
       approvalLevel: req.approvalLevel || 'director'
     });
+  };
+
+  const handleDuplicate = (req: any) => {
+    setNewRequest({
+      title: `${req.title || ''} (Bản sao)`,
+      type: req.type || 'annual',
+      startDate: req.startDate ? format(new Date(req.startDate), 'yyyy-MM-dd') : '',
+      endDate: req.endDate ? format(new Date(req.endDate), 'yyyy-MM-dd') : '',
+      reason: req.reason || '',
+      approvalLevel: req.approvalLevel || 'director'
+    });
+    setShowAddModal(true);
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -518,6 +541,18 @@ export default function LeaveRequests() {
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                       </button>
                     )}
+                    <button 
+                      type="button"
+                      title="Nhân bản đề xuất"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDuplicate(req);
+                      }}
+                      className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    >
+                      <RefreshCcw size={18} />
+                    </button>
                     {canDelete && (
                       <button 
                         type="button"
@@ -670,6 +705,17 @@ export default function LeaveRequests() {
                         Sửa
                       </button>
                     )}
+                    <button
+                      onClick={() => {
+                        const reqToDup = viewingRequest;
+                        setViewingRequest(null);
+                        handleDuplicate(reqToDup);
+                      }}
+                      className="px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl flex items-center gap-1.5 transition-colors"
+                      title="Nhân bản đề xuất"
+                    >
+                      <RefreshCcw size={14} /> Nhân bản
+                    </button>
                     {((viewingRequest.userId === auth.currentUser?.uid || viewingRequest.userEmail === auth.currentUser?.email) && viewingRequest.status !== 'approved' || isSuperAdmin || isAdmin) && (
                       <button
                         onClick={() => {

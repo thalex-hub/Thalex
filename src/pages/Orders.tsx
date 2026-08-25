@@ -273,7 +273,7 @@ export default function Orders() {
 
     if (canSeeAll) {
       // Optimization: Add limit to reduce read quota usage
-      const q = query(collection(db, "orders"), orderBy("startDate", "desc"), limit(300));
+      const q = query(collection(db, "orders"), orderBy("startDate", "desc"), limit(75));
       unsub = onSnapshot(q, (snap) => {
         const list = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
         processOrders(list);

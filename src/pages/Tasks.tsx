@@ -188,7 +188,7 @@ export default function Tasks() {
     const canSeeAll = isAdmin || isDirector;
     
     if (canSeeAll) {
-       const tasksQ = query(collection(db, 'tasks'), limit(300));
+       const tasksQ = query(collection(db, 'tasks'), limit(75));
        unsubTasks = onSnapshot(tasksQ, (snap) => {
          let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)).filter(t => !t.orderId);
          data.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
@@ -248,7 +248,7 @@ export default function Tasks() {
              where('responsibleUserId', 'in', idsArray),
              where('followers', 'array-contains-any', idsArray)
            ),
-           limit(300)
+           limit(75)
          );
          
          unsubTasks = onSnapshot(qCombined, (snap) => {

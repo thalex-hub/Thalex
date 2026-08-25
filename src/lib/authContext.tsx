@@ -444,7 +444,6 @@ interface AuthContextType {
   canEditSalaries: boolean;
   hasPermission: (permissionId: string) => boolean;
   rolePermissions: Record<string, string[]>;
-  allUsers: AppUser[];
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -464,7 +463,6 @@ const AuthContext = createContext<AuthContextType>({
   canEditSalaries: false,
   hasPermission: () => false,
   rolePermissions: {},
-  allUsers: []
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -707,55 +705,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
-  const [allUsers, setAllUsers] = useState<AppUser[]>([]);
 
   useEffect(() => {
     if (!user) {
       setRolePermissions({});
-      setAllUsers([]);
       return;
     }
 
     const fetchAllData = async () => {
       try {
         // Try to load from cache first to show something immediately and save quota
-        const cachedUsers = sessionStorage.getItem('app_users_list');
         const cachedPerms = sessionStorage.getItem('app_role_permissions');
         const lastFetch = sessionStorage.getItem('app_auth_last_fetch');
         
-        if (cachedUsers && cachedPerms && lastFetch) {
+        if (cachedPerms && lastFetch) {
           const age = Date.now() - Number(lastFetch);
           if (age < 300000) { // 5 minutes fresh
-            setAllUsers(JSON.parse(cachedUsers));
             setRolePermissions(JSON.parse(cachedPerms));
             return;
           }
         }
 
-        const usersPromise = getDocs(query(collection(db, 'users'), limit(300)))
-          .then(usersSnap => {
-            const usersList = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-            setAllUsers(usersList);
-            sessionStorage.setItem('app_users_list', JSON.stringify(usersList));
-          })
-          .catch(err => {
-            console.warn("Failed to fetch users list in AuthContext:", err);
-          });
-
-        const permsPromise = getDocs(query(collection(db, 'role_permissions'), limit(100)))
-          .then(permsSnap => {
-            const perms: Record<string, string[]> = {};
-            permsSnap.docs.forEach(doc => {
-              perms[doc.id] = doc.data().permissions || [];
-            });
-            setRolePermissions(perms);
-            sessionStorage.setItem('app_role_permissions', JSON.stringify(perms));
-          })
-          .catch(err => {
-            console.warn("Failed to fetch role_permissions in AuthContext:", err);
-          });
-
-        await Promise.allSettled([usersPromise, permsPromise]);
+        const permsSnap = await getDocs(query(collection(db, 'role_permissions'), limit(100)));
+        const perms: Record<string, string[]> = {};
+        permsSnap.docs.forEach(doc => {
+          perms[doc.id] = doc.data().permissions || [];
+        });
+        setRolePermissions(perms);
+        sessionStorage.setItem('app_role_permissions', JSON.stringify(perms));
         sessionStorage.setItem('app_auth_last_fetch', Date.now().toString());
       } catch (error) {
         console.error("Error loading auth data:", error);
@@ -853,9 +830,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     canEditSalaries,
     hasPermission,
     rolePermissions,
-    allUsers
   }), [
-    user, appUser, loading, isAdmin, isSuperAdmin, isDirector, isManager, isAccountant, isHR, isGeneral, isLeader, isFinanceStaff, canViewSalaries, canEditSalaries, hasPermission, rolePermissions, allUsers
+    user, appUser, loading, isAdmin, isSuperAdmin, isDirector, isManager, isAccountant, isHR, isGeneral, isLeader, isFinanceStaff, canViewSalaries, canEditSalaries, hasPermission, rolePermissions
   ]);
 
   return (

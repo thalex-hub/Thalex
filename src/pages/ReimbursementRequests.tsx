@@ -1,6 +1,6 @@
 import React from 'react';
 import { db, auth, storage } from '../lib/firebase';
-import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or, and, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, ShieldCheck, Wallet, FileText, Upload, RefreshCcw, ArrowRight, FileSpreadsheet, Banknote, ReceiptText, ClipboardCheck, Trash2, Search, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -72,6 +72,7 @@ export default function ReimbursementRequests() {
   const [users, setUsers] = React.useState<any[]>([]);
 
   const { isAdmin, isFinanceStaff, user, appUser, isManager, isAccountant, isSuperAdmin, isDirector, hasPermission, allUsers } = useAuth();
+  const canViewAll = isDirector || isFinanceStaff || hasPermission('view_reimbursements') || hasPermission('menu_proposals_view');
   const canApprove = isDirector || hasPermission('approve_reimbursements');
   const canDisburse = isSuperAdmin || isDirector || isAccountant || hasPermission('disburse_reimbursements') || hasPermission('approve_disbursements') || appUser?.roleId === 'ChiefAccountant' || appUser?.roleId === 'Accountant' || appUser?.roleId === 'AccountantStaff';
 
@@ -86,7 +87,7 @@ export default function ReimbursementRequests() {
     // Fetch orders for selection
     const fetchOrders = async () => {
       let qO;
-      if (isAdmin || isDirector || isFinanceStaff || hasPermission('view_orders') || hasPermission('menu_orders_view')) {
+      if (canViewAll || isAdmin) {
         qO = query(collection(db, 'orders'), orderBy('startDate', 'desc'), limit(200));
       } else {
         qO = query(
@@ -105,9 +106,19 @@ export default function ReimbursementRequests() {
     fetchOrders();
 
     // Fetch user's advances to settle
-    const qAdv = (isDirector || isFinanceStaff || hasPermission('view_reimbursements') || hasPermission('menu_proposals_view'))
+    const qAdv = canViewAll
       ? query(collection(db, 'advance_requests'), where('status', '==', 'disbursed'), limit(500))
-      : query(collection(db, 'advance_requests'), where('userId', '==', user.uid), where('status', '==', 'disbursed'), limit(100));
+      : query(
+          collection(db, 'advance_requests'), 
+          and(
+            or(
+              where('userId', '==', user.uid),
+              where('followers', 'array-contains', user.uid)
+            ),
+            where('status', '==', 'disbursed')
+          ),
+          limit(100)
+        );
 
     const unsubAdvances = onSnapshot(qAdv, (snap) => {
       // Store all advances to check isSettled status for any request
@@ -116,7 +127,7 @@ export default function ReimbursementRequests() {
 
     // Viewing logic: Staff sees their own + settlements for their advances + followers, Accountant/Director sees all
     let unsubRequests = () => {};
-    if (isDirector || isFinanceStaff || hasPermission('view_reimbursements') || hasPermission('menu_proposals_view')) {
+    if (canViewAll) {
       const q = query(collection(db, 'reimbursement_requests'), orderBy('requestDate', 'desc'), limit(500));
       unsubRequests = onSnapshot(q, (snap) => {
         let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -168,7 +179,7 @@ export default function ReimbursementRequests() {
       unsubAdvances();
       unsubRequests();
     };
-  }, [isDirector, isFinanceStaff, user]);
+  }, [canViewAll, isAdmin, user]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -1323,7 +1334,6 @@ export default function ReimbursementRequests() {
                            </button>
                            <button
                              type="button"
-                             disabled={pendingAdvances.length === 0 && !newRequest.advanceRequestId}
                              onClick={() => {
                                if (pendingAdvances.length > 0 && !newRequest.advanceRequestId) {
                                  const adv = pendingAdvances[0];
@@ -1339,7 +1349,7 @@ export default function ReimbursementRequests() {
                              className={cn(
                                "px-4 py-2 rounded-xl text-xs font-bold border transition-all",
                                newRequest.advanceRequestId ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-gray-50 border-gray-100 text-gray-400",
-                               pendingAdvances.length === 0 && !newRequest.advanceRequestId && "opacity-50 cursor-not-allowed"
+                               pendingAdvances.length === 0 && !newRequest.advanceRequestId && "opacity-60"
                              )}
                            >
                               Quyết toán (Có tạm ứng)

@@ -1532,8 +1532,19 @@ export default function OrderDetail() {
       : (plannedProfit - citTax);
     
     const budgetedOperationalExpenses = Math.max(0, budgetedCosts - cogs);
-    const actualOperationalExpenses = Math.max(budgetedOperationalExpenses, totalProjectExpenses);
-    const actualTotalCosts = cogs + actualOperationalExpenses;
+    
+    // Separate supplier payments to avoid double counting with COGS in actual costs calculation
+    const supplierPayments = paymentRequests
+      .filter(p => (p.status === 'approved' || p.status === 'paid') && p.category === 'supplier')
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+    
+    const actualOtherExpenses = Math.max(0, totalProjectExpenses - supplierPayments);
+    
+    // Effective OPEX is the higher of budgeted OPEX or actual non-supplier expenses
+    const actualOperationalExpenses = Math.max(budgetedOperationalExpenses, actualOtherExpenses);
+    
+    // Total costs: either the budgeted COGS or actual supplier payments if higher, plus operational expenses
+    const actualTotalCosts = Math.max(cogs, supplierPayments) + actualOperationalExpenses;
     const actualProfitBeforeTax = rev - actualTotalCosts;
     const actualNetProfit = actualProfitBeforeTax - citTax;
 

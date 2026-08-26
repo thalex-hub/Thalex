@@ -27,17 +27,20 @@ export default function Payroll() {
 
   const getUserStatusInMonth = (u: any, monthKey: string) => {
     if (u?.startDate) {
-      const datePart = u.startDate.split('T')[0];
-      const dateParts = datePart.split('-');
-      if (dateParts.length >= 2) {
-        const startYear = parseInt(dateParts[0]);
-        const startMonth = parseInt(dateParts[1]) - 1; // 0-11
-        const parts = monthKey.split('-');
-        const y = parseInt(parts[0]);
-        const m = parseInt(parts[1]) - 1; // 0-11
-        const diffMonths = (y - startYear) * 12 + (m - startMonth);
-        if (diffMonths < 0) {
-          return 'not_started';
+      const startDateStr = typeof u.startDate === 'string' ? u.startDate : (u.startDate?.toDate?.()?.toISOString() || '');
+      if (startDateStr) {
+        const datePart = startDateStr.split('T')[0];
+        const dateParts = datePart.split('-');
+        if (dateParts.length >= 2) {
+          const startYear = parseInt(dateParts[0]);
+          const startMonth = parseInt(dateParts[1]) - 1; // 0-11
+          const parts = monthKey.split('-');
+          const y = parseInt(parts[0]);
+          const m = parseInt(parts[1]) - 1; // 0-11
+          const diffMonths = (y - startYear) * 12 + (m - startMonth);
+          if (diffMonths < 0) {
+            return 'not_started';
+          }
         }
       }
     }
@@ -49,16 +52,19 @@ export default function Payroll() {
         ? Number(u.probationMonths)
         : 2;
       if (u?.startDate) {
-        const datePart = u.startDate.split('T')[0];
-        const dateParts = datePart.split('-');
-        if (dateParts.length >= 2) {
-          const startYear = parseInt(dateParts[0]);
-          const startMonth = parseInt(dateParts[1]) - 1; // 0-11
-          const parts = monthKey.split('-');
-          const y = parseInt(parts[0]);
-          const m = parseInt(parts[1]) - 1; // 0-11
-          const diffMonths = (y - startYear) * 12 + (m - startMonth);
-          return diffMonths >= 0 && diffMonths < pMonths ? 'probation' : 'official';
+        const startDateStr = typeof u.startDate === 'string' ? u.startDate : (u.startDate?.toDate?.()?.toISOString() || '');
+        if (startDateStr) {
+          const datePart = startDateStr.split('T')[0];
+          const dateParts = datePart.split('-');
+          if (dateParts.length >= 2) {
+            const startYear = parseInt(dateParts[0]);
+            const startMonth = parseInt(dateParts[1]) - 1; // 0-11
+            const parts = monthKey.split('-');
+            const y = parseInt(parts[0]);
+            const m = parseInt(parts[1]) - 1; // 0-11
+            const diffMonths = (y - startYear) * 12 + (m - startMonth);
+            return diffMonths >= 0 && diffMonths < pMonths ? 'probation' : 'official';
+          }
         }
       }
       const parts = monthKey.split('-');
@@ -203,7 +209,9 @@ export default function Payroll() {
     return allUsers
       .filter(u => {
         if (!u.startDate) return true;
-        const datePart = u.startDate.split('T')[0];
+        const startDateStr = typeof u.startDate === 'string' ? u.startDate : (u.startDate?.toDate?.()?.toISOString() || '');
+        if (!startDateStr) return true;
+        const datePart = startDateStr.split('T')[0];
         const dateParts = datePart.split('-');
         if (dateParts.length < 2) return true;
         

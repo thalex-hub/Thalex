@@ -466,19 +466,25 @@ export default function Attendance() {
   };
 
   const handleExportExcel = () => {
-    const exportData = monthData.sort((a, b) => a.workDate.localeCompare(b.workDate)).map(record => ({
-      'Ngày': record.workDate,
-      'Thứ': format(new Date(record.workDate), 'eeee'),
-      'Nhân viên': record.userName,
-      'Giờ vào': record.checkInTime ? format(new Date(record.checkInTime), 'HH:mm:ss') : '',
-      'Giờ ra': record.checkOutTime ? format(new Date(record.checkOutTime), 'HH:mm:ss') : '',
-      'Muộn (phút)': record.lateMinutes || 0,
-      'Về sớm (phút)': record.earlyLeaveMinutes || 0,
-      'Tổng giờ công': record.workHours || 0,
-      'Trạng thái': record.status === 'leave' ? `Nghỉ phép (${record.leaveType === 'annual' ? 'Phép năm' : record.leaveType === 'sick' ? 'Nghỉ ốm' : record.leaveType === 'unpaid' ? 'Không lương' : 'Việc riêng'})` : 
-                   (record.lateMinutes > 0 || record.earlyLeaveMinutes > 0) ? 'Đi muộn/Về sớm' : 'Đúng giờ',
-      'Ghi chú': record.reason || ''
-    }));
+    const exportData = monthData.sort((a, b) => a.workDate.localeCompare(b.workDate)).map(record => {
+      const workDateObj = new Date(record.workDate);
+      const checkInObj = record.checkInTime ? new Date(record.checkInTime) : null;
+      const checkOutObj = record.checkOutTime ? new Date(record.checkOutTime) : null;
+
+      return {
+        'Ngày': record.workDate,
+        'Thứ': !isNaN(workDateObj.getTime()) ? format(workDateObj, 'eeee') : '',
+        'Nhân viên': record.userName,
+        'Giờ vào': checkInObj && !isNaN(checkInObj.getTime()) ? format(checkInObj, 'HH:mm:ss') : '',
+        'Giờ ra': checkOutObj && !isNaN(checkOutObj.getTime()) ? format(checkOutObj, 'HH:mm:ss') : '',
+        'Muộn (phút)': record.lateMinutes || 0,
+        'Về sớm (phút)': record.earlyLeaveMinutes || 0,
+        'Tổng giờ công': record.workHours || 0,
+        'Trạng thái': record.status === 'leave' ? `Nghỉ phép (${record.leaveType === 'annual' ? 'Phép năm' : record.leaveType === 'sick' ? 'Nghỉ ốm' : record.leaveType === 'unpaid' ? 'Không lương' : 'Việc riêng'})` : 
+                     (record.lateMinutes > 0 || record.earlyLeaveMinutes > 0) ? 'Đi muộn/Về sớm' : 'Đúng giờ',
+        'Ghi chú': record.reason || ''
+      };
+    });
     exportToExcel(exportData, `BaoCao_ChamCong_CaNhan_${format(currentMonth, 'MM_yyyy')}`, 'Chấm công cá nhân');
   };
 
@@ -512,17 +518,22 @@ export default function Attendance() {
         allData = allData.filter(record => targetUserIds.includes(record.userId));
       }
 
-      const exportData = allData.map((record: any) => ({
-        'Ngày': record.workDate,
-        'Nhân viên': record.userName || 'N/A',
-        'Giờ vào': record.checkInTime ? format(new Date(record.checkInTime), 'HH:mm:ss') : '',
-        'Giờ ra': record.checkOutTime ? format(new Date(record.checkOutTime), 'HH:mm:ss') : '',
-        'Muộn (phút)': record.lateMinutes || 0,
-        'Về sớm (phút)': record.earlyLeaveMinutes || 0,
-        'Công (giờ)': record.workHours || 0,
-        'Trạng thái': record.status === 'leave' ? `Nghỉ (${record.leaveType})` : 'Làm việc',
-        'Email': record.userEmail || ''
-      }));
+      const exportData = allData.map((record: any) => {
+        const checkInObj = record.checkInTime ? new Date(record.checkInTime) : null;
+        const checkOutObj = record.checkOutTime ? new Date(record.checkOutTime) : null;
+        
+        return {
+          'Ngày': record.workDate,
+          'Nhân viên': record.userName || 'N/A',
+          'Giờ vào': checkInObj && !isNaN(checkInObj.getTime()) ? format(checkInObj, 'HH:mm:ss') : '',
+          'Giờ ra': checkOutObj && !isNaN(checkOutObj.getTime()) ? format(checkOutObj, 'HH:mm:ss') : '',
+          'Muộn (phút)': record.lateMinutes || 0,
+          'Về sớm (phút)': record.earlyLeaveMinutes || 0,
+          'Công (giờ)': record.workHours || 0,
+          'Trạng thái': record.status === 'leave' ? `Nghỉ (${record.leaveType})` : 'Làm việc',
+          'Email': record.userEmail || ''
+        };
+      });
       
       exportToExcel(exportData, `BaoCao_TongHop_ChamCong_${format(currentMonth, 'MM_yyyy')}`, 'Tổng hợp chấm công');
     } catch (error) {
@@ -561,30 +572,35 @@ export default function Attendance() {
           if (record.status === 'leave') return;
           if (record.checkInTime && !record.isExcused) {
             const checkInDate = new Date(record.checkInTime);
-            const hour = checkInDate.getHours();
-            const mins = record.lateMinutes || 0;
-            
-            if (hour >= 10) {
-              dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Vào làm sau 10h', penalty: daySalary / 2 });
-            } else if (mins > 60) {
-              dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Đi muộn > 1h', penalty: 200000 });
-            } else if (mins > 30) {
-              dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Đi muộn 30p-1h', penalty: 150000 });
-            } else if (mins > 0) {
-              dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Đi muộn < 30p', penalty: 50000 });
+            if (!isNaN(checkInDate.getTime())) {
+              const hour = checkInDate.getHours();
+              const mins = record.lateMinutes || 0;
+              
+              if (hour >= 10) {
+                dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Vào làm sau 10h', penalty: daySalary / 2 });
+              } else if (mins > 60) {
+                dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Đi muộn > 1h', penalty: 200000 });
+              } else if (mins > 30) {
+                dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Đi muộn 30p-1h', penalty: 150000 });
+              } else if (mins > 0) {
+                dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Đi muộn < 30p', penalty: 50000 });
+              }
             }
 
             if (record.checkOutTime) {
               const earlyLeaveMinutes = record.earlyLeaveMinutes || 0;
-              const outHour = new Date(record.checkOutTime).getHours();
-              if (outHour < 13) {
-                dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Về trước 13h', penalty: daySalary / 2 });
-              } else if (earlyLeaveMinutes > 60) {
-                dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Về sớm > 1h', penalty: 200000 });
-              } else if (earlyLeaveMinutes > 30) {
-                dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Về sớm 30p-1h', penalty: 150000 });
-              } else if (earlyLeaveMinutes > 0) {
-                dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Về sớm < 30p', penalty: 50000 });
+              const checkOutDate = new Date(record.checkOutTime);
+              if (!isNaN(checkOutDate.getTime())) {
+                const outHour = checkOutDate.getHours();
+                if (outHour < 13) {
+                  dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Về trước 13h', penalty: daySalary / 2 });
+                } else if (earlyLeaveMinutes > 60) {
+                  dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Về sớm > 1h', penalty: 200000 });
+                } else if (earlyLeaveMinutes > 30) {
+                  dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Về sớm 30p-1h', penalty: 150000 });
+                } else if (earlyLeaveMinutes > 0) {
+                  dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Về sớm < 30p', penalty: 50000 });
+                }
               }
             } else if (day < today) {
               dayViolations.push({ userId: u.uid, userName: u.fullName, type: 'Quên chấm công ra', penalty: 50000 });

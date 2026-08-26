@@ -144,7 +144,7 @@ export function calculateSingleMonthSalary(
 
   // Filter attendance for this user only
   const userAttendance = attendance.filter(r => r.userId === targetUser.uid);
-  const currentMonthActiveRecords = userAttendance.filter(r => r.workDate.startsWith(monthKey));
+  const currentMonthActiveRecords = userAttendance.filter(r => typeof r.workDate === 'string' && r.workDate.startsWith(monthKey));
   const hasAnyRecordsInMonth = currentMonthActiveRecords.length > 0;
 
   if (targetUser?.isActive === false && !hasAnyRecordsInMonth) {
@@ -231,41 +231,46 @@ export function calculateSingleMonthSalary(
         
         // Only calculate late/early penalties if the user needs attendance
         if ((targetUser?.needsAttendance !== false) && !record.isExcused) {
-          const checkInDate = new Date(record.checkInTime);
-          const hour = checkInDate.getHours();
-          const mins = record.lateMinutes || 0;
+          const checkInDate = record.checkInTime ? new Date(record.checkInTime) : null;
           
-          if (hour >= 10) {
-            totalPenalties += daySalary / 2;
-            violations.push({ date: dateStr, type: 'Vào làm sau 10h sáng', penalty: daySalary / 2 });
-          } else if (mins > 60) {
-            totalPenalties += 200000;
-            violations.push({ date: dateStr, type: 'Đi muộn > 1 tiếng', penalty: 200000 });
-          } else if (mins > 30) {
-            totalPenalties += 150000;
-            violations.push({ date: dateStr, type: 'Đi muộn 30p - 1 tiếng', penalty: 150000 });
-          } else if (mins > 0) {
-            totalPenalties += 50000;
-            violations.push({ date: dateStr, type: 'Đi muộn < 30p', penalty: 50000 });
+          if (checkInDate && !isNaN(checkInDate.getTime())) {
+            const hour = checkInDate.getHours();
+            const mins = record.lateMinutes || 0;
+            
+            if (hour >= 10) {
+              totalPenalties += daySalary / 2;
+              violations.push({ date: dateStr, type: 'Vào làm sau 10h sáng', penalty: daySalary / 2 });
+            } else if (mins > 60) {
+              totalPenalties += 200000;
+              violations.push({ date: dateStr, type: 'Đi muộn > 1 tiếng', penalty: 200000 });
+            } else if (mins > 30) {
+              totalPenalties += 150000;
+              violations.push({ date: dateStr, type: 'Đi muộn 30p - 1 tiếng', penalty: 150000 });
+            } else if (mins > 0) {
+              totalPenalties += 50000;
+              violations.push({ date: dateStr, type: 'Đi muộn < 30p', penalty: 50000 });
+            }
           }
           
           if (record.checkOutTime) {
             const checkOutDate = new Date(record.checkOutTime);
-            const outHour = checkOutDate.getHours();
-            const earlyMins = record.earlyLeaveMinutes || 0;
-            
-            if (outHour < 13) {
-              totalPenalties += daySalary / 2;
-              violations.push({ date: dateStr, type: 'Về trước 13h chiều', penalty: daySalary / 2 });
-            } else if (earlyMins > 60) {
-              totalPenalties += 200000;
-              violations.push({ date: dateStr, type: 'Về sớm > 1 tiếng', penalty: 200000 });
-            } else if (earlyMins > 30) {
-              totalPenalties += 150000;
-              violations.push({ date: dateStr, type: 'Về sớm 30p - 1 tiếng', penalty: 150000 });
-            } else if (earlyMins > 0) {
-              totalPenalties += 50000;
-              violations.push({ date: dateStr, type: 'Về sớm < 30p', penalty: 50000 });
+            if (!isNaN(checkOutDate.getTime())) {
+              const outHour = checkOutDate.getHours();
+              const earlyMins = record.earlyLeaveMinutes || 0;
+              
+              if (outHour < 13) {
+                totalPenalties += daySalary / 2;
+                violations.push({ date: dateStr, type: 'Về trước 13h chiều', penalty: daySalary / 2 });
+              } else if (earlyMins > 60) {
+                totalPenalties += 200000;
+                violations.push({ date: dateStr, type: 'Về sớm > 1 tiếng', penalty: 200000 });
+              } else if (earlyMins > 30) {
+                totalPenalties += 150000;
+                violations.push({ date: dateStr, type: 'Về sớm 30p - 1 tiếng', penalty: 150000 });
+              } else if (earlyMins > 0) {
+                totalPenalties += 50000;
+                violations.push({ date: dateStr, type: 'Về sớm < 30p', penalty: 50000 });
+              }
             }
           } else if (day < today) {
             totalPenalties += 50000;

@@ -440,6 +440,7 @@ interface AuthContextType {
   isGeneral: boolean;
   isLeader: boolean;
   isFinanceStaff: boolean;
+  allUsers: any[];
   canViewSalaries: boolean;
   canEditSalaries: boolean;
   hasPermission: (permissionId: string) => boolean;
@@ -459,6 +460,7 @@ const AuthContext = createContext<AuthContextType>({
   isGeneral: false,
   isLeader: false,
   isFinanceStaff: false,
+  allUsers: [],
   canViewSalaries: false,
   canEditSalaries: false,
   hasPermission: () => false,
@@ -471,6 +473,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
 
   useEffect(() => {
     let unsubscribeDoc: (() => void) | null = null;
@@ -813,6 +816,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isFinanceStaff = React.useMemo(() => isSuperAdmin || isDirector || isAccountant || hasPermission('manage_cashflow') || hasPermission('view_cashflow'), [isSuperAdmin, isDirector, isAccountant, hasPermission]);
   const isLeader = React.useMemo(() => isAdmin || isManager || isHR || hasPermission('approve_leave_requests'), [isAdmin, isManager, isHR, hasPermission]);
 
+  useEffect(() => {
+    if (!user) {
+      setAllUsers([]);
+      return;
+    }
+
+    const canSeeUsers = isAdmin || isDirector || isHR || isManager || isAccountant || isFinanceStaff || hasPermission('view_users') || hasPermission('manage_users');
+    
+    if (canSeeUsers) {
+      const q = query(collection(db, 'users'), limit(500));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const usersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setAllUsers(usersList);
+      }, (error) => {
+        console.error("Error fetching all users:", error);
+      });
+      return () => unsubscribe();
+    } else {
+      if (appUser) {
+        setAllUsers([{ id: user.uid, ...appUser }]);
+      } else {
+        setAllUsers([]);
+      }
+    }
+  }, [user, isAdmin, isDirector, isHR, isManager, isAccountant, isFinanceStaff, hasPermission, appUser]);
+
   const value = React.useMemo(() => ({
     user, 
     appUser, 
@@ -826,12 +855,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isGeneral,
     isLeader,
     isFinanceStaff,
+    allUsers,
     canViewSalaries,
     canEditSalaries,
     hasPermission,
     rolePermissions,
   }), [
-    user, appUser, loading, isAdmin, isSuperAdmin, isDirector, isManager, isAccountant, isHR, isGeneral, isLeader, isFinanceStaff, canViewSalaries, canEditSalaries, hasPermission, rolePermissions
+    user, appUser, loading, isAdmin, isSuperAdmin, isDirector, isManager, isAccountant, isHR, isGeneral, isLeader, isFinanceStaff, allUsers, canViewSalaries, canEditSalaries, hasPermission, rolePermissions
   ]);
 
   return (

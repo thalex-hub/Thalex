@@ -298,8 +298,13 @@ export default function WarehouseManagement() {
         .forEach(si => {
           let matchesDate = true;
           if (searchDate && si.entryDate) {
-            const siDate = format(new Date(si.entryDate), 'yyyy-MM-dd');
-            if (siDate !== searchDate) matchesDate = false;
+            const entryDateObj = new Date(si.entryDate);
+            if (!isNaN(entryDateObj.getTime())) {
+              const siDate = format(entryDateObj, 'yyyy-MM-dd');
+              if (siDate !== searchDate) matchesDate = false;
+            } else {
+              matchesDate = false;
+            }
           }
           
           if (
@@ -332,8 +337,13 @@ export default function WarehouseManagement() {
 
           let matchesDate = true;
           if (searchDate && i.lastUpdated) {
-            const iDate = format(new Date(i.lastUpdated), 'yyyy-MM-dd');
-            if (iDate !== searchDate) matchesDate = false;
+            const lastUpdatedObj = new Date(i.lastUpdated);
+            if (!isNaN(lastUpdatedObj.getTime())) {
+              const iDate = format(lastUpdatedObj, 'yyyy-MM-dd');
+              if (iDate !== searchDate) matchesDate = false;
+            } else {
+              matchesDate = false;
+            }
           }
 
           if (
@@ -432,8 +442,13 @@ export default function WarehouseManagement() {
         }).filter((item: any) => {
           let matchesDate = true;
           if (searchDate && item.transactionDate) {
-            const itemDate = format(new Date(item.transactionDate), 'yyyy-MM-dd');
-            if (itemDate !== searchDate) matchesDate = false;
+            const transactionDateObj = new Date(item.transactionDate);
+            if (!isNaN(transactionDateObj.getTime())) {
+              const itemDate = format(transactionDateObj, 'yyyy-MM-dd');
+              if (itemDate !== searchDate) matchesDate = false;
+            } else {
+              matchesDate = false;
+            }
           }
           const matchesSearch = (item.productName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                                 (item.productCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -731,7 +746,7 @@ export default function WarehouseManagement() {
                               </td>
                               <td className="px-6 py-4 text-xs font-medium">
                                 <div className="flex flex-col gap-1.5">
-                                  {item.customerWarrantyStartDate ? (
+                                  {item.customerWarrantyStartDate && !isNaN(new Date(item.customerWarrantyStartDate).getTime()) ? (
                                     <div className="inline-flex flex-col gap-0.5 text-xs text-purple-800 bg-purple-50/50 border border-purple-100 p-1.5 rounded-lg">
                                       <span className="text-[10px] font-black tracking-tight uppercase text-purple-700">
                                         BH Khách: {item.customerWarrantyMonths || 0} tháng
@@ -745,7 +760,7 @@ export default function WarehouseManagement() {
                                     </div>
                                   ) : null}
 
-                                  {item.brandWarrantyStartDate ? (
+                                  {item.brandWarrantyStartDate && !isNaN(new Date(item.brandWarrantyStartDate).getTime()) ? (
                                     <div className="inline-flex flex-col gap-0.5 text-xs text-rose-800 bg-rose-50/50 border border-rose-100 p-1.5 rounded-lg">
                                       <span className="text-[10px] font-black tracking-tight uppercase text-rose-700">
                                         BH Hãng: {item.brandWarrantyMonths || 0} tháng
@@ -759,7 +774,7 @@ export default function WarehouseManagement() {
                                     </div>
                                   ) : null}
 
-                                  {!item.customerWarrantyStartDate && !item.brandWarrantyStartDate && (
+                                  {(!item.customerWarrantyStartDate || isNaN(new Date(item.customerWarrantyStartDate).getTime())) && (!item.brandWarrantyStartDate || isNaN(new Date(item.brandWarrantyStartDate).getTime())) && (
                                     <span className="text-gray-400 italic text-[10px] pl-2">-</span>
                                   )}
                                 </div>

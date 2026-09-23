@@ -1,7 +1,7 @@
 import React from 'react';
-import { db, storage } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, setDoc, limit } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFile } from '../lib/storageService';
 import { Shield, Mail, Phone, MapPin, Briefcase, BadgeCheck, Users as UsersIcon, Plus, Edit2, Trash2, X, Settings2, Calendar, FileText, Download, Clock, FileSpreadsheet, Upload, FileUp, Camera } from 'lucide-react';
 import { cn, formatCurrencyInput, parseCurrencyInput, withTimeout } from '../lib/utils';
 import { AppUser } from '../types';
@@ -213,25 +213,23 @@ export default function Users() {
 
     setUploading(true);
     try {
-      const storageRef = ref(storage, `avatars/${userId}_${Date.now()}`);
-      await withTimeout(uploadBytes(storageRef, file), 8000);
-      const downloadURL = await withTimeout(getDownloadURL(storageRef), 5000);
+      const res = await uploadFile(file, 'avatars');
 
       if (editingUser && editingUser.uid === userId) {
         setEditingUser({
           ...editingUser,
-          avatar: downloadURL
+          avatar: res.url
         });
       } else {
         await updateDoc(doc(db, 'users', userId), {
-          avatar: downloadURL,
+          avatar: res.url,
           updatedAt: new Date().toISOString()
         });
       }
 
       await logActivity('Upload Avatar', 'Users', userId, { fileName: file.name });
     } catch (error) {
-      alert('Không thể tải tệp lên. Vui lòng kiểm tra cấu hình Firebase Storage.');
+      alert('Không thể tải ảnh đại diện lên máy chủ.');
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}/avatar`);
     } finally {
       setUploading(false);
@@ -249,13 +247,10 @@ export default function Users() {
 
     setUploading(true);
     try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-      const storageRef = ref(storage, `contracts/${userId}/${safeName}`);
-      await withTimeout(uploadBytes(storageRef, file), 8000);
-      const downloadURL = await withTimeout(getDownloadURL(storageRef), 5000);
+      const res = await uploadFile(file, 'contracts');
 
       await updateDoc(doc(db, 'users', userId), {
-        contractUrl: downloadURL,
+        contractUrl: res.url,
         contractName: file.name,
         contractUpdatedAt: new Date().toISOString()
       });
@@ -263,7 +258,7 @@ export default function Users() {
       if (editingUser && editingUser.uid === userId) {
         setEditingUser({
           ...editingUser,
-          contractUrl: downloadURL,
+          contractUrl: res.url,
           contractName: file.name,
           contractUpdatedAt: new Date().toISOString()
         });
@@ -271,7 +266,7 @@ export default function Users() {
 
       await logActivity('Upload Contract', 'Users', userId, { fileName: file.name });
     } catch (error) {
-      alert('Không thể tải tệp lên. Vui lòng kiểm tra cấu hình Firebase Storage.');
+      alert('Không thể tải tệp hợp đồng lên máy chủ.');
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}/contract`);
     } finally {
       setUploading(false);

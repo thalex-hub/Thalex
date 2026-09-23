@@ -7,6 +7,7 @@ import Layout from './components/Layout';
 import { AppUser } from './types';
 import LoginPage from './pages/Login';
 import NotificationManager from './components/NotificationManager';
+import DownloadErrorModal from './components/DownloadErrorModal';
 import Logo from './components/Logo';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -130,6 +131,7 @@ function AppContent() {
   return (
     <BrowserRouter>
       <NotificationManager />
+      <DownloadErrorModal />
       <Layout>
         <React.Suspense fallback={
           <div className="flex flex-col items-center justify-center p-12 min-h-[300px]">

@@ -1,7 +1,7 @@
 import React from 'react';
-import { db, auth, storage } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { collection, addDoc, query, where, getDocs, getDoc, onSnapshot, doc, updateDoc, deleteDoc, orderBy, or, limit } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFile } from '../lib/storageService';
 import { Plus, ListFilter, CheckCircle, Clock, AlertCircle, ClipboardList, FileDown, BarChart3, Calendar, Trash2, ShieldCheck, CornerUpLeft, LayoutDashboard, List as ListIcon, User, UserCheck, Edit3, CheckSquare, Square, PlusCircle, ChevronRight, GitMerge, Paperclip, FileText, XCircle, FileSpreadsheet, Search, UserPlus, MessageSquare, MessageCircle, Send, Download } from 'lucide-react';
 import { DragDropContext, Droppable as DroppableBase, Draggable as DraggableBase } from '@hello-pangea/dnd';
 import { logActivity } from '../services/activityLogger';
@@ -346,20 +346,17 @@ export default function Tasks() {
       const newFiles = await Promise.all(
         files.map(async (f: any) => {
           try {
-            const safeName = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-            const fileRef = ref(storage, `tasks/${Date.now()}_${safeName}`);
-            await withTimeout(uploadBytes(fileRef, f), 25000);
-            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
+            const res = await uploadFile(f, 'tasks');
             return {
               name: f.name,
               type: f.type,
-              size: f.size,
+              size: res.size || f.size,
               lastModified: f.lastModified,
               uploadDate: new Date().toISOString(),
-              url: downloadUrl
+              url: res.url
             };
           } catch (uploadErr) {
-            console.error("Lỗi tải tệp lên Storage:", uploadErr);
+            console.error("Lỗi tải tệp lên server:", uploadErr);
             alert(`Không thể tải lên tệp: ${f.name}`);
             return null;
           }
@@ -443,20 +440,17 @@ export default function Tasks() {
       const newFiles = await Promise.all(
         files.map(async (f: any) => {
           try {
-            const safeName = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-            const fileRef = ref(storage, `tasks/${Date.now()}_${safeName}`);
-            await withTimeout(uploadBytes(fileRef, f), 25000);
-            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
+            const res = await uploadFile(f, 'tasks');
             return {
               name: f.name,
               type: f.type,
-              size: f.size,
+              size: res.size || f.size,
               lastModified: f.lastModified,
               uploadDate: new Date().toISOString(),
-              url: downloadUrl
+              url: res.url
             };
           } catch (uploadErr) {
-            console.error("Lỗi tải tệp lên Storage:", uploadErr);
+            console.error("Lỗi tải tệp lên server:", uploadErr);
             alert(`Không thể tải lên tệp: ${f.name}`);
             return null;
           }
@@ -551,20 +545,17 @@ export default function Tasks() {
       const newFiles = await Promise.all(
         files.map(async (f: any) => {
           try {
-            const safeName = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-            const fileRef = ref(storage, `tasks/${Date.now()}_${safeName}`);
-            await withTimeout(uploadBytes(fileRef, f), 25000);
-            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
+            const res = await uploadFile(f, 'tasks');
             return {
               name: f.name,
               type: f.type,
-              size: f.size,
+              size: res.size || f.size,
               lastModified: f.lastModified,
               uploadDate: new Date().toISOString(),
-              url: downloadUrl
+              url: res.url
             };
           } catch (uploadErr) {
-            console.error("Lỗi tải tệp lên Storage:", uploadErr);
+            console.error("Lỗi tải tệp lên server:", uploadErr);
             alert(`Không thể tải lên tệp: ${f.name}`);
             return null;
           }
@@ -2725,16 +2716,14 @@ export default function Tasks() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {file.url && (
-                                    <a 
-                                      href={file.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      download={file.name}
+                                    <button 
+                                      type="button"
+                                      onClick={() => downloadFile(file.url, file.name)}
                                       className="p-2 text-blue-500 hover:text-blue-700 bg-blue-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer"
                                       title="Tải về"
                                     >
                                       <Download size={16} />
-                                    </a>
+                                    </button>
                                   )}
                                   <button 
                                     onClick={() => removeFile(i, true)}
@@ -2798,24 +2787,20 @@ export default function Tasks() {
                                                     alt={file.name} 
                                                     referrerPolicy="no-referrer"
                                                   />
-                                                  <a
-                                                    href={file.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    download={file.name}
-                                                    className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-all text-white font-bold text-[10px]"
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => downloadFile(file.url, file.name)}
+                                                    className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-all text-white font-bold text-[10px] cursor-pointer"
                                                   >
                                                     TẢI VỀ
-                                                  </a>
+                                                  </button>
                                                 </div>
                                               )}
-                                              <a 
-                                                href={file.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                download={file.name}
+                                              <button 
+                                                type="button"
+                                                onClick={() => downloadFile(file.url, file.name)}
                                                 className={cn(
-                                                  "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border transition-all hover:scale-[1.02] shadow-sm",
+                                                  "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border transition-all hover:scale-[1.02] shadow-sm cursor-pointer",
                                                   comment.userId === currentUser?.uid 
                                                     ? "bg-blue-700/40 border-blue-400/50 text-blue-50 hover:bg-blue-700/60" 
                                                     : "bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:text-blue-600"
@@ -2827,7 +2812,7 @@ export default function Tasks() {
                                                   <span className="text-[8px] opacity-60 font-medium">Click để tải về ({(file.size / 1024).toFixed(1)} KB)</span>
                                                 </div>
                                                 <Download size={14} className="ml-1 opacity-60" />
-                                              </a>
+                                              </button>
                                             </div>
                                           ) : (
                                             <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border bg-gray-50 border-gray-200 text-gray-400 opacity-60">

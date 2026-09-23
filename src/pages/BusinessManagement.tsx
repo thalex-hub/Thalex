@@ -1,7 +1,7 @@
 import React from 'react';
-import { auth, db, storage } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, setDoc, getDoc, getDocs, where, Timestamp, limit } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFile } from '../lib/storageService';
 import { 
   Shield, Mail, Phone, Briefcase, BadgeCheck, Users as UsersIcon, Plus, Edit2, 
   Trash2, X, Settings2, Calendar, FileText, Download, Clock, FileSpreadsheet,
@@ -572,13 +572,10 @@ export default function BusinessManagement() {
 
     setUploading(true);
     try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-      const storageRef = ref(storage, `contracts/${userId}/${safeName}`);
-      await withTimeout(uploadBytes(storageRef, file), 25000);
-      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
+      const res = await uploadFile(file, 'contracts');
 
       await updateDoc(doc(db, 'users', userId), {
-        contractUrl: downloadURL,
+        contractUrl: res.url,
         contractName: file.name,
         contractUpdatedAt: new Date().toISOString()
       });
@@ -586,7 +583,7 @@ export default function BusinessManagement() {
       if (editingUser && editingUser.uid === userId) {
         setEditingUser({
           ...editingUser,
-          contractUrl: downloadURL,
+          contractUrl: res.url,
           contractName: file.name,
           contractUpdatedAt: new Date().toISOString()
         });

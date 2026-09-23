@@ -1,7 +1,7 @@
 import React from 'react';
-import { db, storage } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, or, getDoc, getDocs, deleteDoc, limit } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFile as uploadFileToServer } from '../lib/storageService';
 import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search, ChevronDown, ChevronUp, RefreshCcw } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -291,14 +291,12 @@ export default function OrderProposals() {
       const financials = calculateFinancials(newProposal);
 
       const uploadFile = async (file: File) => {
-        const fileRef = ref(storage, `proposals/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`);
-        const snapshot = await uploadBytes(fileRef, file);
-        const url = await getDownloadURL(snapshot.ref);
+        const res = await uploadFileToServer(file, 'proposals');
         return {
           name: file.name,
-          size: file.size,
+          size: res.size || file.size,
           type: file.type,
-          url: url
+          url: res.url
         };
       };
 

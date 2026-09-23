@@ -1,7 +1,7 @@
 import React from 'react';
-import { db, auth, storage } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or, and, deleteDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFile } from '../lib/storageService';
 import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, ShieldCheck, Wallet, FileText, Upload, RefreshCcw, ArrowRight, FileSpreadsheet, Banknote, ReceiptText, ClipboardCheck, Trash2, Search, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -216,18 +216,15 @@ export default function ReimbursementRequests() {
       const uploadedAttachments = await Promise.all(
         selectedFiles.map(async (f) => {
           try {
-            const safeName = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-            const fileRef = ref(storage, `reimbursements/${Date.now()}_${safeName}`);
-            await withTimeout(uploadBytes(fileRef, f), 25000);
-            const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
+            const res = await uploadFile(f, 'reimbursements');
             return {
               name: f.name,
               type: f.type,
-              size: f.size,
-              url: downloadUrl
+              size: res.size || f.size,
+              url: res.url
             };
           } catch (uploadErr) {
-            console.error("Lỗi tải tệp lên Storage:", uploadErr);
+            console.error("Lỗi tải tệp lên server:", uploadErr);
             alert(`Không thể tải lên tệp đính kèm: ${f.name}. Yêu cầu của bạn vẫn sẽ được gửi nhưng không có tệp này.`);
             return {
               name: f.name,

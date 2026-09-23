@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { db, storage } from '../lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db } from '../lib/firebase';
+import { uploadFile } from '../lib/storageService';
 import { doc, getDoc, collection, query, where, onSnapshot, addDoc, deleteDoc, getDocs, updateDoc, increment, writeBatch, orderBy, runTransaction, limit } from 'firebase/firestore';
 import { 
   ShoppingCart, 
@@ -437,21 +437,18 @@ export default function OrderDetail() {
 
     for (const file of files) {
       try {
-        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-        const storageRef = ref(storage, `requests/${type}/${Date.now()}_${safeName}`);
-        const snapshot = await withTimeout(uploadBytes(storageRef, file), 25000);
-        const url = await withTimeout(getDownloadURL(snapshot.ref), 10000);
+        const res = await uploadFile(file, `requests_${type}`);
         
         newAttachments.push({
           name: file.name,
-          url,
-          size: file.size,
+          url: res.url,
+          size: res.size || file.size,
           type: file.type,
           uploadDate: new Date().toISOString()
         });
       } catch (err) {
         console.error(`Error uploading file ${file.name}:`, err);
-        alert(`Không thể tải lên tệp: ${file.name}. Storage chưa được kích hoạt.`);
+        alert(`Không thể tải lên tệp: ${file.name}.`);
         newAttachments.push({
           name: file.name,
           url: '',
@@ -3799,16 +3796,14 @@ export default function OrderDetail() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {file.url ? (
-                                    <a 
-                                      href={file.url} 
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      download={file.name}
-                                      className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center"
+                                    <button 
+                                      type="button"
+                                      onClick={() => downloadFile(file.url, file.name)}
+                                      className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer"
                                       title="Tải về"
                                     >
                                       <Download size={16} />
-                                    </a>
+                                    </button>
                                   ) : (
                                     <button onClick={() => alert('Chức năng xem tệp đang được phát triển')} className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center">
                                       <ExternalLink size={16} />
@@ -3872,13 +3867,11 @@ export default function OrderDetail() {
                                       {comment.attachments.map((file: any, idx: number) => (
                                         <div key={idx}>
                                           {file.url ? (
-                                            <a 
-                                              href={file.url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              download={file.name}
+                                            <button 
+                                              type="button"
+                                              onClick={() => downloadFile(file.url, file.name)}
                                               className={cn(
-                                                "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border transition-all hover:scale-[1.02] shadow-sm",
+                                                "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border transition-all hover:scale-[1.02] shadow-sm cursor-pointer",
                                                 comment.userId === user?.uid 
                                                   ? "bg-blue-700/40 border-blue-400/50 text-blue-50 hover:bg-blue-700/60" 
                                                   : "bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:text-blue-600"
@@ -3890,7 +3883,7 @@ export default function OrderDetail() {
                                                 <span className="text-[8px] opacity-60 font-medium">Click để tải về ({(file.size / 1024).toFixed(1)} KB)</span>
                                               </div>
                                               <Download size={14} className="ml-1 opacity-60" />
-                                            </a>
+                                            </button>
                                           ) : (
                                             <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border bg-gray-50 border-gray-200 text-gray-400 opacity-60">
                                               <FileText size={14} />

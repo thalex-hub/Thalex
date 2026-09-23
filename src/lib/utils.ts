@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { triggerDownloadErrorModal } from '../components/DownloadErrorModal';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -145,20 +146,55 @@ export async function downloadFile(url: string | undefined, fileName: string) {
     alert('Không tìm thấy liên kết tải về cho tệp này. Tệp có thể chưa được tải lên máy chủ.');
     return;
   }
-  
+
+  // 1. Data URI download (Base64)
+  if (url.startsWith('data:')) {
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    } catch (e) {
+      console.error('Error downloading data URI:', e);
+    }
+  }
+
+  // 2. Check if URL is already pointing to a known blocked Firebase Storage bucket
+  const isFirebaseStorage = url.includes('firebasestorage.googleapis.com');
+
   try {
     // Attempt download using backend proxy
     const proxyUrl = getApiUrl(`/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName || 'download')}`);
     
     const response = await fetch(proxyUrl);
-    if (!response.ok) {
-       throw new Error(`Server returned ${response.status}`);
-    }
     
-    // Check if what we got was actually a JSON error message instead of the file
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-        throw new Error('Received error response from proxy');
+    // Check if error response or JSON error
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.ok || contentType.includes('application/json')) {
+      const errJson = await response.json().catch(() => null);
+      const isBillingError =
+        response.status === 402 ||
+        errJson?.error === 'GCS_BILLING_DISABLED' ||
+        errJson?.code === 402 ||
+        errJson?.message?.includes('billing account') ||
+        (isFirebaseStorage && response.status === 403);
+
+      if (isBillingError) {
+        triggerDownloadErrorModal({
+          fileName: fileName || 'Tệp đính kèm',
+          title: 'Không thể tải xuống tệp tin',
+          message:
+            'Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị tạm khóa tài khoản thanh toán (Lỗi 402: Billing account is disabled/closed). Google hiện đang khóa quyền đọc các tệp lưu trữ này.',
+          recommendation:
+            'Quản trị viên cần kích hoạt lại Billing trên Google Cloud Console, hoặc bạn có thể tải lại tệp tin mới lên hệ thống (các tệp mới đã được chuyển sang lưu trữ an toàn trên máy chủ).'
+        });
+        return;
+      }
+
+      throw new Error(errJson?.message || `Máy chủ phản hồi mã lỗi: ${response.status}`);
     }
 
     const blob = await response.blob();
@@ -172,11 +208,26 @@ export async function downloadFile(url: string | undefined, fileName: string) {
     document.body.removeChild(link);
     
     setTimeout(() => {
-        window.URL.revokeObjectURL(objectUrl);
-    }, 10000);
-    
-  } catch (error) {
-    console.error('Download proxy failed, falling back to direct link:', error);
+      window.URL.revokeObjectURL(objectUrl);
+    }, 15000);
+    return;
+  } catch (error: any) {
+    console.error('Download proxy failed:', error);
+
+    // If it's a Firebase Storage URL, NEVER open it in a new tab because it will show Google's raw 402 error JSON!
+    if (isFirebaseStorage) {
+      triggerDownloadErrorModal({
+        fileName: fileName || 'Tệp đính kèm',
+        title: 'Không thể tải xuống tệp tin',
+        message:
+          'Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị khóa tài khoản thanh toán (Lỗi 402: Billing account is disabled in state closed). Google chặn quyền truy cập vào tệp.',
+        recommendation:
+          'Vui lòng liên hệ Quản trị viên để kích hoạt lại Billing trên Google Cloud Console, hoặc tải tệp mới lên hệ thống.'
+      });
+      return;
+    }
+
+    // For other normal external URLs (like external drive links), fall back to opening direct link
     try {
       const link = document.createElement('a');
       link.href = url;

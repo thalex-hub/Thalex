@@ -33,8 +33,8 @@ import {
   or,
   and
 } from 'firebase/firestore';
-import { db, auth, storage } from '../lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth } from '../lib/firebase';
+import { uploadFile } from '../lib/storageService';
 import { useAuth } from '../lib/authContext';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -283,12 +283,10 @@ export default function Storage() {
           throw new Error('Vui lòng chọn một tệp tin từ máy tính.');
         }
 
-        const safeName = selectedFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-        const fileRef = ref(storage, `storage/${Date.now()}_${safeName}`);
-        await withTimeout(uploadBytes(fileRef, selectedFile), 25000);
-        fileUrl = await withTimeout(getDownloadURL(fileRef), 10000);
-        fileSize = selectedFile.size;
-        mimeType = selectedFile.type || 'application/octet-stream';
+        const uploaded = await uploadFile(selectedFile, 'storage');
+        fileUrl = uploaded.url;
+        fileSize = uploaded.size;
+        mimeType = uploaded.mimeType || selectedFile.type || 'application/octet-stream';
         documentName = newFileData.name.trim() || selectedFile.name;
       } else {
         if (!newFileData.name || !newFileData.url) {
@@ -744,16 +742,14 @@ export default function Storage() {
                     </div>
 
                     <div className="flex items-center gap-2 pt-4 border-t border-gray-50">
-                      <a 
-                        href={file.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download={file.name}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-blue-600 text-blue-600 rounded-full text-xs font-extrabold hover:bg-blue-50 transition-all"
+                      <button 
+                        type="button"
+                        onClick={() => forceDownload(file.url, file.name)}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-blue-600 text-blue-600 rounded-full text-xs font-extrabold hover:bg-blue-50 transition-all cursor-pointer"
                       >
                         <Download size={14} className="stroke-[3]" />
                         Tải xuống
-                      </a>
+                      </button>
                       {file.type === 'personal' && file.ownerId === user?.uid && (
                         <button 
                           onClick={() => setShowShareModal(file)}

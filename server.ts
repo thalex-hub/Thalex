@@ -7,7 +7,7 @@ import fs from "fs";
 
 const app = express();
 
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Enable CORS for all origins (especially custom domains like thalex.com.vn)
 app.use((req, res, next) => {
@@ -71,33 +71,38 @@ const getGeminiClient = () => {
 // API routes
 app.post("/api/upload", async (req, res) => {
   try {
-    const { filename, base64Data } = req.body;
+    const { filename, base64Data, folder } = req.body;
     if (!filename || !base64Data) {
       return res.status(400).json({ error: "Filename and base64Data are required" });
     }
 
     // Ensure uploads directory exists
     const uploadsDir = path.join(process.cwd(), "uploads");
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    const subfolder = folder ? String(folder).replace(/[^a-zA-Z0-9_-]/g, "") : "";
+    const targetDir = subfolder ? path.join(uploadsDir, subfolder) : uploadsDir;
+
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    // Handle base64 prefix if modern File Reader data URI is passed
+    // Handle base64 prefix if data URI is passed
     const cleanBase64 = base64Data.replace(/^data:.*?;base64,/, "");
 
     // Prepare unique filename
     const ext = path.extname(filename);
     const baseName = path.basename(filename, ext);
-    // Remove complex characters to make it clean
-    const cleanBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, "_");
-    const uniqueFilename = `${cleanBaseName}_${Date.now()}${ext}`;
-    const filePath = path.join(uploadsDir, uniqueFilename);
+    // Remove unsafe characters but keep alphanumeric, dash and underscore
+    const cleanBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50);
+    const uniqueFilename = `${cleanBaseName || "file"}_${Date.now()}${ext || ""}`;
+    const filePath = path.join(targetDir, uniqueFilename);
 
     // Save the file binary buffer back to disk
     fs.writeFileSync(filePath, Buffer.from(cleanBase64, "base64"));
     
-    const fileUrl = `/uploads/${uniqueFilename}`;
+    const fileUrl = subfolder ? `/uploads/${subfolder}/${uniqueFilename}` : `/uploads/${uniqueFilename}`;
     const stats = fs.statSync(filePath);
+
+    console.log(`[UPLOAD SUCCESS] Saved: ${fileUrl} (${stats.size} bytes)`);
 
     res.json({
       success: true,
@@ -547,39 +552,107 @@ app.post("/api/send-account-email", async (req, res) => {
 app.get("/api/download", async (req, res) => {
   try {
     const rawUrl = req.query.url as string;
-    const filename = req.query.filename as string || "download";
-    
+    const filename = (req.query.filename as string) || "download";
+
     if (!rawUrl) {
       return res.status(400).json({ error: "Missing url parameter" });
     }
 
-    // Try to decode as base64 first just in case there are old requests pending,
-    // otherwise use the URL directly
-    let fileUrl = rawUrl;
-    if (!rawUrl.startsWith('http')) {
-        try { fileUrl = Buffer.from(rawUrl, 'base64').toString('utf-8'); } catch(e) {}
+    // 1. Check if rawUrl is a local uploads path (e.g. /uploads/... or uploads/...)
+    if (rawUrl.startsWith("/uploads/") || rawUrl.startsWith("uploads/")) {
+      const cleanRel = rawUrl.replace(/^\/?uploads\//, "");
+      const decodedRel = decodeURIComponent(cleanRel);
+      const filePath = path.join(process.cwd(), "uploads", decodedRel);
+
+      if (fs.existsSync(filePath)) {
+        return res.download(filePath, filename);
+      } else {
+        return res.status(404).json({ error: "Tệp tin không tồn tại trên máy chủ" });
+      }
     }
 
-    const response = await fetch(fileUrl);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+    // 2. Check if rawUrl is a data URI
+    if (rawUrl.startsWith("data:")) {
+      const matches = rawUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const contentType = matches[1];
+        const buffer = Buffer.from(matches[2], "base64");
+        const encodedFilename = encodeURIComponent(filename).replace(/['()]/g, escape).replace(/\*/g, "%2A");
+        res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodedFilename}; filename="${encodedFilename}"`);
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Content-Length", buffer.length);
+        return res.end(buffer);
+      }
     }
-    
+
+    // 3. Handle base64 encoded URL or standard HTTP URL
+    let fileUrl = rawUrl;
+    if (!rawUrl.startsWith("http")) {
+      try {
+        const decoded = Buffer.from(rawUrl, "base64").toString("utf-8");
+        if (decoded.startsWith("http")) {
+          fileUrl = decoded;
+        }
+      } catch (e) {}
+    }
+
+    // Check if the decoded fileUrl refers to local /uploads/
+    if (fileUrl.includes("/uploads/")) {
+      const relPart = fileUrl.substring(fileUrl.indexOf("/uploads/") + 9).split("?")[0];
+      const filePath = path.join(process.cwd(), "uploads", decodeURIComponent(relPart));
+      if (fs.existsSync(filePath)) {
+        return res.download(filePath, filename);
+      }
+    }
+
+    // 4. Fetch external URL
+    const response = await fetch(fileUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; ThalexWorkspace/1.0)",
+      },
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      const isBillingDisabled =
+        response.status === 402 ||
+        responseText.includes("billing account") ||
+        responseText.includes("accountDisabled") ||
+        (fileUrl.includes("firebasestorage.googleapis.com") && response.status === 403);
+
+      if (isBillingDisabled) {
+        return res.status(402).json({
+          error: "GCS_BILLING_DISABLED",
+          code: 402,
+          message:
+            "Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị vô hiệu hóa thanh toán (Billing account is disabled/closed - Lỗi 402). Google hiện đang khóa quyền đọc các tệp này.",
+          details: responseText,
+        });
+      }
+
+      return res.status(response.status).json({
+        error: "FETCH_FAILED",
+        status: response.status,
+        message: `Không thể tải tệp tin từ máy chủ lưu trữ (Mã phản hồi: ${response.status})`,
+      });
+    }
+
     const contentType = response.headers.get("content-type") || "application/octet-stream";
-    
-    // Use proper encoding for the filename in Content-Disposition header
-    const encodedFilename = encodeURIComponent(filename).replace(/['()]/g, escape).replace(/\*/g, '%2A');
+    const encodedFilename = encodeURIComponent(filename).replace(/['()]/g, escape).replace(/\*/g, "%2A");
     res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodedFilename}; filename="${encodedFilename}"`);
     res.setHeader("Content-Type", contentType);
-    
-    // Fetch directly to array buffer and send
+
+    const contentLength = response.headers.get("content-length");
+    if (contentLength) {
+      res.setHeader("Content-Length", contentLength);
+    }
+
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    
     res.end(buffer);
   } catch (error: any) {
     console.error("Proxy download error:", error);
-    res.status(500).json({ error: "Failed to download file" });
+    res.status(500).json({ error: error.message || "Failed to download file" });
   }
 });
 
@@ -1322,7 +1395,11 @@ app.get("/api/health", (req, res) => {
 
 // Vite middleware setup for development, or static file serving for production
 async function setupVite() {
-  if (process.env.NODE_ENV !== "production") {
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    (process.env.NODE_ENV !== "development" && fs.existsSync(path.join(process.cwd(), "dist", "index.html")));
+
+  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -1337,7 +1414,7 @@ async function setupVite() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }
 

@@ -1,7 +1,7 @@
 import React from 'react';
-import { db, auth, storage } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, getDocs, limit, or, deleteDoc, getDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFile } from '../lib/storageService';
 import { Receipt, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileStack, Building2, User, ReceiptText, Zap, Droplets, Truck, PenTool, Users, Megaphone, Tags, ShieldCheck, Paperclip, FileText, Undo2, ChevronRight, FileSpreadsheet, Wallet, Search, Trash2, UserPlus, RefreshCcw } from 'lucide-react';
 
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
@@ -262,25 +262,22 @@ export default function PaymentRequests() {
     setLoading(true);
 
     try {
-      // Upload any actual File objects to Firebase storage
+      // Upload any actual File objects to server storage
       const uploadedAttachments = await Promise.all(
         newRequest.attachments.map(async (att) => {
           if (att.file) {
             try {
-              const safeName = att.file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-              const fileRef = ref(storage, `payment_requests/${Date.now()}_${safeName}`);
-              await withTimeout(uploadBytes(fileRef, att.file), 25000);
-              const downloadUrl = await withTimeout(getDownloadURL(fileRef), 10000);
+              const res = await uploadFile(att.file, 'payment_requests');
               return {
                 name: att.name,
                 type: att.type,
-                size: att.size,
+                size: res.size || att.size,
                 lastModified: att.lastModified,
-                url: downloadUrl
+                url: res.url
               };
             } catch (uploadErr) {
-              console.error("Lỗi tải tệp lên Storage:", uploadErr);
-              alert(`Không thể tải lên tệp đính kèm: ${att.name}. Yêu cầu của bạn vẫn sẽ được gửi nhưng không có tệp này. Lỗi: Storage chưa được kích hoạt hoặc quá tải.`);
+              console.error("Lỗi tải tệp lên server:", uploadErr);
+              alert(`Không thể tải lên tệp đính kèm: ${att.name}. Yêu cầu của bạn vẫn sẽ được gửi nhưng không có tệp này.`);
               return {
                  name: att.name,
                  type: att.type,

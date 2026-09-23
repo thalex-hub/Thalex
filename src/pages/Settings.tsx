@@ -16,10 +16,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { auth, db, storage } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { updatePassword, updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { doc, updateDoc, writeBatch, collection, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFile } from '../lib/storageService';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, withTimeout } from '../lib/utils';
 import CompanyProfile from './CompanyProfile';
@@ -436,9 +436,8 @@ export default function Settings() {
     setProfileError('');
     
     try {
-      const storageRef = ref(storage, `avatars/${user.uid}_${Date.now()}`);
-      await withTimeout(uploadBytes(storageRef, file), 25000);
-      const downloadURL = await withTimeout(getDownloadURL(storageRef), 10000);
+      const res = await uploadFile(file, 'avatars');
+      const downloadURL = res.url;
       
       // Update local state
       setAvatarUrl(downloadURL);
@@ -457,8 +456,8 @@ export default function Settings() {
       setTimeout(() => setProfileSuccess(false), 3000);
     } catch (err: any) {
       console.error('Error uploading avatar:', err);
-      alert('Không thể tải ảnh. Vui lòng kiểm tra Firebase Storage.');
-      setProfileError('Không thể tải ảnh. Vui lòng kiểm tra Firebase Storage.');
+      alert('Không thể tải ảnh đại diện lên máy chủ.');
+      setProfileError('Không thể tải ảnh đại diện lên máy chủ.');
     } finally {
       setIsUploading(false);
     }

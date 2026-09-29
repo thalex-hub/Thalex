@@ -621,11 +621,13 @@ app.get("/api/download", async (req, res) => {
         (fileUrl.includes("firebasestorage.googleapis.com") && response.status === 403);
 
       if (isBillingDisabled) {
-        return res.status(402).json({
-          error: "GCS_BILLING_DISABLED",
-          code: 402,
+        return res.status(response.status === 403 ? 403 : 402).json({
+          error: response.status === 403 ? "STORAGE_PERMISSION_DENIED" : "GCS_BILLING_DISABLED",
+          code: response.status,
           message:
-            "Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị vô hiệu hóa thanh toán (Billing account is disabled/closed - Lỗi 402). Google hiện đang khóa quyền đọc các tệp này.",
+            response.status === 403
+              ? "Tệp tin trên Firebase Storage bị từ chối truy cập (Lỗi 403: Permission denied). Nguyên nhân: Quy tắc bảo mật Storage Rules chưa cho phép đọc, hoặc tài khoản thanh toán vừa nâng cấp cần vài phút để đồng bộ."
+              : "Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị vô hiệu hóa thanh toán (Billing account is disabled/closed - Lỗi 402). Google hiện đang khóa quyền đọc các tệp này.",
           details: responseText,
         });
       }

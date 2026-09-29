@@ -53,7 +53,7 @@ export default function DownloadErrorModal() {
                   {errorInfo.title || 'Không thể tải tệp tin'}
                 </h3>
                 <p className="text-xs text-white/80 mt-0.5">
-                  Lỗi hệ thống lưu trữ Firebase Storage (402 Billing Closed)
+                  Lỗi truy cập Firebase Storage (Quyền truy cập bị từ chối / 403-402)
                 </p>
               </div>
             </div>
@@ -82,9 +82,9 @@ export default function DownloadErrorModal() {
             <div className="text-sm text-slate-600 leading-relaxed bg-amber-50/70 border border-amber-200/80 rounded-xl p-3.5 flex gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <span className="font-semibold text-amber-900 block mb-1">Nguyên nhân lỗi 402:</span>
+                <span className="font-semibold text-amber-900 block mb-1">Chi tiết lỗi:</span>
                 {errorInfo.message ||
-                  'Tệp tin này được tải lên trước đây trên Firebase Storage của Google Cloud nhưng dự án liên kết đã bị khóa tài khoản thanh toán (Billing account is disabled in state closed). Google chặn toàn bộ yêu cầu tải về.'}
+                  'Tệp tin này được tải lên trước đây trên Firebase Storage của Google Cloud nhưng dự án liên kết đang bị từ chối truy cập hoặc chưa được cấp quyền đọc.'}
               </div>
             </div>
 
@@ -93,14 +93,20 @@ export default function DownloadErrorModal() {
                 <CheckCircle2 className="w-4 h-4 text-blue-600" />
                 Hướng dẫn khắc phục:
               </div>
-              <ul className="list-disc pl-4 space-y-1.5 text-blue-800 leading-normal">
-                <li>
-                  <span className="font-semibold text-blue-950">Đối với người dùng:</span> Bạn có thể liên hệ người tạo tệp để gửi lại tệp hoặc tải tệp mới lên hệ thống. Các tệp tải lên hiện tại đã được chuyển sang lưu trữ an toàn trên máy chủ nội bộ.
-                </li>
-                <li>
-                  <span className="font-semibold text-blue-950">Đối với quản trị viên:</span> Cần kiểm tra và kích hoạt lại tài khoản thanh toán (Billing Account) trên Google Cloud Console để mở lại quyền đọc tệp cũ trên Firebase Storage.
-                </li>
-              </ul>
+              {errorInfo.recommendation ? (
+                <div className="text-blue-900 leading-relaxed font-medium">
+                  {errorInfo.recommendation}
+                </div>
+              ) : (
+                <ul className="list-disc pl-4 space-y-1.5 text-blue-800 leading-normal">
+                  <li>
+                    <span className="font-semibold text-blue-950">Đối với người dùng:</span> Bạn có thể liên hệ người tạo tệp để gửi lại tệp hoặc tải tệp mới lên hệ thống. Các tệp tải lên hiện tại đã được chuyển sang lưu trữ an toàn trên máy chủ nội bộ.
+                  </li>
+                  <li>
+                    <span className="font-semibold text-blue-950">Đối với quản trị viên:</span> Cần kiểm tra và kích hoạt lại tài khoản thanh toán (Billing Account) trên Google Cloud Console để mở lại quyền đọc tệp cũ trên Firebase Storage.
+                  </li>
+                </ul>
+              )}
             </div>
           </div>
 

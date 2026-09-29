@@ -183,13 +183,16 @@ export async function downloadFile(url: string | undefined, fileName: string) {
         (isFirebaseStorage && response.status === 403);
 
       if (isBillingError) {
+        const isPermissionDenied = response.status === 403 || errJson?.code === 403;
         triggerDownloadErrorModal({
           fileName: fileName || 'Tệp đính kèm',
           title: 'Không thể tải xuống tệp tin',
-          message:
-            'Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị tạm khóa tài khoản thanh toán (Lỗi 402: Billing account is disabled/closed). Google hiện đang khóa quyền đọc các tệp lưu trữ này.',
-          recommendation:
-            'Quản trị viên cần kích hoạt lại Billing trên Google Cloud Console, hoặc bạn có thể tải lại tệp tin mới lên hệ thống (các tệp mới đã được chuyển sang lưu trữ an toàn trên máy chủ).'
+          message: isPermissionDenied
+            ? 'Dự án đã nâng cấp gói Blaze, tuy nhiên Firebase Storage từ chối truy cập (Lỗi 403: Permission denied). Nguyên nhân do Quy tắc bảo mật (Storage Rules) trên Firebase Console chưa cho phép đọc tệp, hoặc tài khoản thanh toán vừa nâng cấp cần thêm 5 - 15 phút để Google Cloud kích hoạt lại hoàn toàn hạn ngạch.'
+            : (errJson?.message || 'Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị tạm khóa tài khoản thanh toán (Lỗi 402: Billing account is disabled/closed). Google hiện đang khóa quyền đọc các tệp lưu trữ này.'),
+          recommendation: isPermissionDenied
+            ? 'Vào Firebase Console > Storage > Rules, đặt "allow read: if true;" (hoặc allow read: if request.auth != null;), sau đó nhấn Publish. Nếu vừa kích hoạt Blaze, vui lòng đợi vài phút để hệ thống Google đồng bộ.'
+            : 'Quản trị viên cần kiểm tra và liên kết tài khoản thanh toán (Billing Account) còn hiệu lực trên Google Cloud Console cho đúng Project ID của ứng dụng.'
         });
         return;
       }
@@ -214,15 +217,15 @@ export async function downloadFile(url: string | undefined, fileName: string) {
   } catch (error: any) {
     console.error('Download proxy failed:', error);
 
-    // If it's a Firebase Storage URL, NEVER open it in a new tab because it will show Google's raw 402 error JSON!
+    // If it's a Firebase Storage URL, NEVER open it in a new tab because it will show Google's raw error JSON!
     if (isFirebaseStorage) {
       triggerDownloadErrorModal({
         fileName: fileName || 'Tệp đính kèm',
         title: 'Không thể tải xuống tệp tin',
         message:
-          'Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị khóa tài khoản thanh toán (Lỗi 402: Billing account is disabled in state closed). Google chặn quyền truy cập vào tệp.',
+          'Tệp tin này được lưu trữ trên Firebase Storage nhưng dịch vụ lưu trữ từ chối yêu cầu đọc (Lỗi 403 Permission Denied hoặc Billing Quota).',
         recommendation:
-          'Vui lòng liên hệ Quản trị viên để kích hoạt lại Billing trên Google Cloud Console, hoặc tải tệp mới lên hệ thống.'
+          '1. Kiểm tra quy tắc bảo mật (Storage Rules) trên Firebase Console (tab Storage > Rules) đảm bảo có "allow read: if true;".\n2. Đảm bảo đúng Project ID gen-lang-client-0900315510 đã được liên kết thẻ thanh toán và có hạn ngạch.'
       });
       return;
     }

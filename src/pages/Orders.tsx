@@ -1047,7 +1047,7 @@ export default function Orders() {
                   Thời gian
                 </th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">
-                  Tổng giá bán (VAT)
+                  Tổng giá bán có VAT
                 </th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right" title="Giá vốn hàng hoá (COGS) - Không kèm chi phí phụ">
                   Giá vốn COGS

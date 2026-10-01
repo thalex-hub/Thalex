@@ -415,7 +415,11 @@ export default function Orders() {
     if (orders.length === 0) return;
     const exportData = orders.map((order) => {
       const basePriceVal = Number(order.basePrice) || Math.round(Number(order.contractValueWithVAT || order.totalValue) / 1.1) || 0;
-      const contractValueWithVATVal = Number(order.contractValueWithVAT) || Math.round(basePriceVal * 1.1) || Number(order.totalValue) || 0;
+      const contractValueWithVATVal = (Number(order.contractValueWithVAT) > basePriceVal)
+        ? Number(order.contractValueWithVAT)
+        : (Number(order.totalValue) > basePriceVal
+            ? Number(order.totalValue)
+            : (order.sellingVAT ? basePriceVal + Number(order.sellingVAT) : Math.round(basePriceVal * 1.1)));
       
       const expectedProfitVal = order.expectedProfit !== undefined && order.expectedProfit !== null && order.expectedProfit !== ''
         ? Number(order.expectedProfit)
@@ -438,7 +442,7 @@ export default function Orders() {
         "Tên ĐH": order.name,
         "Khách hàng": order.customerName || order.customerId,
         "Giá bán chưa VAT": basePriceVal,
-        "Giá trị HĐ bán (VAT)": contractValueWithVATVal,
+        "Tổng giá bán có VAT": contractValueWithVATVal,
         "Tổng chi phí đơn hàng": totalCostsVal,
         "Lợi nhuận gộp": expectedProfitVal,
         "Tỉ lệ LN/Giá vốn": formatPercentStr(marginVal),
@@ -961,12 +965,16 @@ export default function Orders() {
                     </div>
                     
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">
-                        Giá trị HĐ bán (VAT)
+                      <p className="text-[10px] font-bold text-gray-400 uppercase" title="Giá trị hợp đồng bán có VAT">
+                        Tổng giá bán có VAT
                       </p>
                       <p className="text-sm font-black text-gray-900">
                         {formatCurrency(
-                          order.contractValueWithVAT || order.totalValue,
+                          Number(order.contractValueWithVAT) > (order.basePrice || 0)
+                            ? order.contractValueWithVAT
+                            : (Number(order.totalValue) > (order.basePrice || 0)
+                                ? order.totalValue
+                                : (order.sellingVAT ? (order.basePrice || 0) + Number(order.sellingVAT) : Math.round(Number(order.basePrice || Math.round(Number(order.totalValue) / 1.1)) * 1.1)))
                         )}
                       </p>
                     </div>
@@ -1039,7 +1047,7 @@ export default function Orders() {
                   Thời gian
                 </th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">
-                  D.Thu bán (VAT)
+                  Tổng giá bán (VAT)
                 </th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right" title="Giá vốn hàng hoá (COGS) - Không kèm chi phí phụ">
                   Giá vốn COGS
@@ -1118,7 +1126,13 @@ export default function Orders() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className="font-black text-gray-800 text-xs">
-                        {formatCurrency(order.contractValueWithVAT || order.totalValue)}
+                        {formatCurrency(
+                          Number(order.contractValueWithVAT) > (order.basePrice || 0)
+                            ? order.contractValueWithVAT
+                            : (Number(order.totalValue) > (order.basePrice || 0)
+                                ? order.totalValue
+                                : (order.sellingVAT ? (order.basePrice || 0) + Number(order.sellingVAT) : Math.round(Number(order.basePrice || Math.round(Number(order.totalValue) / 1.1)) * 1.1)))
+                        )}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right text-xs text-gray-600 font-bold">

@@ -1500,12 +1500,17 @@ export default function OrderDetail() {
     .reduce((sum, r) => sum + (r.amount || 0), 0);
 
   const totalProjectExpenses = totalAdvances + totalPaymentReqs + totalReimbursements;
-  const orderValue = Number(order.contractValueWithVAT || order.totalValue) || 0;
+  const baseRev = order.basePrice || Math.round(Number(order.contractValueWithVAT || order.totalValue) / 1.1) || 0;
+  const orderValue = (Number(order.contractValueWithVAT) > baseRev)
+    ? Number(order.contractValueWithVAT)
+    : (Number(order.totalValue) > baseRev
+        ? Number(order.totalValue)
+        : (order.sellingVAT ? baseRev + Number(order.sellingVAT) : Math.round(baseRev * 1.1)));
   const progress = orderValue > 0 ? (paidAmount / orderValue) * 100 : 0;
   const inflowPayments = payments.filter(p => !p.type || p.type === 'income');
 
   const financeSummary = (() => {
-    const rev = order.basePrice || Math.round(Number(order.contractValueWithVAT || order.totalValue) / 1.1) || 0;
+    const rev = baseRev;
     const cogs = Number(order.costPrice) || 0;
     
     let budgetedCosts = Number(order.budgetedTotalCosts) || Number(order.totalCosts) || 0;
@@ -1599,11 +1604,20 @@ export default function OrderDetail() {
                     if (propDoc.exists()) {
                       const pData = propDoc.data();
                       const paid = Number(order.paidAmount || 0);
+                      const sell = Number(pData.sellingPrice) || 0;
+                      const sellVAT = (pData.sellingVAT !== undefined && Number(pData.sellingVAT) !== 0)
+                        ? Number(pData.sellingVAT)
+                        : (Number(pData.contractValueWithVAT) && Number(pData.contractValueWithVAT) > sell
+                            ? Number(pData.contractValueWithVAT) - sell
+                            : Math.round(sell * 0.1));
+                      const totalV = (Number(pData.contractValueWithVAT) && Number(pData.contractValueWithVAT) > sell)
+                        ? Number(pData.contractValueWithVAT)
+                        : (sell + sellVAT);
                       const upData: any = {
-                        basePrice: Number(pData.sellingPrice) || 0,
-                        sellingVAT: Number(pData.sellingVAT) || 0,
-                        contractValueWithVAT: Number(pData.contractValueWithVAT) || 0,
-                        totalValue: Number(pData.contractValueWithVAT) || 0,
+                        basePrice: sell,
+                        sellingVAT: sellVAT,
+                        contractValueWithVAT: totalV,
+                        totalValue: totalV,
                         costPrice: Number(pData.costPrice) || 0,
                         financialCost: Number(pData.financialCost) || 0,
                         warrantyCost: Number(pData.warrantyCost) || 0,
@@ -1924,7 +1938,7 @@ export default function OrderDetail() {
                       <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                          <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Giá bán chưa VAT</p>
                          <p className="text-sm font-black text-gray-900">{formatCurrency(financeSummary.rev)}</p>
-                         <p className="text-[8px] font-bold text-gray-400 mt-1 uppercase">HĐ gồm VAT: {formatCurrency(orderValue)}</p>
+                         <p className="text-[8px] font-bold text-purple-600 mt-1 uppercase" title="Tổng giá bán có VAT">Tổng có VAT: {formatCurrency(orderValue)}</p>
                       </div>
 
                       {/* Box 2: Dòng tiền thu về */}

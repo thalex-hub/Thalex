@@ -442,8 +442,16 @@ export default function SalesManagement() {
                       
                       <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
                          <div>
-                            <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest leading-none mb-1">Giá trị HĐ bán (VAT)</p>
-                            <p className="text-sm font-black text-gray-900">{formatCurrency(order.contractValueWithVAT || order.totalValue)}</p>
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Tổng giá bán có VAT</p>
+                            <p className="text-sm font-black text-gray-900">
+                              {formatCurrency(
+                                Number(order.contractValueWithVAT) > (order.basePrice || 0)
+                                  ? order.contractValueWithVAT
+                                  : (Number(order.totalValue) > (order.basePrice || 0)
+                                      ? order.totalValue
+                                      : (order.sellingVAT ? (order.basePrice || 0) + Number(order.sellingVAT) : Math.round(Number(order.basePrice || Math.round(Number(order.totalValue) / 1.1)) * 1.1)))
+                              )}
+                            </p>
                          </div>
                          
                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -571,7 +579,15 @@ export default function SalesManagement() {
                                 <p className="text-[10px] text-gray-400 font-bold uppercase">{o.customerName}</p>
                              </div>
                           </div>
-                          <p className="text-sm font-black text-blue-600">{formatCurrency(o.contractValueWithVAT || o.totalValue)}</p>
+                          <p className="text-sm font-black text-blue-600">
+                            {formatCurrency(
+                              Number(o.contractValueWithVAT) > (o.basePrice || 0)
+                                ? o.contractValueWithVAT
+                                : (Number(o.totalValue) > (o.basePrice || 0)
+                                    ? o.totalValue
+                                    : (o.sellingVAT ? (o.basePrice || 0) + Number(o.sellingVAT) : Math.round(Number(o.basePrice || Math.round(Number(o.totalValue) / 1.1)) * 1.1)))
+                            )}
+                          </p>
                        </div>
                     ))}
                     {filteredOrders.length === 0 && <p className="p-10 text-center text-xs text-gray-400 italic">Không có dữ liệu</p>}

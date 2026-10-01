@@ -695,7 +695,15 @@ export default function CashFlowManagement() {
       setProcessing(false);
     }
   };
-  const totalContractValue = activeOrders.reduce((sum, o) => sum + (Number(o.contractValueWithVAT || o.totalValue) || 0), 0);
+  const totalContractValue = activeOrders.reduce((sum, o) => {
+    const base = Number(o.basePrice) || Math.round(Number(o.contractValueWithVAT || o.totalValue) / 1.1) || 0;
+    const val = (Number(o.contractValueWithVAT) > base)
+      ? Number(o.contractValueWithVAT)
+      : (Number(o.totalValue) > base
+          ? Number(o.totalValue)
+          : (o.sellingVAT ? base + Number(o.sellingVAT) : Math.round(base * 1.1)));
+    return sum + val;
+  }, 0);
   
   // Pending collection is lifetime based usually
   const allIncomeForOrders = payments.filter(p => p.type === 'income' && p.orderId).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
@@ -1104,7 +1112,7 @@ export default function CashFlowManagement() {
                   <div className="p-8 border-b border-gray-50 bg-gray-50/30">
                      <div className="grid grid-cols-2 gap-8">
                         <div>
-                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Giá trị HĐ bán (VAT)</p>
+                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Tổng giá bán có VAT</p>
                             <p className="text-2xl font-black text-gray-900">{formatCurrency(totalContractValue)}</p>
                         </div>
                         <div className="text-right">
@@ -1120,7 +1128,7 @@ export default function CashFlowManagement() {
                            <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                               <th className="px-6 py-4">Đơn hàng</th>
                               <th className="px-6 py-4">Khách hàng</th>
-                              <th className="px-6 py-4 text-right">Giá trị HĐ bán (VAT)</th>
+                              <th className="px-6 py-4 text-right">Tổng giá bán có VAT</th>
                               <th className="px-6 py-4 text-right">Đã thu</th>
                               <th className="px-6 py-4 text-right text-rose-600">Cần thu</th>
                            </tr>
@@ -1129,7 +1137,12 @@ export default function CashFlowManagement() {
                            {activeOrders.slice(0, 10).map(order => {
                              const oPayments = payments.filter(p => p.orderId === order.id && p.type === 'income');
                              const paid = oPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-                             const orderVal = Number(order.totalValue || order.contractValueWithVAT) || 0;
+                             const base = Number(order.basePrice) || Math.round(Number(order.contractValueWithVAT || order.totalValue) / 1.1) || 0;
+                             const orderVal = (Number(order.contractValueWithVAT) > base)
+                               ? Number(order.contractValueWithVAT)
+                               : (Number(order.totalValue) > base
+                                   ? Number(order.totalValue)
+                                   : (order.sellingVAT ? base + Number(order.sellingVAT) : Math.round(base * 1.1)));
                              const remaining = orderVal - paid;
                              
                              if (remaining <= 0) return null;

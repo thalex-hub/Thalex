@@ -133,11 +133,19 @@ export default function OrderProposals() {
 
   const calculateFinancials = (data: typeof newProposal) => {
     const sell = Number(data.sellingPrice) || 0;
-    const sellVAT = Number(data.sellingVAT) || 0;
-    const contractValueWithVAT = sell + sellVAT;
+    const sellVAT = (data.sellingVAT !== undefined && data.sellingVAT !== '' && Number(data.sellingVAT) !== 0)
+      ? Number(data.sellingVAT)
+      : (Number(data.contractValueWithVAT) && Number(data.contractValueWithVAT) > sell
+          ? Number(data.contractValueWithVAT) - sell
+          : Math.round(sell * 0.1));
+    const contractValueWithVAT = (Number(data.contractValueWithVAT) && Number(data.contractValueWithVAT) > sell)
+      ? Number(data.contractValueWithVAT)
+      : (sell + sellVAT);
 
     const cost = Number(data.costPrice) || 0;
-    const costVAT = Number(data.costVAT) || 0;
+    const costVAT = (data.costVAT !== undefined && data.costVAT !== '' && Number(data.costVAT) !== 0)
+      ? Number(data.costVAT)
+      : Math.round(cost * 0.1);
     const totalCostWithVAT = cost + costVAT;
     
     const financialCost = totalCostWithVAT * 0.02;
@@ -165,7 +173,9 @@ export default function OrderProposals() {
       marginAfterCIT,
       marginAfterCITOnSalesPreVAT,
       contractValueWithVAT,
+      sellingVAT,
       totalCostWithVAT,
+      costVAT,
       financialCost,
       warranty
     };
@@ -179,7 +189,9 @@ export default function OrderProposals() {
     marginAfterCIT,
     marginAfterCITOnSalesPreVAT,
     contractValueWithVAT,
+    sellingVAT,
     totalCostWithVAT,
+    costVAT,
     financialCost,
     warranty
   } = calculateFinancials(newProposal);
@@ -305,13 +317,13 @@ export default function OrderProposals() {
           customerId: newProposal.customerId,
           customerName: customer?.companyName || customer?.name || 'Khách hàng lẻ',
           sellingPrice: Number(newProposal.sellingPrice),
-          sellingVAT: Number(newProposal.sellingVAT),
+          sellingVAT: financials.sellingVAT,
           contractValueWithVAT: financials.contractValueWithVAT,
           payment1Percentage: Number(newProposal.payment1Percentage),
           payment1Amount: Number(newProposal.payment1Amount),
           remainingDebt: Number(newProposal.remainingDebt),
           costPrice: Number(newProposal.costPrice),
-          costVAT: Number(newProposal.costVAT),
+          costVAT: financials.costVAT,
           totalCostWithVAT: financials.totalCostWithVAT,
           financialCost: financials.financialCost,
           warrantyCost: financials.warranty,
@@ -403,21 +415,35 @@ export default function OrderProposals() {
 
   const handleEdit = (prop: any) => {
     setEditingProposal(prop);
+    const sell = Number(prop.sellingPrice) || 0;
+    const fallbackSellVAT = (prop.sellingVAT !== undefined && Number(prop.sellingVAT) !== 0)
+      ? Number(prop.sellingVAT)
+      : (Number(prop.contractValueWithVAT) && Number(prop.contractValueWithVAT) > sell
+          ? Number(prop.contractValueWithVAT) - sell
+          : Math.round(sell * 0.1));
+    const fallbackContractValueWithVAT = (Number(prop.contractValueWithVAT) && Number(prop.contractValueWithVAT) > sell)
+      ? Number(prop.contractValueWithVAT)
+      : (sell + fallbackSellVAT);
+
     const cost = Number(prop.costPrice) || 0;
     const fallbackCostVAT = (prop.costVAT !== undefined && Number(prop.costVAT) !== 0)
       ? Number(prop.costVAT)
       : Math.round(cost * 0.1);
     const totalWithVAT = cost + fallbackCostVAT;
 
+    const p1Percent = Number(prop.payment1Percentage) || 0;
+    const p1Amount = Number(prop.payment1Amount) || (fallbackContractValueWithVAT * (p1Percent / 100));
+    const remainingDebt = Number(prop.remainingDebt) || (fallbackContractValueWithVAT - p1Amount);
+
     setNewProposal({
       name: prop.name || '',
       customerId: prop.customerId || '',
       sellingPrice: (prop.sellingPrice || '').toString(),
-      sellingVAT: (prop.sellingVAT || '0').toString(),
-      contractValueWithVAT: (prop.contractValueWithVAT || '0').toString(),
+      sellingVAT: fallbackSellVAT.toString(),
+      contractValueWithVAT: fallbackContractValueWithVAT.toString(),
       payment1Percentage: (prop.payment1Percentage || '0').toString(),
-      payment1Amount: (prop.payment1Amount || '0').toString(),
-      remainingDebt: (prop.remainingDebt || '0').toString(),
+      payment1Amount: p1Amount.toString(),
+      remainingDebt: remainingDebt.toString(),
       costPrice: (prop.costPrice || '').toString(),
       costVAT: fallbackCostVAT.toString(),
       totalCostWithVAT: totalWithVAT.toString(),
@@ -434,18 +460,38 @@ export default function OrderProposals() {
   };
 
   const handleDuplicate = (prop: any) => {
+    const sell = Number(prop.sellingPrice) || 0;
+    const fallbackSellVAT = (prop.sellingVAT !== undefined && Number(prop.sellingVAT) !== 0)
+      ? Number(prop.sellingVAT)
+      : (Number(prop.contractValueWithVAT) && Number(prop.contractValueWithVAT) > sell
+          ? Number(prop.contractValueWithVAT) - sell
+          : Math.round(sell * 0.1));
+    const fallbackContractValueWithVAT = (Number(prop.contractValueWithVAT) && Number(prop.contractValueWithVAT) > sell)
+      ? Number(prop.contractValueWithVAT)
+      : (sell + fallbackSellVAT);
+
+    const cost = Number(prop.costPrice) || 0;
+    const fallbackCostVAT = (prop.costVAT !== undefined && Number(prop.costVAT) !== 0)
+      ? Number(prop.costVAT)
+      : Math.round(cost * 0.1);
+    const totalWithVAT = cost + fallbackCostVAT;
+
+    const p1Percent = Number(prop.payment1Percentage) || 0;
+    const p1Amount = Number(prop.payment1Amount) || (fallbackContractValueWithVAT * (p1Percent / 100));
+    const remainingDebt = Number(prop.remainingDebt) || (fallbackContractValueWithVAT - p1Amount);
+
     setNewProposal({
       name: `${prop.name || ''} (Bản sao)`,
       customerId: prop.customerId || '',
       sellingPrice: (prop.sellingPrice || '').toString(),
-      sellingVAT: (prop.sellingVAT || '0').toString(),
-      contractValueWithVAT: (prop.contractValueWithVAT || '0').toString(),
+      sellingVAT: fallbackSellVAT.toString(),
+      contractValueWithVAT: fallbackContractValueWithVAT.toString(),
       payment1Percentage: (prop.payment1Percentage || '0').toString(),
-      payment1Amount: (prop.payment1Amount || '0').toString(),
-      remainingDebt: (prop.remainingDebt || '0').toString(),
+      payment1Amount: p1Amount.toString(),
+      remainingDebt: remainingDebt.toString(),
       costPrice: (prop.costPrice || '').toString(),
-      costVAT: (prop.costVAT || '0').toString(),
-      totalCostWithVAT: (prop.totalCostWithVAT || '0').toString(),
+      costVAT: fallbackCostVAT.toString(),
+      totalCostWithVAT: totalWithVAT.toString(),
       financialCost: (prop.financialCost || '0').toString(),
       warrantyCost: (prop.warrantyCost || '0').toString(),
       contingencyCost: (prop.contingencyCost || '0').toString(),
@@ -567,8 +613,14 @@ export default function OrderProposals() {
         const orderCode = `${prefix}${nextSeq.toString().padStart(2, '0')}`;
 
         const sell = Number(proposal.sellingPrice) || 0;
-        const sellVAT = Number(proposal.sellingVAT) || 0;
-        const totalV = Number(proposal.contractValueWithVAT) || (sell + sellVAT);
+        const sellVAT = (proposal.sellingVAT !== undefined && Number(proposal.sellingVAT) !== 0)
+          ? Number(proposal.sellingVAT)
+          : (Number(proposal.contractValueWithVAT) && Number(proposal.contractValueWithVAT) > sell
+              ? Number(proposal.contractValueWithVAT) - sell
+              : Math.round(sell * 0.1));
+        const totalV = (Number(proposal.contractValueWithVAT) && Number(proposal.contractValueWithVAT) > sell)
+          ? Number(proposal.contractValueWithVAT)
+          : (sell + sellVAT);
 
         const orderRef = await addDoc(collection(db, 'orders'), {
           proposalId: id,
@@ -704,7 +756,14 @@ export default function OrderProposals() {
 
     const exportData = proposals.map(p => {
       const sellingPriceVal = cleanNumber(p.sellingPrice || p.value);
-      const contractValueWithVATVal = cleanNumber(p.contractValueWithVAT);
+      const sellVATVal = (p.sellingVAT !== undefined && cleanNumber(p.sellingVAT) !== 0)
+        ? cleanNumber(p.sellingVAT)
+        : (cleanNumber(p.contractValueWithVAT) > sellingPriceVal
+            ? cleanNumber(p.contractValueWithVAT) - sellingPriceVal
+            : Math.round(sellingPriceVal * 0.1));
+      const contractValueWithVATVal = (cleanNumber(p.contractValueWithVAT) > sellingPriceVal)
+        ? cleanNumber(p.contractValueWithVAT)
+        : (sellingPriceVal + sellVATVal);
       const totalCostsVal = cleanNumber(p.totalCosts);
       const expectedProfitVal = cleanNumber(p.expectedProfit);
       const costPriceVal = cleanNumber(p.costPrice);
@@ -729,7 +788,8 @@ export default function OrderProposals() {
         'Tên đề xuất': p.name,
         'Khách hàng': customers.find(c => c.id === p.customerId)?.companyName || p.customerName || p.customerId,
         'Giá bán chưa VAT': sellingPriceVal,
-        'Giá trị HĐ bán (VAT)': contractValueWithVATVal,
+        'Thuế VAT Giá bán': sellVATVal,
+        'Tổng giá bán có VAT': contractValueWithVATVal,
         'Tổng chi phí đơn hàng': totalCostsVal,
         'Lợi nhuận gộp': expectedProfitVal,
         'Tỉ lệ LN/Giá vốn': formatPercent(marginVal),
@@ -747,8 +807,14 @@ export default function OrderProposals() {
     if (!viewingProposal) return null;
     
     const sell = Number(viewingProposal.sellingPrice) || 0;
-    const sellVAT = Number(viewingProposal.sellingVAT) || 0;
-    const contractValueWithVAT = Number(viewingProposal.contractValueWithVAT) || (sell + sellVAT);
+    const sellVAT = (viewingProposal.sellingVAT !== undefined && Number(viewingProposal.sellingVAT) !== 0)
+      ? Number(viewingProposal.sellingVAT)
+      : (Number(viewingProposal.contractValueWithVAT) && Number(viewingProposal.contractValueWithVAT) > sell
+          ? Number(viewingProposal.contractValueWithVAT) - sell
+          : Math.round(sell * 0.1));
+    const contractValueWithVAT = (Number(viewingProposal.contractValueWithVAT) && Number(viewingProposal.contractValueWithVAT) > sell)
+      ? Number(viewingProposal.contractValueWithVAT)
+      : (sell + sellVAT);
 
     const cost = Number(viewingProposal.costPrice) || 0;
     
@@ -781,6 +847,7 @@ export default function OrderProposals() {
 
     return {
       contractValueWithVAT,
+      sellingVAT: sellVAT,
       costVAT,
       totalCostWithVAT,
       financialCost,
@@ -1031,8 +1098,17 @@ export default function OrderProposals() {
                         <p className="text-blue-600 text-xs sm:text-[13px] lg:text-sm font-black tracking-tight mt-0.5">{formatCurrency(prop.sellingPrice || prop.value)}</p>
                      </div>
                      <div>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase">Giá trị HĐ bán (VAT)</p>
-                        <p className="text-purple-600 text-xs sm:text-[13px] lg:text-sm font-black tracking-tight mt-0.5">{formatCurrency(prop.contractValueWithVAT)}</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase" title="Giá trị hợp đồng bán có VAT">Tổng giá bán có VAT</p>
+                        <p className="text-purple-600 text-xs sm:text-[13px] lg:text-sm font-black tracking-tight mt-0.5">
+                          {(() => {
+                            const sell = Number(prop.sellingPrice || prop.value) || 0;
+                            const cVal = Number(prop.contractValueWithVAT);
+                            const finalVal = (cVal && cVal > sell)
+                              ? cVal
+                              : (sell + (Number(prop.sellingVAT) || Math.round(sell * 0.1)));
+                            return formatCurrency(finalVal);
+                          })()}
+                        </p>
                      </div>
                      <div>
                         <p className="text-[10px] text-gray-400 font-bold uppercase">Tổng chi phí đơn hàng</p>
@@ -1177,7 +1253,7 @@ export default function OrderProposals() {
                       <p className="text-xs sm:text-sm lg:text-[15px] font-black text-blue-700 break-words" title={formatCurrency(viewingProposal.sellingPrice)}>{formatCurrency(viewingProposal.sellingPrice)}</p>
                    </div>
                    <div className="p-3 sm:p-4 bg-purple-50 rounded-2xl border border-purple-100 flex flex-col justify-between min-h-[82px] shadow-sm">
-                      <p className="text-[10px] font-black text-purple-400 uppercase mb-1 tracking-wider">Giá trị HĐ bán (VAT)</p>
+                      <p className="text-[10px] font-black text-purple-400 uppercase mb-1 tracking-wider" title="Giá trị hợp đồng bán có VAT">Tổng giá bán có VAT</p>
                       <p className="text-xs sm:text-sm lg:text-[15px] font-black text-purple-700 break-words" title={formatCurrency(viewFinancials?.contractValueWithVAT)}>{formatCurrency(viewFinancials?.contractValueWithVAT)}</p>
                    </div>
                    <div className="p-3 sm:p-4 bg-amber-50 rounded-2xl border border-amber-100 flex flex-col justify-between min-h-[82px] shadow-sm">
@@ -1312,7 +1388,19 @@ export default function OrderProposals() {
                           <DollarSign size={14} className="text-amber-600" /> Bóc tách chi phí & thuế
                         </h4>
                         <div className="bg-gray-900 p-6 rounded-3xl space-y-4 text-white shadow-xl">
-                            <div className="flex justify-between border-b border-gray-800 pb-2">
+                            <div className="flex justify-between border-b border-gray-800 pb-2 text-blue-300">
+                               <span className="text-xs text-gray-400 font-bold uppercase">Giá bán chưa VAT</span>
+                               <span className="font-bold">{formatCurrency(viewingProposal.sellingPrice)}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-800 pb-2 text-blue-300">
+                               <span className="text-xs text-gray-400 font-bold uppercase">Thuế VAT giá bán (10%)</span>
+                               <span className="font-bold">{formatCurrency(viewFinancials?.sellingVAT)}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-800 pb-2 text-purple-400 font-black italic">
+                               <span className="text-xs uppercase">Tổng giá bán có VAT</span>
+                               <span>{formatCurrency(viewFinancials?.contractValueWithVAT)}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-800 pb-2 pt-2">
                                <span className="text-xs text-gray-400 font-bold uppercase">Giá vốn chưa VAT</span>
                                <span className="font-bold">{formatCurrency(viewingProposal.costPrice)}</span>
                             </div>
@@ -1717,7 +1805,7 @@ export default function OrderProposals() {
                                  onChange={e => {
                                    const val = parseCurrencyInput(e.target.value);
                                    const sell = Number(val) || 0;
-                                   const sellVAT = Number(newProposal.sellingVAT) || 0; // Auto-calculate 10% VAT as default
+                                   const sellVAT = Math.round(sell * 0.1); // Auto-calculate 10% VAT as default
                                    const totalVal = sell + sellVAT;
                                    const p1Percent = Number(newProposal.payment1Percentage) || 0;
                                    const p1Amount = totalVal * (p1Percent / 100);
@@ -1762,9 +1850,12 @@ export default function OrderProposals() {
                              </div>
 
                              <div className="col-span-1 md:col-span-2">
-                               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Giá trị hợp đồng bán có VAT (VND)</label>
-                               <div className="w-full bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 font-black text-purple-700">
-                                 {formatCurrency(contractValueWithVAT)}
+                               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Tổng giá bán có VAT (VND)</label>
+                               <div className="w-full bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 font-black text-purple-700 flex flex-wrap justify-between items-center gap-2">
+                                 <span>{formatCurrency(contractValueWithVAT)}</span>
+                                 <span className="text-[11px] font-bold text-purple-400">
+                                   (Giá bán {formatCurrency(newProposal.sellingPrice || 0)} + VAT {formatCurrency(sellingVAT)})
+                                 </span>
                                </div>
                              </div>
 

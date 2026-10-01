@@ -123,6 +123,35 @@ export default function NotificationManager() {
     return false;
   }, []);
 
+  const addHistoricalNotification = React.useCallback((
+    title: string, 
+    body: string, 
+    type: 'soon' | 'overdue' | 'returned' | 'approval' | 'comment', 
+    taskId?: string, 
+    link?: string,
+    docId?: string,
+    colName?: string
+  ) => {
+    setNotifications(prev => [
+      { id: Math.random().toString(36).substr(2, 9), title, body, time: new Date(), type, read: false, taskId, link, docId, colName },
+      ...prev.slice(0, 49) // Keep last 50
+    ]);
+  }, []);
+
+  const sendNotification = React.useCallback((title: string, body: string, type: 'soon' | 'overdue' | 'returned' | 'approval' | 'comment') => {
+    if (typeof Notification === 'undefined' || permission !== 'granted') return;
+
+    try {
+      new Notification(title, {
+        body,
+        icon: '/favicon.ico',
+        tag: type
+      });
+    } catch (e) {
+      console.warn('Notification failed (iframe limitation):', e);
+    }
+  }, [permission]);
+
   // Load user-isolated notification history
   React.useEffect(() => {
     if (!currentUser) {
@@ -611,21 +640,6 @@ export default function NotificationManager() {
     });
   }, [tasks]);
 
-  const addHistoricalNotification = (
-    title: string, 
-    body: string, 
-    type: 'soon' | 'overdue' | 'returned' | 'approval' | 'comment', 
-    taskId?: string, 
-    link?: string,
-    docId?: string,
-    colName?: string
-  ) => {
-    setNotifications(prev => [
-      { id: Math.random().toString(36).substr(2, 9), title, body, time: new Date(), type, read: false, taskId, link, docId, colName },
-      ...prev.slice(0, 49) // Keep last 50
-    ]);
-  };
-
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
@@ -634,20 +648,6 @@ export default function NotificationManager() {
     if (typeof Notification === 'undefined') return;
     const result = await Notification.requestPermission();
     setPermission(result);
-  };
-
-  const sendNotification = (title: string, body: string, type: 'soon' | 'overdue' | 'returned' | 'approval' | 'comment') => {
-    if (typeof Notification === 'undefined' || permission !== 'granted') return;
-
-    try {
-      new Notification(title, {
-        body,
-        icon: '/favicon.ico',
-        tag: type
-      });
-    } catch (e) {
-      console.warn('Notification failed (iframe limitation):', e);
-    }
   };
 
   const navigateToNotification = (notification: any) => {

@@ -13,8 +13,6 @@ import { Task, AppUser } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/authContext';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToExcel } from '../lib/excel';
 
@@ -981,6 +979,8 @@ export default function Tasks() {
         return t.status !== 'completed' && isPast;
       }).length;
 
+      const { jsPDF } = await import('jspdf');
+      await import('jspdf-autotable');
       const doc = new jsPDF();
       
       // Title

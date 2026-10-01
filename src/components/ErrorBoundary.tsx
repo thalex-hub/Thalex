@@ -56,11 +56,16 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   private handleReset = () => {
     this.setState({ hasError: false, error: null });
-    window.location.href = '/';
+    window.location.href = '/?_t=' + Date.now();
   };
 
   private handleReload = () => {
-    window.location.reload();
+    if (typeof caches !== 'undefined') {
+      caches.keys().then((names) => {
+        names.forEach(name => caches.delete(name));
+      }).catch(() => {});
+    }
+    window.location.href = window.location.origin + window.location.pathname + '?_t=' + Date.now();
   };
 
   public render() {

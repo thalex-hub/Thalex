@@ -13,6 +13,55 @@ import { sendProposalEmailNotification } from '../lib/proposalEmail';
 
 import { handleFirestoreError, OperationType } from "../lib/firestoreUtils";
 
+function calculateFinancials(data: any) {
+  const sell = Number(data?.sellingPrice) || 0;
+  const sellingVAT = (data?.sellingVAT !== undefined && data?.sellingVAT !== '' && Number(data?.sellingVAT) !== 0)
+    ? Number(data.sellingVAT)
+    : (Number(data?.contractValueWithVAT) && Number(data?.contractValueWithVAT) > sell
+        ? Number(data.contractValueWithVAT) - sell
+        : Math.round(sell * 0.1));
+  const contractValueWithVAT = (Number(data?.contractValueWithVAT) && Number(data?.contractValueWithVAT) > sell)
+    ? Number(data.contractValueWithVAT)
+    : (sell + sellingVAT);
+
+  const cost = Number(data?.costPrice) || 0;
+  const costVAT = (data?.costVAT !== undefined && data?.costVAT !== '' && Number(data?.costVAT) !== 0)
+    ? Number(data.costVAT)
+    : Math.round(cost * 0.1);
+  const totalCostWithVAT = cost + costVAT;
+  
+  const financialCost = totalCostWithVAT * 0.02;
+  const warranty = sell * 0.02;
+  const contingency = Number(data?.contingencyCost) || 0;
+  const acquisition = Number(data?.customerAcquisitionCost) || 0;
+  const others = Number(data?.otherCosts) || 0;
+
+  // Formula: Total Costs = Cost Price + Financial Cost + Warranty Cost + Contingency Cost + Customer Acquisition Cost + Other Costs
+  const totalCosts = cost + financialCost + warranty + contingency + acquisition + others;
+  const profit = sell - totalCosts;
+  const margin = cost > 0 ? (profit / cost) * 100 : 0;
+
+  const citTax = (sell - cost) > 0 ? 0.2 * (sell - cost) : 0;
+  const profitAfterCIT = profit - citTax;
+  const marginAfterCIT = cost > 0 ? (profitAfterCIT / cost) * 100 : 0;
+  const marginAfterCITOnSalesPreVAT = sell > 0 ? (profitAfterCIT / sell) * 100 : 0;
+
+  return { 
+    totalCosts, 
+    profit, 
+    margin, 
+    profitAfterCIT, 
+    marginAfterCIT,
+    marginAfterCITOnSalesPreVAT,
+    contractValueWithVAT,
+    sellingVAT,
+    totalCostWithVAT,
+    costVAT,
+    financialCost,
+    warranty
+  };
+}
+
 export default function OrderProposals() {
   const [proposals, setProposals] = React.useState<any[]>([]);
   const [showAddModal, setShowAddModal] = React.useState(false);
@@ -129,56 +178,6 @@ export default function OrderProposals() {
 
   const formatWithCommas = (value: string | number) => {
     return formatCurrencyInput(value);
-  };
-
-  const calculateFinancials = (data: typeof newProposal) => {
-    const sell = Number(data.sellingPrice) || 0;
-    const sellVAT = (data.sellingVAT !== undefined && data.sellingVAT !== '' && Number(data.sellingVAT) !== 0)
-      ? Number(data.sellingVAT)
-      : (Number(data.contractValueWithVAT) && Number(data.contractValueWithVAT) > sell
-          ? Number(data.contractValueWithVAT) - sell
-          : Math.round(sell * 0.1));
-    const contractValueWithVAT = (Number(data.contractValueWithVAT) && Number(data.contractValueWithVAT) > sell)
-      ? Number(data.contractValueWithVAT)
-      : (sell + sellVAT);
-
-    const cost = Number(data.costPrice) || 0;
-    const costVAT = (data.costVAT !== undefined && data.costVAT !== '' && Number(data.costVAT) !== 0)
-      ? Number(data.costVAT)
-      : Math.round(cost * 0.1);
-    const totalCostWithVAT = cost + costVAT;
-    
-    const financialCost = totalCostWithVAT * 0.02;
-    
-    const warranty = sell * 0.02;
-    const contingency = Number(data.contingencyCost) || 0;
-    const acquisition = Number(data.customerAcquisitionCost) || 0;
-    const others = Number(data.otherCosts) || 0;
-
-    // Formula requested: Total Costs = Cost Price + Financial Cost + Warranty Cost + Contingency Cost + Customer Acquisition Cost + Other Costs
-    const totalCosts = cost + financialCost + warranty + contingency + acquisition + others;
-    const profit = sell - totalCosts;
-    const margin = cost > 0 ? (profit / cost) * 100 : 0;
-
-    const citTax = (sell - cost) > 0 ? 0.2 * (sell - cost) : 0;
-    const profitAfterCIT = profit - citTax;
-    const marginAfterCIT = cost > 0 ? (profitAfterCIT / cost) * 100 : 0;
-    const marginAfterCITOnSalesPreVAT = sell > 0 ? (profitAfterCIT / sell) * 100 : 0;
-
-    return { 
-      totalCosts, 
-      profit, 
-      margin, 
-      profitAfterCIT, 
-      marginAfterCIT,
-      marginAfterCITOnSalesPreVAT,
-      contractValueWithVAT,
-      sellingVAT,
-      totalCostWithVAT,
-      costVAT,
-      financialCost,
-      warranty
-    };
   };
 
   const { 

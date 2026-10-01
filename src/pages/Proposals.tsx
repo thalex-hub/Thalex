@@ -143,21 +143,17 @@ export default function ProposalsOverview() {
          const q2 = query(collection(db, colName), where('departmentId', '==', appUser?.departmentId || 'none'), orderBy('createdAt', 'desc'), limit(50));
          const q3 = query(collection(db, colName), where('followers', 'array-contains', user.uid), orderBy('createdAt', 'desc'), limit(50));
          
-         const unsub1 = onSnapshot(q1, snap => { l1 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2, l3]); }, err => console.error(err));
-         const unsub2 = onSnapshot(q2, snap => { l2 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2, l3]); }, err => console.error(err));
-         const unsub3 = onSnapshot(q3, snap => { l3 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2, l3]); }, err => console.error(err));
-         
-         unsubscribes.push(() => { unsub1(); unsub2(); unsub3(); });
+         unsubscribes.push(onSnapshot(q1, snap => { l1 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2, l3]); }, err => console.error(err)));
+         unsubscribes.push(onSnapshot(q2, snap => { l2 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2, l3]); }, err => console.error(err)));
+         unsubscribes.push(onSnapshot(q3, snap => { l3 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2, l3]); }, err => console.error(err)));
       } else {
          const field = colName === 'order_proposals' ? 'createdBy' : 'userId';
          let l1: any[] = []; let l2: any[] = [];
          const q1 = query(collection(db, colName), where(field, '==', user.uid), orderBy('createdAt', 'desc'), limit(50));
          const q2 = query(collection(db, colName), where('followers', 'array-contains', user.uid), orderBy('createdAt', 'desc'), limit(50));
          
-         const unsub1 = onSnapshot(q1, snap => { l1 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2]); }, err => console.error(err));
-         const unsub2 = onSnapshot(q2, snap => { l2 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2]); }, err => console.error(err));
-         
-         unsubscribes.push(() => { unsub1(); unsub2(); });
+         unsubscribes.push(onSnapshot(q1, snap => { l1 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2]); }, err => console.error(err)));
+         unsubscribes.push(onSnapshot(q2, snap => { l2 = snap.docs.map(d => ({ id: d.id, ...d.data() })); processSnapshots([l1, l2]); }, err => console.error(err)));
       }
     });
 

@@ -31,6 +31,30 @@ import { exportToExcel } from '../lib/excel';
 
 import { useAuth } from '../lib/authContext';
 
+const getProposalLabel = (col: string) => {
+  switch(col) {
+    case 'leave_requests': return 'Nghỉ phép';
+    case 'advance_requests': return 'Tạm ứng';
+    case 'payment_requests': return 'Thanh toán';
+    case 'order_proposals': return 'Đơn hàng';
+    case 'reimbursement_requests': return 'Hoàn ứng';
+    case 'business_trip_requests': return 'Công tác';
+    default: return 'Khác';
+  }
+};
+
+const getProposalLink = (col: string) => {
+  switch(col) {
+    case 'leave_requests': return '/proposals/leave';
+    case 'advance_requests': return '/proposals/advance';
+    case 'payment_requests': return '/proposals/payment';
+    case 'order_proposals': return '/proposals/order';
+    case 'reimbursement_requests': return '/proposals/reimbursement';
+    case 'business_trip_requests': return '/proposals/business-trip';
+    default: return '#';
+  }
+};
+
 export default function ProposalsOverview() {
   const [stats, setStats] = useState({
     pending: 0,
@@ -234,30 +258,6 @@ export default function ProposalsOverview() {
       return dateB - dateA;
     });
   }, [refinedProposals, activeFilter, checkNeedsAction]);
-
-  const getProposalLabel = (col: string) => {
-    switch(col) {
-      case 'leave_requests': return 'Nghỉ phép';
-      case 'advance_requests': return 'Tạm ứng';
-      case 'payment_requests': return 'Thanh toán';
-      case 'order_proposals': return 'Đơn hàng';
-      case 'reimbursement_requests': return 'Hoàn ứng';
-      case 'business_trip_requests': return 'Công tác';
-      default: return 'Khác';
-    }
-  };
-
-  const getProposalLink = (col: string) => {
-    switch(col) {
-      case 'leave_requests': return '/proposals/leave';
-      case 'advance_requests': return '/proposals/advance';
-      case 'payment_requests': return '/proposals/payment';
-      case 'order_proposals': return '/proposals/order';
-      case 'reimbursement_requests': return '/proposals/reimbursement';
-      case 'business_trip_requests': return '/proposals/business-trip';
-      default: return '#';
-    }
-  };
 
   const proposalTypes = [
     { title: 'Nghỉ phép', icon: Calendar, color: 'text-orange-600', bg: 'bg-orange-50', link: '/proposals/leave', desc: 'Đăng ký nghỉ phép, nghỉ ốm' },

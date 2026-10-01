@@ -779,7 +779,7 @@ export default function Tasks() {
     }
   };
 
-  const checkAndCompleteOrder = async (orderId: string | undefined, parentId: string | undefined) => {
+  async function checkAndCompleteOrder(orderId: string | undefined, parentId: string | undefined) {
     if (!orderId) return;
 
     try {

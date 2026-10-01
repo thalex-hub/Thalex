@@ -52,6 +52,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { useAuth } from '../lib/authContext';
 
+const getTaskOrder = (task: any) => {
+  const match = task?.name?.match(/^(\d+)\./);
+  if (match) return parseInt(match[1]);
+  if (typeof task?.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
+  return 999;
+};
+
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -2094,24 +2101,8 @@ export default function OrderDetail() {
              
              <div className="p-4 space-y-3">
                 {/* Parent Task Rendering - All top-level tasks sorted by orderIndex */}
-                {tasks.filter(t => !t.parentId).sort((a, b) => {
-                  const getTaskOrder = (task: any) => {
-                    const match = task.name?.match(/^(\d+)\./);
-                    if (match) return parseInt(match[1]);
-                    if (typeof task.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
-                    return 999;
-                  };
-                  return getTaskOrder(a) - getTaskOrder(b);
-                }).map((parentTask, i) => {
-                  const subtasks = tasks.filter(st => st.parentId === parentTask.id).sort((a, b) => {
-                    const getTaskOrder = (task: any) => {
-                      const match = task.name?.match(/^(\d+)\./);
-                      if (match) return parseInt(match[1]);
-                      if (typeof task.orderIndex === 'number' && task.orderIndex > -1) return task.orderIndex;
-                      return 999;
-                    };
-                    return getTaskOrder(a) - getTaskOrder(b);
-                  });
+                {tasks.filter(t => !t.parentId).sort((a, b) => getTaskOrder(a) - getTaskOrder(b)).map((parentTask, i) => {
+                  const subtasks = tasks.filter(st => st.parentId === parentTask.id).sort((a, b) => getTaskOrder(a) - getTaskOrder(b));
                   const completedSubtasks = subtasks.filter(st => st.status === 'completed').length;
                   const phaseProgress = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : 
                                        (parentTask.status === 'completed' ? 100 : (parentTask.progress || 0));

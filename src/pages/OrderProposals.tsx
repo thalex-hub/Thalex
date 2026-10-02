@@ -326,9 +326,9 @@ export default function OrderProposals() {
           totalCostWithVAT: financials.totalCostWithVAT,
           financialCost: financials.financialCost,
           warrantyCost: financials.warranty,
-          contingencyCost: Number(newProposal.contingencyCost),
-          customerAcquisitionCost: Number(newProposal.customerAcquisitionCost),
-          otherCosts: Number(newProposal.otherCosts),
+          contingencyCost: Number(newProposal.contingencyCost) || 0,
+          customerAcquisitionCost: Number(newProposal.customerAcquisitionCost) || 0,
+          otherCosts: isNaN(Number(newProposal.otherCosts)) ? 0 : Number(newProposal.otherCosts),
           expectedProfit: financials.profit,
           profitMargin: financials.margin,
           expectedProfitAfterCIT: financials.profitAfterCIT,
@@ -1429,7 +1429,9 @@ export default function OrderProposals() {
                             </div>
                             <div className="flex justify-between border-b border-gray-800 pb-2">
                                <span className="text-xs text-gray-400 font-bold uppercase">Chi phí khác</span>
-                               <span className="font-bold">{formatCurrency(viewingProposal.otherCosts)}</span>
+                               <span className={cn("font-bold", Number(viewingProposal.otherCosts) < 0 ? "text-rose-400 font-black" : "")}>
+                                 {formatCurrency(viewingProposal.otherCosts)}
+                               </span>
                             </div>
                             <div className="flex justify-between pt-2 border-t border-gray-700">
                                <span className="text-xs text-blue-400 font-black uppercase tracking-widest">Thuế CIT (20%)</span>
@@ -1982,18 +1984,50 @@ export default function OrderProposals() {
                              </div>
 
                              <div>
-                               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Chi phí khác (VND)</label>
-                               <input 
-                                 type="text"
-                                 inputMode="decimal"
-                                 className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 outline-none" 
-                                 placeholder="0"
-                                 value={formatWithCommas(newProposal.otherCosts)} 
-                                 onChange={e => {
-                                   const val = parseCurrencyInput(e.target.value);
-                                   setNewProposal({...newProposal, otherCosts: val});
-                                 }} 
-                               />
+                               <div className="flex items-center justify-between mb-1">
+                                 <label className="block text-xs font-bold text-gray-400 uppercase">Chi phí khác (VND)</label>
+                                 <span className="text-[10px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md">
+                                   Cho phép số âm
+                                 </span>
+                               </div>
+                               <div className="relative flex items-center">
+                                 <input 
+                                   type="text"
+                                   className={cn(
+                                     "w-full bg-white border border-gray-100 rounded-xl pl-4 pr-16 py-3 outline-none font-medium transition-colors",
+                                     newProposal.otherCosts && String(newProposal.otherCosts).startsWith('-') ? "text-rose-600 font-bold border-rose-200" : ""
+                                   )} 
+                                   placeholder="0" 
+                                   value={formatWithCommas(newProposal.otherCosts)} 
+                                   onChange={e => {
+                                     const val = parseCurrencyInput(e.target.value);
+                                     setNewProposal({...newProposal, otherCosts: val});
+                                   }} 
+                                 />
+                                 <button
+                                   type="button"
+                                   tabIndex={-1}
+                                   onClick={() => {
+                                     const current = (newProposal.otherCosts || '').toString();
+                                     if (current.startsWith('-')) {
+                                       setNewProposal({...newProposal, otherCosts: current.substring(1)});
+                                     } else if (current && current !== '0') {
+                                       setNewProposal({...newProposal, otherCosts: '-' + current});
+                                     } else {
+                                       setNewProposal({...newProposal, otherCosts: '-'});
+                                     }
+                                   }}
+                                   className={cn(
+                                     "absolute right-2 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer",
+                                     newProposal.otherCosts && String(newProposal.otherCosts).startsWith('-')
+                                       ? "bg-rose-100 text-rose-700 hover:bg-rose-200 border border-rose-300"
+                                       : "bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200"
+                                   )}
+                                   title="Đổi dấu Dương / Âm (+ / -)"
+                                 >
+                                   <span>+ / -</span>
+                                 </button>
+                               </div>
                              </div>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-4 border-t border-gray-200">

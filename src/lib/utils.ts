@@ -27,13 +27,13 @@ export function formatCurrency(value: number | string | undefined | null) {
 export function formatCurrencyInput(value: number | string | undefined | null) {
   if (value === undefined || value === null || value === '') return '';
   
-  const sValue = value.toString();
-  
+  const sValue = value.toString().trim();
+  if (sValue === '') return '';
+  if (sValue === '-') return '-';
+
   // Normalize input: could be "1000.5" (machine) or "1.000,5" (user)
-  // If it's a number, it will be "1000.5"
   let normalized = sValue;
   if (!sValue.includes(',') && sValue.includes('.')) {
-    // Check if it's already a formatted string with dots as thousands
     const dotCount = (sValue.match(/\./g) || []).length;
     if (dotCount > 1 || (dotCount === 1 && sValue.length - sValue.indexOf('.') > 3)) {
        // Likely thousands separator
@@ -42,21 +42,23 @@ export function formatCurrencyInput(value: number | string | undefined | null) {
     }
   }
   
-  // Remove all thousands separators (dots) for processing
-  const clean = normalized.replace(/\./g, '');
+  // Check if negative (either starts with '-' or user typed '-' at the end)
+  const isNegative = normalized.startsWith('-') || normalized.endsWith('-');
+  // Remove all thousands separators (dots) and minus signs for processing
+  const clean = normalized.replace(/\./g, '').replace(/-/g, '');
   const parts = clean.split(',');
-  const integerPart = parts[0].replace(/[^0-9-]/g, '');
+  const integerPart = parts[0].replace(/[^0-9]/g, '');
   const decimalPart = parts.length > 1 ? parts[1].replace(/[^0-9]/g, '').slice(0, 2) : null;
 
   if (integerPart === '' && decimalPart === null) {
-    return clean.startsWith('-') ? '-' : '';
+    return isNegative ? '-' : '';
   }
 
   let formatted = '';
   if (integerPart !== '') {
     const num = parseFloat(integerPart);
-    formatted = new Intl.NumberFormat('vi-VN').format(num);
-  } else if (clean.startsWith('-')) {
+    formatted = (isNegative ? '-' : '') + new Intl.NumberFormat('vi-VN').format(num);
+  } else if (isNegative) {
     formatted = '-';
   }
 
@@ -64,7 +66,7 @@ export function formatCurrencyInput(value: number | string | undefined | null) {
     return formatted + ',' + decimalPart;
   }
   
-  if (clean.endsWith(',')) {
+  if (normalized.endsWith(',')) {
     return formatted + ',';
   }
 
@@ -73,10 +75,12 @@ export function formatCurrencyInput(value: number | string | undefined | null) {
 
 export function parseCurrencyInput(value: string): string {
   if (!value) return '';
-  // Convert vi-VN input (1.000.000,5) to machine-readable numeric string (1000000.5)
-  // This preserves the decimal point for typing.
-  const clean = value.replace(/\./g, '').replace(',', '.');
-  return clean;
+  const trimmed = value.trim();
+  if (trimmed === '-') return '-';
+  const isNegative = trimmed.startsWith('-') || trimmed.endsWith('-');
+  const cleanWithoutMinus = trimmed.replace(/-/g, '').replace(/\./g, '').replace(',', '.');
+  const sanitized = cleanWithoutMinus.replace(/[^0-9.]/g, '');
+  return (isNegative ? '-' : '') + sanitized;
 }
 
 export function formatPercent(value: number | string | undefined | null) {

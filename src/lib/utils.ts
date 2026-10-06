@@ -83,6 +83,43 @@ export function parseCurrencyInput(value: string): string {
   return (isNegative ? '-' : '') + sanitized;
 }
 
+export function parseFinancialNumber(val: any): number {
+  if (val === undefined || val === null || val === '') return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const s = String(val).trim();
+  if (s === '-' || s === '' || s === '+') return 0;
+  
+  const isNegative = s.startsWith('-') || s.endsWith('-');
+  let normalized = s.replace(/-/g, '').replace(/\+/g, '').trim();
+  
+  if (normalized.includes('.') && normalized.includes(',')) {
+    const lastDot = normalized.lastIndexOf('.');
+    const lastComma = normalized.lastIndexOf(',');
+    if (lastComma > lastDot) {
+      normalized = normalized.replace(/\./g, '').replace(',', '.');
+    } else {
+      normalized = normalized.replace(/,/g, '');
+    }
+  } else if (normalized.includes('.')) {
+    const dotCount = (normalized.match(/\./g) || []).length;
+    if (dotCount > 1 || (dotCount === 1 && normalized.length - normalized.indexOf('.') > 3)) {
+      normalized = normalized.replace(/\./g, '');
+    }
+  } else if (normalized.includes(',')) {
+    const commaCount = (normalized.match(/,/g) || []).length;
+    if (commaCount > 1 || (commaCount === 1 && normalized.length - normalized.indexOf(',') > 3)) {
+      normalized = normalized.replace(/,/g, '');
+    } else {
+      normalized = normalized.replace(',', '.');
+    }
+  }
+  
+  const clean = normalized.replace(/[^0-9.]/g, '');
+  const num = parseFloat(clean);
+  if (isNaN(num)) return 0;
+  return isNegative ? -num : num;
+}
+
 export function formatPercent(value: number | string | undefined | null) {
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (num === undefined || num === null || isNaN(num)) return '0%';

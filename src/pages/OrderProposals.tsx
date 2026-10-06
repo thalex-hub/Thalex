@@ -5,7 +5,7 @@ import { uploadFile as uploadFileToServer } from '../lib/storageService';
 import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search, ChevronDown, ChevronUp, RefreshCcw } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput, withTimeout } from '../lib/utils';
+import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput, parseFinancialNumber, withTimeout } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/authContext';
 import { exportToExcel } from '../lib/excel';
@@ -14,34 +14,38 @@ import { sendProposalEmailNotification } from '../lib/proposalEmail';
 import { handleFirestoreError, OperationType } from "../lib/firestoreUtils";
 
 function calculateFinancials(data: any) {
-  const sell = Number(data?.sellingPrice) || 0;
-  const sellingVAT = (data?.sellingVAT !== undefined && data?.sellingVAT !== '' && Number(data?.sellingVAT) !== 0)
-    ? Number(data.sellingVAT)
-    : (Number(data?.contractValueWithVAT) && Number(data?.contractValueWithVAT) > sell
-        ? Number(data.contractValueWithVAT) - sell
+  const sell = parseFinancialNumber(data?.sellingPrice);
+  const rawSellVAT = data?.sellingVAT;
+  const rawContractVal = parseFinancialNumber(data?.contractValueWithVAT);
+
+  const sellingVAT = (rawSellVAT !== undefined && rawSellVAT !== '' && parseFinancialNumber(rawSellVAT) !== 0)
+    ? parseFinancialNumber(rawSellVAT)
+    : (rawContractVal && rawContractVal > sell
+        ? rawContractVal - sell
         : Math.round(sell * 0.1));
-  const contractValueWithVAT = (Number(data?.contractValueWithVAT) && Number(data?.contractValueWithVAT) > sell)
-    ? Number(data.contractValueWithVAT)
+  const contractValueWithVAT = (rawContractVal && rawContractVal > sell)
+    ? rawContractVal
     : (sell + sellingVAT);
 
-  const cost = Number(data?.costPrice) || 0;
-  const costVAT = (data?.costVAT !== undefined && data?.costVAT !== '' && Number(data?.costVAT) !== 0)
-    ? Number(data.costVAT)
+  const cost = parseFinancialNumber(data?.costPrice);
+  const rawCostVAT = data?.costVAT;
+  const costVAT = (rawCostVAT !== undefined && rawCostVAT !== '' && parseFinancialNumber(rawCostVAT) !== 0)
+    ? parseFinancialNumber(rawCostVAT)
     : Math.round(cost * 0.1);
   const totalCostWithVAT = cost + costVAT;
   
-  const financialCost = totalCostWithVAT * 0.02;
-  const warranty = sell * 0.02;
-  const contingency = Number(data?.contingencyCost) || 0;
-  const acquisition = Number(data?.customerAcquisitionCost) || 0;
-  const others = Number(data?.otherCosts) || 0;
+  const financialCost = Math.round(totalCostWithVAT * 0.02);
+  const warranty = Math.round(sell * 0.02);
+  const contingency = parseFinancialNumber(data?.contingencyCost);
+  const acquisition = parseFinancialNumber(data?.customerAcquisitionCost);
+  const others = parseFinancialNumber(data?.otherCosts);
 
   // Formula: Total Costs = Cost Price + Financial Cost + Warranty Cost + Contingency Cost + Customer Acquisition Cost + Other Costs
   const totalCosts = cost + financialCost + warranty + contingency + acquisition + others;
   const profit = sell - totalCosts;
   const margin = cost > 0 ? (profit / cost) * 100 : 0;
 
-  const citTax = (sell - cost) > 0 ? 0.2 * (sell - cost) : 0;
+  const citTax = (sell - cost) > 0 ? Math.round(0.2 * (sell - cost)) : 0;
   const profitAfterCIT = profit - citTax;
   const marginAfterCIT = cost > 0 ? (profitAfterCIT / cost) * 100 : 0;
   const marginAfterCITOnSalesPreVAT = sell > 0 ? (profitAfterCIT / sell) * 100 : 0;
@@ -58,7 +62,13 @@ function calculateFinancials(data: any) {
     totalCostWithVAT,
     costVAT,
     financialCost,
-    warranty
+    warranty,
+    warrantyCost: warranty,
+    expectedProfit: profit,
+    expectedProfitAfterCIT: profitAfterCIT,
+    profitMargin: margin,
+    profitMarginAfterCIT: marginAfterCIT,
+    profitMarginAfterCITOnSalesPreVAT: marginAfterCITOnSalesPreVAT
   };
 }
 
@@ -315,20 +325,20 @@ export default function OrderProposals() {
           name: newProposal.name,
           customerId: newProposal.customerId,
           customerName: customer?.companyName || customer?.name || 'Khách hàng lẻ',
-          sellingPrice: Number(newProposal.sellingPrice),
+          sellingPrice: parseFinancialNumber(newProposal.sellingPrice),
           sellingVAT: financials.sellingVAT,
           contractValueWithVAT: financials.contractValueWithVAT,
-          payment1Percentage: Number(newProposal.payment1Percentage),
-          payment1Amount: Number(newProposal.payment1Amount),
-          remainingDebt: Number(newProposal.remainingDebt),
-          costPrice: Number(newProposal.costPrice),
+          payment1Percentage: parseFinancialNumber(newProposal.payment1Percentage),
+          payment1Amount: parseFinancialNumber(newProposal.payment1Amount),
+          remainingDebt: parseFinancialNumber(newProposal.remainingDebt),
+          costPrice: parseFinancialNumber(newProposal.costPrice),
           costVAT: financials.costVAT,
           totalCostWithVAT: financials.totalCostWithVAT,
           financialCost: financials.financialCost,
           warrantyCost: financials.warranty,
-          contingencyCost: Number(newProposal.contingencyCost) || 0,
-          customerAcquisitionCost: Number(newProposal.customerAcquisitionCost) || 0,
-          otherCosts: isNaN(Number(newProposal.otherCosts)) ? 0 : Number(newProposal.otherCosts),
+          contingencyCost: parseFinancialNumber(newProposal.contingencyCost),
+          customerAcquisitionCost: parseFinancialNumber(newProposal.customerAcquisitionCost),
+          otherCosts: parseFinancialNumber(newProposal.otherCosts),
           expectedProfit: financials.profit,
           profitMargin: financials.margin,
           expectedProfitAfterCIT: financials.profitAfterCIT,
@@ -414,36 +424,36 @@ export default function OrderProposals() {
 
   const handleEdit = (prop: any) => {
     setEditingProposal(prop);
-    const sell = Number(prop.sellingPrice) || 0;
-    const fallbackSellVAT = (prop.sellingVAT !== undefined && Number(prop.sellingVAT) !== 0)
-      ? Number(prop.sellingVAT)
-      : (Number(prop.contractValueWithVAT) && Number(prop.contractValueWithVAT) > sell
-          ? Number(prop.contractValueWithVAT) - sell
+    const sell = parseFinancialNumber(prop.sellingPrice);
+    const fallbackSellVAT = (prop.sellingVAT !== undefined && parseFinancialNumber(prop.sellingVAT) !== 0)
+      ? parseFinancialNumber(prop.sellingVAT)
+      : (parseFinancialNumber(prop.contractValueWithVAT) && parseFinancialNumber(prop.contractValueWithVAT) > sell
+          ? parseFinancialNumber(prop.contractValueWithVAT) - sell
           : Math.round(sell * 0.1));
-    const fallbackContractValueWithVAT = (Number(prop.contractValueWithVAT) && Number(prop.contractValueWithVAT) > sell)
-      ? Number(prop.contractValueWithVAT)
+    const fallbackContractValueWithVAT = (parseFinancialNumber(prop.contractValueWithVAT) && parseFinancialNumber(prop.contractValueWithVAT) > sell)
+      ? parseFinancialNumber(prop.contractValueWithVAT)
       : (sell + fallbackSellVAT);
 
-    const cost = Number(prop.costPrice) || 0;
-    const fallbackCostVAT = (prop.costVAT !== undefined && Number(prop.costVAT) !== 0)
-      ? Number(prop.costVAT)
+    const cost = parseFinancialNumber(prop.costPrice);
+    const fallbackCostVAT = (prop.costVAT !== undefined && parseFinancialNumber(prop.costVAT) !== 0)
+      ? parseFinancialNumber(prop.costVAT)
       : Math.round(cost * 0.1);
     const totalWithVAT = cost + fallbackCostVAT;
 
-    const p1Percent = Number(prop.payment1Percentage) || 0;
-    const p1Amount = Number(prop.payment1Amount) || (fallbackContractValueWithVAT * (p1Percent / 100));
-    const remainingDebt = Number(prop.remainingDebt) || (fallbackContractValueWithVAT - p1Amount);
+    const p1Percent = parseFinancialNumber(prop.payment1Percentage);
+    const p1Amount = parseFinancialNumber(prop.payment1Amount) || Math.round(fallbackContractValueWithVAT * (p1Percent / 100));
+    const remainingDebt = parseFinancialNumber(prop.remainingDebt) || (fallbackContractValueWithVAT - p1Amount);
 
     setNewProposal({
       name: prop.name || '',
       customerId: prop.customerId || '',
-      sellingPrice: (prop.sellingPrice || '').toString(),
+      sellingPrice: (prop.sellingPrice !== undefined && prop.sellingPrice !== null ? prop.sellingPrice : '').toString(),
       sellingVAT: fallbackSellVAT.toString(),
       contractValueWithVAT: fallbackContractValueWithVAT.toString(),
-      payment1Percentage: (prop.payment1Percentage || '0').toString(),
+      payment1Percentage: (prop.payment1Percentage !== undefined && prop.payment1Percentage !== null ? prop.payment1Percentage : '0').toString(),
       payment1Amount: p1Amount.toString(),
       remainingDebt: remainingDebt.toString(),
-      costPrice: (prop.costPrice || '').toString(),
+      costPrice: (prop.costPrice !== undefined && prop.costPrice !== null ? prop.costPrice : '').toString(),
       costVAT: fallbackCostVAT.toString(),
       totalCostWithVAT: totalWithVAT.toString(),
       financialCost: (prop.financialCost || '0').toString(),
@@ -459,36 +469,36 @@ export default function OrderProposals() {
   };
 
   const handleDuplicate = (prop: any) => {
-    const sell = Number(prop.sellingPrice) || 0;
-    const fallbackSellVAT = (prop.sellingVAT !== undefined && Number(prop.sellingVAT) !== 0)
-      ? Number(prop.sellingVAT)
-      : (Number(prop.contractValueWithVAT) && Number(prop.contractValueWithVAT) > sell
-          ? Number(prop.contractValueWithVAT) - sell
+    const sell = parseFinancialNumber(prop.sellingPrice);
+    const fallbackSellVAT = (prop.sellingVAT !== undefined && parseFinancialNumber(prop.sellingVAT) !== 0)
+      ? parseFinancialNumber(prop.sellingVAT)
+      : (parseFinancialNumber(prop.contractValueWithVAT) && parseFinancialNumber(prop.contractValueWithVAT) > sell
+          ? parseFinancialNumber(prop.contractValueWithVAT) - sell
           : Math.round(sell * 0.1));
-    const fallbackContractValueWithVAT = (Number(prop.contractValueWithVAT) && Number(prop.contractValueWithVAT) > sell)
-      ? Number(prop.contractValueWithVAT)
+    const fallbackContractValueWithVAT = (parseFinancialNumber(prop.contractValueWithVAT) && parseFinancialNumber(prop.contractValueWithVAT) > sell)
+      ? parseFinancialNumber(prop.contractValueWithVAT)
       : (sell + fallbackSellVAT);
 
-    const cost = Number(prop.costPrice) || 0;
-    const fallbackCostVAT = (prop.costVAT !== undefined && Number(prop.costVAT) !== 0)
-      ? Number(prop.costVAT)
+    const cost = parseFinancialNumber(prop.costPrice);
+    const fallbackCostVAT = (prop.costVAT !== undefined && parseFinancialNumber(prop.costVAT) !== 0)
+      ? parseFinancialNumber(prop.costVAT)
       : Math.round(cost * 0.1);
     const totalWithVAT = cost + fallbackCostVAT;
 
-    const p1Percent = Number(prop.payment1Percentage) || 0;
-    const p1Amount = Number(prop.payment1Amount) || (fallbackContractValueWithVAT * (p1Percent / 100));
-    const remainingDebt = Number(prop.remainingDebt) || (fallbackContractValueWithVAT - p1Amount);
+    const p1Percent = parseFinancialNumber(prop.payment1Percentage);
+    const p1Amount = parseFinancialNumber(prop.payment1Amount) || Math.round(fallbackContractValueWithVAT * (p1Percent / 100));
+    const remainingDebt = parseFinancialNumber(prop.remainingDebt) || (fallbackContractValueWithVAT - p1Amount);
 
     setNewProposal({
       name: `${prop.name || ''} (Bản sao)`,
       customerId: prop.customerId || '',
-      sellingPrice: (prop.sellingPrice || '').toString(),
+      sellingPrice: (prop.sellingPrice !== undefined && prop.sellingPrice !== null ? prop.sellingPrice : '').toString(),
       sellingVAT: fallbackSellVAT.toString(),
       contractValueWithVAT: fallbackContractValueWithVAT.toString(),
-      payment1Percentage: (prop.payment1Percentage || '0').toString(),
+      payment1Percentage: (prop.payment1Percentage !== undefined && prop.payment1Percentage !== null ? prop.payment1Percentage : '0').toString(),
       payment1Amount: p1Amount.toString(),
       remainingDebt: remainingDebt.toString(),
-      costPrice: (prop.costPrice || '').toString(),
+      costPrice: (prop.costPrice !== undefined && prop.costPrice !== null ? prop.costPrice : '').toString(),
       costVAT: fallbackCostVAT.toString(),
       totalCostWithVAT: totalWithVAT.toString(),
       financialCost: (prop.financialCost || '0').toString(),
@@ -804,60 +814,7 @@ export default function OrderProposals() {
 
   const viewFinancials = React.useMemo(() => {
     if (!viewingProposal) return null;
-    
-    const sell = Number(viewingProposal.sellingPrice) || 0;
-    const sellVAT = (viewingProposal.sellingVAT !== undefined && Number(viewingProposal.sellingVAT) !== 0)
-      ? Number(viewingProposal.sellingVAT)
-      : (Number(viewingProposal.contractValueWithVAT) && Number(viewingProposal.contractValueWithVAT) > sell
-          ? Number(viewingProposal.contractValueWithVAT) - sell
-          : Math.round(sell * 0.1));
-    const contractValueWithVAT = (Number(viewingProposal.contractValueWithVAT) && Number(viewingProposal.contractValueWithVAT) > sell)
-      ? Number(viewingProposal.contractValueWithVAT)
-      : (sell + sellVAT);
-
-    const cost = Number(viewingProposal.costPrice) || 0;
-    
-    // Fallback: If costVAT is explicitly zero or empty/missing, default to 10% VAT of the cost
-    const costVAT = (viewingProposal.costVAT !== undefined && Number(viewingProposal.costVAT) !== 0)
-      ? Number(viewingProposal.costVAT) 
-      : Math.round(cost * 0.1);
-
-    const totalCostWithVAT = cost + costVAT;
-    
-    // Financial Cost: 2% of totalCostWithVAT
-    const financialCost = Number(viewingProposal.financialCost) || (totalCostWithVAT * 0.02);
-    
-    // Warranty Cost: 2% of sellingPrice (sell)
-    const warrantyCost = Number(viewingProposal.warrantyCost) || (sell * 0.02);
-    
-    const contingencyCost = Number(viewingProposal.contingencyCost) || 0;
-    const customerAcquisitionCost = Number(viewingProposal.customerAcquisitionCost) || 0;
-    const otherCosts = Number(viewingProposal.otherCosts) || 0;
-
-    const totalCosts = cost + financialCost + warrantyCost + contingencyCost + customerAcquisitionCost + otherCosts;
-    const expectedProfit = sell - totalCosts;
-    
-    const citTax = (sell - cost) > 0 ? 0.2 * (sell - cost) : 0;
-    const expectedProfitAfterCIT = expectedProfit - citTax;
-
-    const profitMargin = cost > 0 ? (expectedProfit / cost) * 100 : 0;
-    const profitMarginAfterCIT = cost > 0 ? (expectedProfitAfterCIT / cost) * 100 : 0;
-    const profitMarginAfterCITOnSalesPreVAT = sell > 0 ? (expectedProfitAfterCIT / sell) * 100 : 0;
-
-    return {
-      contractValueWithVAT,
-      sellingVAT: sellVAT,
-      costVAT,
-      totalCostWithVAT,
-      financialCost,
-      warrantyCost,
-      totalCosts,
-      expectedProfit,
-      expectedProfitAfterCIT,
-      profitMargin,
-      profitMarginAfterCIT,
-      profitMarginAfterCITOnSalesPreVAT
-    };
+    return calculateFinancials(viewingProposal);
   }, [viewingProposal]);
 
   return (
@@ -1805,11 +1762,11 @@ export default function OrderProposals() {
                                  value={formatWithCommas(newProposal.sellingPrice)} 
                                  onChange={e => {
                                    const val = parseCurrencyInput(e.target.value);
-                                   const sell = Number(val) || 0;
+                                   const sell = parseFinancialNumber(val);
                                    const sellVAT = Math.round(sell * 0.1); // Auto-calculate 10% VAT as default
                                    const totalVal = sell + sellVAT;
-                                   const p1Percent = Number(newProposal.payment1Percentage) || 0;
-                                   const p1Amount = totalVal * (p1Percent / 100);
+                                   const p1Percent = parseFinancialNumber(newProposal.payment1Percentage);
+                                   const p1Amount = Math.round(totalVal * (p1Percent / 100));
                                    const debt = totalVal - p1Amount;
                                    setNewProposal({
                                      ...newProposal, 
@@ -1833,11 +1790,11 @@ export default function OrderProposals() {
                                  value={formatWithCommas(newProposal.sellingVAT)} 
                                  onChange={e => {
                                    const val = parseCurrencyInput(e.target.value);
-                                   const sell = Number(newProposal.sellingPrice) || 0;
-                                   const sellVAT = Number(val) || 0;
+                                   const sell = parseFinancialNumber(newProposal.sellingPrice);
+                                   const sellVAT = parseFinancialNumber(val);
                                    const totalVal = sell + sellVAT;
-                                   const p1Percent = Number(newProposal.payment1Percentage) || 0;
-                                   const p1Amount = totalVal * (p1Percent / 100);
+                                   const p1Percent = parseFinancialNumber(newProposal.payment1Percentage);
+                                   const p1Amount = Math.round(totalVal * (p1Percent / 100));
                                    const debt = totalVal - p1Amount;
                                    setNewProposal({
                                      ...newProposal, 
@@ -1873,7 +1830,7 @@ export default function OrderProposals() {
                                  value={formatWithCommas(newProposal.costPrice)} 
                                  onChange={e => {
                                    const val = parseCurrencyInput(e.target.value);
-                                   const cost = Number(val) || 0;
+                                   const cost = parseFinancialNumber(val);
                                    const costVAT = Math.round(cost * 0.1);
                                    setNewProposal({
                                      ...newProposal, 
@@ -1924,8 +1881,8 @@ export default function OrderProposals() {
                                     value={newProposal.payment1Percentage} 
                                     onChange={e => {
                                       const percent = e.target.value;
-                                      const totalVal = Number(newProposal.contractValueWithVAT) || 0;
-                                      const p1Amount = totalVal * (Number(percent.replace(',', '.')) / 100);
+                                      const totalVal = parseFinancialNumber(newProposal.contractValueWithVAT);
+                                      const p1Amount = Math.round(totalVal * (parseFinancialNumber(percent) / 100));
                                       const debt = totalVal - p1Amount;
                                       setNewProposal({
                                         ...newProposal, 

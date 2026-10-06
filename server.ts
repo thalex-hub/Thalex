@@ -7,7 +7,7 @@ import fs from "fs";
 
 const app = express();
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Enable CORS for all origins (especially custom domains like thalex.com.vn)
 app.use((req, res, next) => {

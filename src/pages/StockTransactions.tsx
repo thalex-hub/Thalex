@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { 
   collection, 
@@ -34,7 +34,8 @@ import {
   Trash2,
   Building2,
   Edit2,
-  Eye
+  Eye,
+  AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { formatCurrency, cn } from '../lib/utils';
@@ -72,6 +73,14 @@ interface StockTransaction {
   }[];
   transactionDate: string;
   status: 'pending' | 'completed' | 'cancelled';
+  lastEditedBy?: string;
+  lastEditedAt?: string;
+  editReason?: string;
+  editHistory?: {
+    editedBy: string;
+    editedAt: string;
+    reason: string;
+  }[];
 }
 
 interface Product {
@@ -145,6 +154,9 @@ export default function StockTransactions() {
     return new Error(`Lỗi hệ thống: ${errInfo.error} (Path: ${path})`);
   };
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editTxId = searchParams.get('editTxId');
+  const [editReason, setEditReason] = React.useState('');
   const [historyTab, setHistoryTab] = React.useState<'inbound' | 'outbound' | 'transfer'>('outbound');
   const [transactions, setTransactions] = React.useState<StockTransaction[]>([]);
   const [editingTransaction, setEditingTransaction] = React.useState<StockTransaction | null>(null);
@@ -332,6 +344,31 @@ export default function StockTransactions() {
     };
   }, []);
 
+  React.useEffect(() => {
+    if (editTxId && !editingTransaction && !showAddModal) {
+      const found = transactions.find(t => t.id === editTxId);
+      if (found) {
+        handleEditTransaction(found);
+        setSearchParams(prev => {
+          const next = new URLSearchParams(prev);
+          next.delete('editTxId');
+          return next;
+        }, { replace: true });
+      } else if (!loading) {
+        getDoc(doc(db, 'stock_transactions', editTxId)).then(snap => {
+          if (snap.exists()) {
+            handleEditTransaction({ id: snap.id, ...snap.data() } as StockTransaction);
+            setSearchParams(prev => {
+              const next = new URLSearchParams(prev);
+              next.delete('editTxId');
+              return next;
+            }, { replace: true });
+          }
+        }).catch(err => console.error("Error fetching tx by editTxId:", err));
+      }
+    }
+  }, [editTxId, transactions, loading]);
+
   const handleAddItem = () => {
     setFormItems([...formItems, {
       productId: '',
@@ -396,7 +433,8 @@ export default function StockTransactions() {
     setLinkedOrderId(tx.orderId || '');
     setOrderSearchTerm(tx.linkedOrderName || '');
     setTaskName(tx.taskName || '');
-    setNote(tx.note);
+    setNote(tx.note || '');
+    setEditReason('');
     setFormItems(tx.items.map(i => ({
       productId: i.productId || '',
       productCode: i.productCode,
@@ -418,6 +456,7 @@ export default function StockTransactions() {
   const handleCancel = () => {
     setShowAddModal(false);
     setEditingTransaction(null);
+    setEditReason('');
     setFormItems([{
       productId: '',
       productCode: '',
@@ -489,6 +528,189 @@ export default function StockTransactions() {
     const twName = warehouses.find(w => w.id === toWarehouse)?.name || '';
     const selectedOrder = orders.find(o => o.id === linkedOrderId);
 
+    // Case 1: Editing an ALREADY COMPLETED outbound transaction (reconcile inventory & serial numbers)
+    if (editingTransaction && editingTransaction.status === 'completed' && editingTransaction.type === 'outbound') {
+      const confirmMsg = "Phiếu xuất kho này ĐÃ HOÀN TẤT XUẤT HÀNG. Khi bạn lưu thay đổi, hệ thống sẽ tự động tính toán lại và điều chỉnh số lượng tồn kho cũng như các số Serial (S/N) theo dữ liệu mới.\n\nBạn có chắc chắn muốn lưu các điều chỉnh này?";
+      if (!window.confirm(confirmMsg)) {
+        return;
+      }
+
+      setProcessingTxId(editingTransaction.id);
+      try {
+        const oldItems = editingTransaction.items || [];
+        const oldWarehouseId = editingTransaction.warehouseId;
+        const newWarehouseId = selectedWarehouse;
+
+        // Resolve product IDs for new items if missing
+        const itemsWithResolvedIds = [...normalizedItems];
+        await Promise.all(itemsWithResolvedIds.map(async (item, i) => {
+          if (!item.productId && item.productCode) {
+            const prodQuery = query(collection(db, 'products'), where('code', '==', item.productCode));
+            const prodSnap = await getDocs(prodQuery);
+            if (!prodSnap.empty) {
+              itemsWithResolvedIds[i] = { ...item, productId: prodSnap.docs[0].id };
+            }
+          }
+        }));
+
+        const makeInvKey = (whId: string, pId: string) => `${whId}_${pId}`.replace(/[^a-zA-Z0-9_\-]/g, '_');
+        const makeSnKey = (whId: string, sn: string) => `${whId}_${sn}`.replace(/[^a-zA-Z0-9_\-]/g, '_');
+
+        const invChanges: Record<string, { warehouseId: string; productId: string; netChange: number }> = {};
+        const addInvChange = (whId: string, pId: string, delta: number) => {
+          if (!whId || !pId) return;
+          const key = makeInvKey(whId, pId);
+          if (!invChanges[key]) {
+            invChanges[key] = { warehouseId: whId, productId: pId, netChange: 0 };
+          }
+          invChanges[key].netChange += delta;
+        };
+
+        // 1. Revert old exported items (+quantity restored to old warehouse)
+        for (const oldItem of oldItems) {
+          if (oldItem.productId) {
+            addInvChange(oldWarehouseId, oldItem.productId, oldItem.quantity || 0);
+          }
+        }
+
+        // 2. Apply new exported items (-quantity deducted from new warehouse)
+        for (const newItem of itemsWithResolvedIds) {
+          if (newItem.productId) {
+            addInvChange(newWarehouseId, newItem.productId, -(newItem.quantity || 0));
+          }
+        }
+
+        // Serial number reconciliation
+        const oldSerialsMap = new Map<string, { warehouseId: string; sn: string; item: any }>();
+        for (const oi of oldItems) {
+          if (oi.sn && oi.sn.trim() !== '' && oi.sn.trim() !== '-') {
+            const key = makeSnKey(oldWarehouseId, oi.sn.trim());
+            oldSerialsMap.set(key, { warehouseId: oldWarehouseId, sn: oi.sn.trim(), item: oi });
+          }
+        }
+
+        const newSerialsMap = new Map<string, { warehouseId: string; sn: string; item: any }>();
+        for (const ni of itemsWithResolvedIds) {
+          if (ni.sn && ni.sn.trim() !== '' && ni.sn.trim() !== '-') {
+            const key = makeSnKey(newWarehouseId, ni.sn.trim());
+            newSerialsMap.set(key, { warehouseId: newWarehouseId, sn: ni.sn.trim(), item: ni });
+          }
+        }
+
+        // Serials to restore into stock_items (were exported in old, but not in new or moved warehouse)
+        const serialsToRestore: { warehouseId: string; sn: string; item: any }[] = [];
+        oldSerialsMap.forEach((val, key) => {
+          if (!newSerialsMap.has(key)) {
+            serialsToRestore.push(val);
+          }
+        });
+
+        // Serials to delete from stock_items (are in new, but were not previously exported from that warehouse)
+        const serialsToDelete: { warehouseId: string; sn: string; item: any }[] = [];
+        newSerialsMap.forEach((val, key) => {
+          if (!oldSerialsMap.has(key)) {
+            serialsToDelete.push(val);
+          }
+        });
+
+        // Execute atomic Firestore transaction
+        await runTransaction(db, async (transaction) => {
+          const txRef = doc(db, 'stock_transactions', editingTransaction.id);
+          
+          // READ PHASE:
+          const txSnap = await transaction.get(txRef);
+          if (!txSnap.exists()) {
+            throw new Error("Phiếu xuất kho không tồn tại.");
+          }
+
+          const invSnaps: Record<string, any> = {};
+          for (const key of Object.keys(invChanges)) {
+            invSnaps[key] = await transaction.get(doc(db, 'inventory', key));
+          }
+
+          // WRITE PHASE:
+          // 1. Inventory adjustments
+          for (const key of Object.keys(invChanges)) {
+            const { warehouseId, productId, netChange } = invChanges[key];
+            if (netChange === 0) continue;
+            const invSnap = invSnaps[key];
+            const currentQty = (invSnap && invSnap.exists()) ? (invSnap.data().quantity || 0) : 0;
+            const newQty = Math.max(0, currentQty + netChange);
+            const invRef = doc(db, 'inventory', key);
+            transaction.set(invRef, {
+              productId,
+              warehouseId,
+              quantity: newQty,
+              lastUpdated: new Date().toISOString()
+            }, { merge: true });
+          }
+
+          // 2. Restore un-exported serials to stock_items
+          for (const itemRest of serialsToRestore) {
+            const stockKey = makeSnKey(itemRest.warehouseId, itemRest.sn);
+            const stockRef = doc(db, 'stock_items', stockKey);
+            transaction.set(stockRef, {
+              productId: itemRest.item.productId || '',
+              productCode: itemRest.item.productCode || '',
+              productName: itemRest.item.productName || '',
+              warehouseId: itemRest.warehouseId,
+              sn: itemRest.sn,
+              entryDate: editingTransaction.transactionDate || new Date().toISOString(),
+              brandWarrantyStartDate: itemRest.item.brandWarrantyStartDate || '',
+              brandWarrantyMonths: itemRest.item.brandWarrantyMonths || 0,
+              brandWarrantyEndDate: itemRest.item.brandWarrantyEndDate || '',
+              lastUpdated: new Date().toISOString()
+            });
+          }
+
+          // 3. Delete newly exported serials from stock_items
+          for (const itemDel of serialsToDelete) {
+            const stockKey = makeSnKey(itemDel.warehouseId, itemDel.sn);
+            const stockRef = doc(db, 'stock_items', stockKey);
+            transaction.delete(stockRef);
+          }
+
+          // 4. Update the stock transaction document
+          const nowIso = new Date().toISOString();
+          const reasonText = editReason.trim() || 'Điều chỉnh nhầm lẫn phiếu xuất kho đã xuất';
+          const newHistoryItem = {
+            editedBy: appUser?.fullName || user?.email || 'Người dùng',
+            editedAt: nowIso,
+            reason: reasonText
+          };
+          const existingHistory = Array.isArray(editingTransaction.editHistory) ? editingTransaction.editHistory : [];
+
+          transaction.update(txRef, {
+            warehouseId: newWarehouseId,
+            warehouseName: wName,
+            orderId: linkedOrderId || undefined,
+            linkedOrderName: selectedOrder ? (selectedOrder.code || selectedOrder.contractNumber || selectedOrder.name || selectedOrder.customerName || `Đơn #${selectedOrder.id.slice(0,6)}`) : (linkedOrderId ? orderSearchTerm : undefined),
+            taskName: outboundPurpose === 'task' ? taskName : undefined,
+            outboundPurpose,
+            note,
+            items: itemsWithResolvedIds,
+            status: 'completed',
+            updatedAt: nowIso,
+            lastEditedBy: appUser?.fullName || user?.email || 'Người dùng',
+            lastEditedAt: nowIso,
+            editReason: reasonText,
+            editHistory: [...existingHistory, newHistoryItem]
+          });
+        });
+
+        window.alert("Đã cập nhật phiếu xuất kho thành công! Số lượng tồn kho và danh sách Serial (S/N) đã được đồng bộ tự động.");
+        handleCancel();
+      } catch (error: any) {
+        console.error("Error updating completed outbound transaction:", error);
+        const enrichedError = handleFirestoreError(error, OperationType.WRITE, `stock_transactions/${editingTransaction.id}`);
+        window.alert("Lỗi cập nhật phiếu xuất: " + enrichedError.message);
+      } finally {
+        setProcessingTxId(null);
+      }
+      return;
+    }
+
+    // Case 2: Standard pending transaction update or new transaction
     const newTx: Omit<StockTransaction, 'id'> = {
       userId: appUser?.uid || '',
       userName: appUser?.fullName || 'Unknown',
@@ -518,31 +740,7 @@ export default function StockTransactions() {
       } else {
         await addDoc(collection(db, 'stock_transactions'), cleanTx);
       }
-      setShowAddModal(false);
-      setEditingTransaction(null);
-      setFormItems([{
-        productId: '',
-        productCode: '',
-        productName: '',
-        unit: '',
-        quantity: 1,
-        sn: '',
-        brandWarrantyStartDate: '',
-        brandWarrantyMonths: 0,
-        brandWarrantyEndDate: '',
-        customerWarrantyStartDate: '',
-        customerWarrantyMonths: 0,
-        customerWarrantyEndDate: ''
-      }]);
-      setProductSearchQueries(['']);
-      setActiveProductDropdownIndex(null);
-      setNote('');
-      setSelectedWarehouse('');
-      setToWarehouse('');
-      setLinkedOrderId('');
-      setOrderSearchTerm('');
-      setTaskName('');
-      setOutboundPurpose('order');
+      handleCancel();
     } catch (error: any) {
       console.error("Error saving transaction:", error);
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -958,10 +1156,17 @@ export default function StockTransactions() {
                   <td className="px-6 py-4">
                     <div className="flex flex-col items-center gap-1">
                        {tx.status === 'completed' ? (
-                         <div className="flex items-center gap-1.5 text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100">
-                            <CheckCircle2 size={14} />
-                            <span className="text-[10px] font-black uppercase tracking-wider">Hoàn tất</span>
-                         </div>
+                         <>
+                           <div className="flex items-center gap-1.5 text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100">
+                              <CheckCircle2 size={14} />
+                              <span className="text-[10px] font-black uppercase tracking-wider">Hoàn tất</span>
+                           </div>
+                           {tx.lastEditedAt && (
+                             <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 whitespace-nowrap" title={`Sửa lần cuối bởi ${tx.lastEditedBy || 'N/A'}: ${tx.editReason || ''}`}>
+                               Đã sửa {format(new Date(tx.lastEditedAt), 'dd/MM')}
+                             </span>
+                           )}
+                         </>
                        ) : tx.status === 'cancelled' ? (
                          <div className="flex items-center gap-1.5 text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100 italic">
                             <XCircle size={14} />
@@ -984,6 +1189,18 @@ export default function StockTransactions() {
                        >
                          <Eye size={18} />
                        </button>
+
+                       {/* For completed outbound transactions: allow editing when mistakes are discovered */}
+                       {tx.status === 'completed' && tx.type === 'outbound' && canManageWarehouse && (
+                         <button 
+                           disabled={!!processingTxId}
+                           onClick={(e) => { e.stopPropagation(); handleEditTransaction(tx); }}
+                           className="w-11 h-11 flex items-center justify-center rounded-full transition-all border shadow-sm text-amber-600 bg-amber-50 hover:bg-amber-100 border-amber-200"
+                           title="Chỉnh sửa phiếu xuất kho đã hoàn tất (điều chỉnh nhầm lẫn)"
+                         >
+                           <Edit2 size={18} />
+                         </button>
+                       )}
 
                        {tx.status === 'pending' && canManageWarehouse && (
                          <>
@@ -1038,23 +1255,69 @@ export default function StockTransactions() {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl"
           >
-            <div className="px-8 py-6 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+            <div className={cn(
+              "px-8 py-6 border-b flex items-center justify-between",
+              editingTransaction?.status === 'completed' && editingTransaction.type === 'outbound'
+                ? "bg-amber-50/80 border-amber-200"
+                : "bg-gray-50 border-gray-100"
+            )}>
               <div>
-                <h3 className="text-xl font-black text-gray-900 uppercase">
-                  {editingTransaction ? 'Chỉnh sửa ' : 'Tạo mới '}
-                  {transactionType === 'inbound' ? 'Phiếu Nhập kho' : 
-                   transactionType === 'outbound' ? 'Phiếu Xuất kho' : 
-                   'Lệnh Điều chuyển'}
-                </h3>
-                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1 italic">
-                  {editingTransaction ? 'Cập nhật lại các thông tin của phiếu' : 'Vui lòng điền đầy đủ thông tin bên dưới'}
-                </p>
+                {editingTransaction?.status === 'completed' && editingTransaction.type === 'outbound' ? (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-black text-amber-900 uppercase">
+                        Chỉnh sửa Phiếu Xuất Kho Đã Xuất
+                      </h3>
+                      <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        Đã xuất hàng
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-700 font-bold uppercase tracking-widest mt-1">
+                      Mã phiếu #{editingTransaction.id.slice(0, 8).toUpperCase()} • Điều chỉnh lại nhầm lẫn khi xuất hàng
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900 uppercase">
+                      {editingTransaction ? 'Chỉnh sửa ' : 'Tạo mới '}
+                      {transactionType === 'inbound' ? 'Phiếu Nhập kho' : 
+                       transactionType === 'outbound' ? 'Phiếu Xuất kho' : 
+                       'Lệnh Điều chuyển'}
+                    </h3>
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1 italic">
+                      {editingTransaction ? 'Cập nhật lại các thông tin của phiếu' : 'Vui lòng điền đầy đủ thông tin bên dưới'}
+                    </p>
+                  </div>
+                )}
               </div>
               <button onClick={handleCancel} className="p-2 hover:bg-white rounded-xl transition-colors">
                 <Plus className="rotate-45 text-gray-400" size={24} />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {editingTransaction?.status === 'completed' && editingTransaction?.type === 'outbound' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2.5 shadow-sm">
+                  <div className="flex items-center gap-2 text-xs font-black text-amber-800 uppercase tracking-wide">
+                    <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                    Chế độ điều chỉnh phiếu xuất kho đã hoàn tất xuất
+                  </div>
+                  <p className="text-xs text-amber-900 leading-relaxed">
+                    Phiếu này <strong>đã được xuất hàng và trừ kho trước đó</strong>. Bạn có thể sửa đổi lại sản phẩm, số lượng, số Serial (S/N), kho xuất hoặc đơn hàng liên kết nếu phát hiện có sự nhầm lẫn. Khi lưu, hệ thống sẽ <strong>tự động hoàn trả kho cũ, trừ kho mới và đồng bộ lại danh sách Serial (S/N)</strong> tương ứng.
+                  </p>
+                  <div className="pt-1">
+                    <label className="text-[10px] font-black text-amber-800 uppercase tracking-wider block mb-1">
+                      Lý do điều chỉnh / nhầm lẫn phát hiện (Lưu vào lịch sử phiếu):
+                    </label>
+                    <input 
+                      type="text"
+                      value={editReason}
+                      onChange={e => setEditReason(e.target.value)}
+                      placeholder="Ví dụ: Xuất nhầm số Serial cho khách, điều chỉnh lại số lượng thực tế..."
+                      className="w-full px-4 py-2.5 bg-white border border-amber-300 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 text-xs font-bold text-gray-800"
+                    />
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">
@@ -1232,13 +1495,24 @@ export default function StockTransactions() {
                 </div>
                 
                 {formItems.map((item, index) => {
-                  const availableInStock = inventory
-                    .filter(inv => inv.warehouseId === selectedWarehouse && inv.quantity > 0)
-                    .map(inv => {
-                      const p = products.find(prod => prod.id === inv.productId);
-                      return { ...inv, product: p };
-                    })
-                    .filter(item => item.product);
+                  const isEditingCompletedOutbound = editingTransaction?.status === 'completed' && editingTransaction?.type === 'outbound';
+                  const availableInStock = products.map(p => {
+                    const inv = inventory.find(i => i.warehouseId === selectedWarehouse && i.productId === p.id);
+                    let qty = inv?.quantity || 0;
+                    if (isEditingCompletedOutbound && editingTransaction.warehouseId === selectedWarehouse) {
+                      const origItem = (editingTransaction.items || []).find(i => i.productId === p.id || i.productCode === p.code);
+                      if (origItem) {
+                        qty += (origItem.quantity || 0);
+                      }
+                    }
+                    return {
+                      id: inv?.id || `${selectedWarehouse}_${p.id}`,
+                      productId: p.id,
+                      warehouseId: selectedWarehouse,
+                      quantity: qty,
+                      product: p
+                    };
+                  }).filter(item => item.quantity > 0);
 
                   const isOutbound = transactionType !== 'inbound';
 
@@ -1593,13 +1867,35 @@ export default function StockTransactions() {
                               Hàng trong kho theo tuổi lưu kho (Thứ tự FIFO - Lâu nhất trước):
                             </div>
                             {(() => {
-                              const matchingStock = stockItems
+                              const isEditingCompleted = editingTransaction?.status === 'completed' && editingTransaction?.type === 'outbound';
+                              let matchingStock: any[] = stockItems
                                 .filter(si => si.productId === item.productId && si.warehouseId === selectedWarehouse)
                                 .sort((a, b) => {
                                   const dateA = a.entryDate ? new Date(a.entryDate).getTime() : 0;
                                   const dateB = b.entryDate ? new Date(b.entryDate).getTime() : 0;
                                   return dateA - dateB; // Oldest first
                                 });
+
+                              if (isEditingCompleted && editingTransaction.warehouseId === selectedWarehouse) {
+                                const currentTicketSerials = (editingTransaction.items || [])
+                                  .filter(oi => (oi.productId === item.productId || oi.productCode === item.productCode) && oi.sn && oi.sn !== '-')
+                                  .map(oi => ({
+                                    id: `curr_${editingTransaction.id}_${oi.sn}`,
+                                    productId: oi.productId || item.productId,
+                                    productCode: oi.productCode,
+                                    productName: oi.productName,
+                                    warehouseId: selectedWarehouse,
+                                    sn: oi.sn,
+                                    entryDate: editingTransaction.transactionDate || '',
+                                    isCurrentTicketSn: true
+                                  }));
+
+                                for (const cts of currentTicketSerials) {
+                                  if (!matchingStock.some(s => s.sn === cts.sn)) {
+                                    matchingStock = [cts, ...matchingStock];
+                                  }
+                                }
+                              }
 
                               if (matchingStock.length === 0) {
                                 return (
@@ -1638,7 +1934,14 @@ export default function StockTransactions() {
                                           <span className="font-extrabold text-[13px] tracking-wide font-mono">
                                             SN: {stockItem.sn}
                                           </span>
-                                          {idx === 0 && (
+                                          {stockItem.isCurrentTicketSn ? (
+                                            <span className={cn(
+                                              "text-[8px] font-black uppercase px-1.5 py-0.5 rounded tracking-widest",
+                                              isSelected ? "bg-white text-emerald-800" : "bg-emerald-600 text-white"
+                                            )}>
+                                              Đang xuất trên phiếu này
+                                            </span>
+                                          ) : idx === 0 && (
                                             <span className={cn(
                                               "text-[8px] font-black uppercase px-1.5 py-0.5 rounded tracking-widest",
                                               isSelected ? "bg-white text-amber-700" : "bg-red-500 text-white animate-pulse"
@@ -1651,7 +1954,7 @@ export default function StockTransactions() {
                                           "text-[10px] sm:text-[11px] font-medium flex items-center justify-between mt-1 pt-1 border-t",
                                           isSelected ? "border-amber-500 text-amber-100" : "border-gray-100 text-gray-400"
                                         )}>
-                                          <span>Nhập: {entryDateStr}</span>
+                                          <span>{stockItem.isCurrentTicketSn ? 'Đã xuất phiếu này' : `Nhập: ${entryDateStr}`}</span>
                                           <span className={cn("font-extrabold", isSelected ? "text-white" : "text-amber-600")}>
                                             {daysInStock} ngày
                                           </span>
@@ -1691,14 +1994,26 @@ export default function StockTransactions() {
                 </button>
                 <button 
                   type="submit"
+                  disabled={!!processingTxId}
                   className={cn(
                     "flex-[2] py-4 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg",
-                    transactionType === 'inbound' ? "bg-green-600 hover:bg-green-700 shadow-green-100" : 
-                    transactionType === 'outbound' ? "bg-rose-600 hover:bg-rose-700 shadow-rose-100" : 
-                    "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
+                    editingTransaction?.status === 'completed' && editingTransaction.type === 'outbound'
+                      ? "bg-amber-600 hover:bg-amber-700 shadow-amber-200"
+                      : transactionType === 'inbound' 
+                        ? "bg-green-600 hover:bg-green-700 shadow-green-100" 
+                        : transactionType === 'outbound' 
+                          ? "bg-rose-600 hover:bg-rose-700 shadow-rose-100" 
+                          : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100",
+                    processingTxId && "opacity-50 cursor-not-allowed"
                   )}
                 >
-                  {editingTransaction ? 'Cập nhật phiếu' : 'Lưu Phiếu Tạm'}
+                  {processingTxId 
+                    ? 'Đang đồng bộ...' 
+                    : (editingTransaction?.status === 'completed' && editingTransaction.type === 'outbound') 
+                      ? 'Lưu điều chỉnh & Đồng bộ kho' 
+                      : editingTransaction 
+                        ? 'Cập nhật phiếu' 
+                        : 'Lưu Phiếu Tạm'}
                 </button>
               </div>
             </form>
@@ -1865,41 +2180,80 @@ export default function StockTransactions() {
                   </table>
                 </div>
               </div>
+
+              {/* Edit History Audit Trail if any */}
+              {detailsTx.editHistory && detailsTx.editHistory.length > 0 && (
+                <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-2.5">
+                  <div className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-wider">
+                    <History size={14} className="text-amber-600" />
+                    Lịch sử điều chỉnh phiếu xuất ({detailsTx.editHistory.length} lần)
+                  </div>
+                  <div className="space-y-2">
+                    {detailsTx.editHistory.map((h, i) => (
+                      <div key={i} className="bg-white p-3 rounded-xl border border-amber-100 text-xs text-gray-700 space-y-1">
+                        <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold uppercase">
+                          <span>Người sửa: <strong className="text-gray-800">{h.editedBy}</strong></span>
+                          <span>{format(new Date(h.editedAt), 'dd/MM/yyyy HH:mm')}</span>
+                        </div>
+                        <p className="text-xs text-amber-950 font-medium">Lý do điều chỉnh: "{h.reason}"</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Actions Footer inside Detail view */}
-            <div className="px-8 py-5 border-t border-gray-100 flex items-center justify-end gap-3 bg-gray-50/30">
-              <button 
-                type="button"
-                onClick={() => setDetailsTx(null)}
-                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-black uppercase tracking-wider rounded-xl transition-all"
-              >
-                Đóng
-              </button>
-              {detailsTx.status === 'pending' && (isAdmin || isManager || isHR || isAccountant) && (
-                <div className="flex gap-2">
+            <div className="px-8 py-5 border-t border-gray-100 flex items-center justify-between gap-3 bg-gray-50/30">
+              <div>
+                {detailsTx.status === 'completed' && detailsTx.type === 'outbound' && canManageWarehouse && (
                   <button 
                     type="button"
                     onClick={() => {
-                      setConfirmTx({ type: 'cancel', tx: detailsTx });
+                      const toEdit = detailsTx;
                       setDetailsTx(null);
+                      handleEditTransaction(toEdit);
                     }}
-                    className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5"
+                    className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-amber-200/50"
+                    title="Chỉnh sửa phiếu xuất kho nếu phát hiện nhầm lẫn"
                   >
-                    <XCircle size={14} /> Hủy Phiếu
+                    <Edit2 size={14} /> Chỉnh sửa phiếu xuất này
                   </button>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setConfirmTx({ type: 'complete', tx: detailsTx });
-                      setDetailsTx(null);
-                    }}
-                    className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-green-100 flex items-center gap-1.5"
-                  >
-                    <CheckCircle2 size={14} /> Duyệt Phiếu
-                  </button>
-                </div>
-              )}
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={() => setDetailsTx(null)}
+                  className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-black uppercase tracking-wider rounded-xl transition-all"
+                >
+                  Đóng
+                </button>
+                {detailsTx.status === 'pending' && (isAdmin || isManager || isHR || isAccountant) && (
+                  <>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setConfirmTx({ type: 'cancel', tx: detailsTx });
+                        setDetailsTx(null);
+                      }}
+                      className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5"
+                    >
+                      <XCircle size={14} /> Hủy Phiếu
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setConfirmTx({ type: 'complete', tx: detailsTx });
+                        setDetailsTx(null);
+                      }}
+                      className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-green-100 flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 size={14} /> Duyệt Phiếu
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </motion.div>
         </div>

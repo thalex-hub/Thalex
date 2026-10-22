@@ -1068,11 +1068,21 @@ export default function WarehouseManagement() {
                 </div>
               </div>
 
-              <div className="px-8 py-5 border-t border-gray-100 flex items-center justify-end bg-gray-50">
+              <div className="px-8 py-5 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+                {canManage && viewingOutboundTx ? (
+                  <Link 
+                    to={`/stock-transactions?editTxId=${viewingOutboundTx.id}`}
+                    onClick={() => setViewingOutboundTx(null)}
+                    className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-amber-200/50 flex items-center gap-2"
+                    title="Chỉnh sửa phiếu xuất kho này nếu phát hiện có sự nhầm lẫn khi xuất"
+                  >
+                    <Edit2 size={16} /> Chỉnh sửa phiếu xuất này
+                  </Link>
+                ) : <div />}
                 <button 
                   type="button" 
                   onClick={() => setViewingOutboundTx(null)}
-                  className="px-6 py-2 bg-gray-200 hover:bg-gray-350 text-gray-700 text-xs font-black uppercase tracking-wider rounded-xl transition-all"
+                  className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-black uppercase tracking-wider rounded-xl transition-all"
                 >
                   Đóng
                 </button>

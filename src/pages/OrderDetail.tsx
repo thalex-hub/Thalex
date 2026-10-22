@@ -4191,39 +4191,53 @@ export default function OrderDetail() {
             </div>
 
             {/* Actions Footer inside Detail view */}
-            <div className="px-8 py-5 border-t border-gray-100 flex items-center justify-end gap-3 bg-gray-50/30">
-              <button 
-                type="button"
-                onClick={() => setViewingTx(null)}
-                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-black uppercase tracking-wider rounded-xl transition-all"
-              >
-                Đóng
-              </button>
-              {viewingTx.status === 'pending' && (isAdmin || isManager) && (
-                <div className="flex gap-2">
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setConfirmTx({ type: 'cancel', tx: viewingTx });
-                      setViewingTx(null);
-                    }}
-                    className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5"
+            <div className="px-8 py-5 border-t border-gray-100 flex items-center justify-between gap-3 bg-gray-50/30">
+              <div>
+                {viewingTx.status === 'completed' && viewingTx.type === 'outbound' && (isAdmin || isManager) && (
+                  <Link 
+                    to={`/stock-transactions?editTxId=${viewingTx.id}`}
+                    onClick={() => setViewingTx(null)}
+                    className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-amber-200/50 flex items-center gap-2"
+                    title="Chỉnh sửa phiếu xuất kho nếu phát hiện nhầm lẫn khi xuất"
                   >
-                    <XCircle size={14} /> Hủy Phiếu
-                  </button>
-                  <button 
-                    type="button"
-                    disabled={!!processingTxId}
-                    onClick={() => {
-                      setConfirmTx({ type: 'complete', tx: viewingTx });
-                      setViewingTx(null);
-                    }}
-                    className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-green-100 flex items-center gap-1.5"
-                  >
-                    <CheckCircle2 size={14} /> Duyệt & Xuất Kho
-                  </button>
-                </div>
-              )}
+                    <Edit2 size={14} /> Chỉnh sửa phiếu xuất này
+                  </Link>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={() => setViewingTx(null)}
+                  className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-black uppercase tracking-wider rounded-xl transition-all"
+                >
+                  Đóng
+                </button>
+                {viewingTx.status === 'pending' && (isAdmin || isManager) && (
+                  <div className="flex gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setConfirmTx({ type: 'cancel', tx: viewingTx });
+                        setViewingTx(null);
+                      }}
+                      className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5"
+                    >
+                      <XCircle size={14} /> Hủy Phiếu
+                    </button>
+                    <button 
+                      type="button"
+                      disabled={!!processingTxId}
+                      onClick={() => {
+                        setConfirmTx({ type: 'complete', tx: viewingTx });
+                        setViewingTx(null);
+                      }}
+                      className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-green-100 flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 size={14} /> Duyệt & Xuất Kho
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
         </div>

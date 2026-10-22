@@ -456,7 +456,21 @@
           }
         },
         "transactionDate": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] }
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] },
+        "lastEditedBy": { "type": "string" },
+        "lastEditedAt": { "type": "string", "format": "date-time" },
+        "editReason": { "type": "string" },
+        "editHistory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "editedBy": { "type": "string" },
+              "editedAt": { "type": "string", "format": "date-time" },
+              "reason": { "type": "string" }
+            }
+          }
+        }
       },
       "required": ["userId", "type", "warehouseId", "items", "transactionDate", "status"]
     },

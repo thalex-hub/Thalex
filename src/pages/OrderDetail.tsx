@@ -95,17 +95,38 @@ export default function OrderDetail() {
   });
   const taskFileInputRef = React.useRef<HTMLInputElement>(null);
   const subtaskFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [proposalData, setProposalData] = React.useState<any>(null);
+  const [isUploadingTaskFile, setIsUploadingTaskFile] = React.useState(false);
+  const [showAddOrderDocModal, setShowAddOrderDocModal] = React.useState(false);
+  const [orderDocFile, setOrderDocFile] = React.useState<File | null>(null);
+  const [orderDocCategory, setOrderDocCategory] = React.useState<'contract' | 'vat_invoice' | 'acceptance_report' | 'payment_voucher' | 'technical' | 'other'>('contract');
+  const [orderDocName, setOrderDocName] = React.useState('');
+  const [isUploadingOrderDoc, setIsUploadingOrderDoc] = React.useState(false);
+  const [selectedInvoiceForUpload, setSelectedInvoiceForUpload] = React.useState<any>(null);
+  const invoiceAttachInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleSubtaskFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files).map((file: any) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        lastModified: file.lastModified,
-        uploadDate: new Date().toISOString()
-      }));
-      setSubtaskForm(prev => ({ ...prev, attachments: [...prev.attachments, ...newFiles] }));
+  const handleSubtaskFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      try {
+        const files = Array.from(e.target.files) as File[];
+        for (const file of files) {
+          const res = await uploadFile(file, 'tasks');
+          setSubtaskForm(prev => ({
+            ...prev,
+            attachments: [...prev.attachments, {
+              name: file.name,
+              size: file.size,
+              type: file.type || 'application/octet-stream',
+              url: res.url,
+              fileId: res.fileId || null,
+              lastModified: file.lastModified,
+              uploadDate: new Date().toISOString()
+            }]
+          }));
+        }
+      } catch (err: any) {
+        console.error("Lỗi tải tệp việc con:", err);
+      }
     }
   };
 
@@ -604,26 +625,28 @@ export default function OrderDetail() {
     setUpdatingInvoice(true);
     try {
       let fileUrl = '';
+      let fileId = null;
+      let fileSize = 0;
+      let mimeType = 'application/pdf';
+
       if (newInvoiceFile) {
-        if (newInvoiceFile.size < 800000) {
-          const reader = new FileReader();
-          const base64Promise = new Promise<string>((resolve) => {
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(newInvoiceFile);
-          });
-          fileUrl = await base64Promise;
-        } else {
-          fileUrl = `local-file://${newInvoiceFile.name}`;
-        }
+        const uploadRes = await uploadFile(newInvoiceFile, 'invoices');
+        fileUrl = uploadRes.url;
+        fileId = uploadRes.fileId || null;
+        fileSize = uploadRes.size || newInvoiceFile.size;
+        mimeType = uploadRes.mimeType || newInvoiceFile.type || 'application/pdf';
       }
 
       const newInv = {
         id: Math.random().toString(36).substring(2, 9),
         amount: Number(amountVal),
-        invoiceNo: newInvoiceNo,
+        invoiceNo: newInvoiceNo.trim(),
         date: newInvoiceDate,
         fileUrl: fileUrl,
+        fileId: fileId,
         fileName: newInvoiceFile ? newInvoiceFile.name : undefined,
+        fileSize: fileSize,
+        mimeType: mimeType,
         notes: newInvoiceNotes,
         createdAt: new Date().toISOString()
       };
@@ -631,8 +654,25 @@ export default function OrderDetail() {
       const existingInvoices = order?.invoices || [];
       const updatedInvoices = [...existingInvoices, newInv];
       
+      const orderAttachments = [...(order?.attachments || [])];
+      if (newInvoiceFile && fileUrl) {
+        orderAttachments.push({
+          id: Math.random().toString(36).substring(2, 9),
+          name: `Hóa đơn ${newInvoiceNo || ''} - ${newInvoiceFile.name}`,
+          fileName: newInvoiceFile.name,
+          url: fileUrl,
+          fileId: fileId,
+          size: fileSize,
+          type: mimeType,
+          category: 'vat_invoice',
+          uploadDate: new Date().toISOString(),
+          uploadedBy: user?.displayName || user?.email || 'Kế toán'
+        });
+      }
+
       const updateData = {
         invoices: updatedInvoices,
+        attachments: orderAttachments,
         isInvoiced: true,
         invoicedAt: newInvoiceDate ? new Date(newInvoiceDate).toISOString() : new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -649,10 +689,115 @@ export default function OrderDetail() {
       setNewInvoiceNotes('');
       setNewInvoiceFile(null);
       setShowAddInvoiceModal(false);
+      alert('Đã khai báo xuất hóa đơn và lưu trữ chứng từ thành công!');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `orders/${id}`);
     } finally {
       setUpdatingInvoice(false);
+    }
+  };
+
+  const handleAttachInvoiceFile = async (invoiceId: string, file: File) => {
+    if (!id || !file) return;
+    try {
+      const uploadRes = await uploadFile(file, 'invoices');
+      const updatedInvoices = (order?.invoices || []).map((inv: any) => {
+        if (inv.id === invoiceId) {
+          return {
+            ...inv,
+            fileUrl: uploadRes.url,
+            fileId: uploadRes.fileId || null,
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type || 'application/pdf',
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return inv;
+      });
+
+      const orderAttachments = [...(order?.attachments || []), {
+        id: Math.random().toString(36).substring(2, 9),
+        name: `Chứng từ hóa đơn - ${file.name}`,
+        fileName: file.name,
+        url: uploadRes.url,
+        fileId: uploadRes.fileId || null,
+        size: file.size,
+        type: file.type || 'application/pdf',
+        category: 'vat_invoice',
+        uploadDate: new Date().toISOString(),
+        uploadedBy: user?.displayName || user?.email || 'Kế toán'
+      }];
+
+      await updateDoc(doc(db, 'orders', id), {
+        invoices: updatedInvoices,
+        attachments: orderAttachments,
+        updatedAt: new Date().toISOString()
+      });
+      setOrder((prev: any) => ({ ...prev, invoices: updatedInvoices, attachments: orderAttachments }));
+      alert(`Đã đính kèm chứng từ "${file.name}" cho hóa đơn thành công!`);
+    } catch (err: any) {
+      console.error("Lỗi đính kèm chứng từ:", err);
+      alert(`Không thể đính kèm chứng từ: ${err.message}`);
+    }
+  };
+
+  const handleAddOrderDocument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !orderDocFile) return;
+
+    setIsUploadingOrderDoc(true);
+    try {
+      const uploadRes = await uploadFile(orderDocFile, 'orders');
+      const newDoc = {
+        id: Math.random().toString(36).substring(2, 9),
+        name: orderDocName.trim() || orderDocFile.name,
+        fileName: orderDocFile.name,
+        category: orderDocCategory,
+        url: uploadRes.url,
+        fileId: uploadRes.fileId || null,
+        size: orderDocFile.size,
+        type: orderDocFile.type || 'application/pdf',
+        uploadDate: new Date().toISOString(),
+        uploadedBy: user?.displayName || user?.email || 'Người dùng'
+      };
+
+      const updatedAttachments = [...(order?.attachments || []), newDoc];
+      
+      const updatePayload: any = {
+        attachments: updatedAttachments,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (orderDocCategory === 'contract' && !order?.contractDraft) {
+        updatePayload.contractDraft = newDoc;
+      }
+
+      await updateDoc(doc(db, 'orders', id), updatePayload);
+      setOrder((prev: any) => ({ ...prev, ...updatePayload }));
+
+      // If this is a contract, also sync to task 1 (1. Ký hợp đồng)
+      if (orderDocCategory === 'contract') {
+        const contractTask = tasks.find(t => t.name?.toLowerCase().includes('hợp đồng') || t.orderIndex === 0);
+        if (contractTask) {
+          const updatedTaskAtts = [...(contractTask.attachments || []), newDoc];
+          await updateDoc(doc(db, 'tasks', contractTask.id), {
+            attachments: updatedTaskAtts,
+            updatedAt: new Date().toISOString()
+          });
+          setTasks(prev => prev.map(t => t.id === contractTask.id ? { ...t, attachments: updatedTaskAtts } : t));
+        }
+      }
+
+      alert('Đã tải tài liệu lên đơn hàng thành công!');
+      setShowAddOrderDocModal(false);
+      setOrderDocFile(null);
+      setOrderDocName('');
+    } catch (err: any) {
+      console.error("Lỗi khi tải tài liệu đơn hàng:", err);
+      alert(`Không thể tải tài liệu lên: ${err?.message || 'Vui lòng thử lại'}`);
+    } finally {
+      setIsUploadingOrderDoc(false);
     }
   };
 
@@ -1185,36 +1330,59 @@ export default function OrderDetail() {
     }
   };
 
-  // Helper to handle file upload for task
+  // Helper to handle file upload for task with persistent storage
   const handleTaskFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0] || !selectedTask) return;
+    if (!e.target.files || e.target.files.length === 0 || !selectedTask) return;
     
-    const file = e.target.files[0];
-    
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const newAttachment = {
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        lastModified: file.lastModified,
-        uploadDate: new Date().toISOString(),
-        url: reader.result
-      };
+    setIsUploadingTaskFile(true);
+    try {
+      const files = Array.from(e.target.files) as File[];
+      const newUploadedList: any[] = [];
 
-      const attachments = [...(selectedTask.attachments || []), newAttachment];
-      setSelectedTask({ ...selectedTask, attachments });
+      for (const file of files) {
+        const uploadRes = await uploadFile(file, 'tasks');
+        newUploadedList.push({
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          fileId: uploadRes.fileId || null,
+          url: uploadRes.url,
+          lastModified: file.lastModified,
+          uploadDate: new Date().toISOString()
+        });
+      }
 
-      try {
-        await updateDoc(doc(db, 'tasks', selectedTask.id), {
-          attachments: attachments,
+      const updatedAttachments = [...(selectedTask.attachments || []), ...newUploadedList];
+      
+      // Update selectedTask
+      setSelectedTask((prev: any) => ({ ...prev, attachments: updatedAttachments }));
+      
+      // Update tasks array in state
+      setTasks(prevTasks => prevTasks.map(t => t.id === selectedTask.id ? { ...t, attachments: updatedAttachments } : t));
+
+      // Persist to Firestore
+      await updateDoc(doc(db, 'tasks', selectedTask.id), {
+        attachments: updatedAttachments,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Also sync to order general attachments if contract or invoice related
+      if (selectedTask.name?.toLowerCase().includes('hợp đồng') || selectedTask.name?.toLowerCase().includes('hoá đơn')) {
+        const currentOrderAtts = order?.attachments || [];
+        const combined = [...currentOrderAtts, ...newUploadedList];
+        await updateDoc(doc(db, 'orders', id!), {
+          attachments: combined,
           updatedAt: new Date().toISOString()
         });
-      } catch (err) {
-        console.error("Error uploading file:", err);
+        setOrder((prev: any) => ({ ...prev, attachments: combined }));
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error("Error uploading task file:", err);
+      alert(`Lỗi khi tải tệp lên: ${err?.message || 'Vui lòng thử lại'}`);
+    } finally {
+      setIsUploadingTaskFile(false);
+      if (taskFileInputRef.current) taskFileInputRef.current.value = '';
+    }
   };
 
   const [showPaymentModal, setShowPaymentModal] = React.useState(false);
@@ -1316,7 +1484,86 @@ export default function OrderDetail() {
       }
 
       const orderData = { id: orderSnap.id, ...orderSnap.data() } as any;
-      setOrder(orderData);
+      
+      // Auto-recover contract, business plan, and attachments from proposal if missing
+      if (orderData.proposalId) {
+        try {
+          const propSnap = await getDoc(doc(db, 'order_proposals', orderData.proposalId));
+          if (propSnap.exists()) {
+            const pData = propSnap.data();
+            setProposalData(pData);
+            
+            let needsOrderDocSync = false;
+            const syncedOrderData = { ...orderData };
+
+            if (!orderData.contractDraft && pData.contractDraft) {
+              syncedOrderData.contractDraft = pData.contractDraft;
+              needsOrderDocSync = true;
+            }
+            if (!orderData.businessPlan && pData.businessPlan) {
+              syncedOrderData.businessPlan = pData.businessPlan;
+              needsOrderDocSync = true;
+            }
+
+            const propAttachments: any[] = [];
+            if (pData.contractDraft) {
+              propAttachments.push({
+                id: 'prop_contract',
+                name: pData.contractDraft.name || `Hợp đồng - ${orderData.name}`,
+                fileName: pData.contractDraft.name,
+                url: pData.contractDraft.url,
+                fileId: pData.contractDraft.fileId || null,
+                size: pData.contractDraft.size || 0,
+                type: pData.contractDraft.type || 'application/pdf',
+                category: 'contract',
+                source: 'proposal',
+                uploadDate: pData.updatedAt || pData.createdAt || new Date().toISOString()
+              });
+            }
+            if (pData.businessPlan) {
+              propAttachments.push({
+                id: 'prop_pakd',
+                name: pData.businessPlan.name || `PAKD - ${orderData.name}`,
+                fileName: pData.businessPlan.name,
+                url: pData.businessPlan.url,
+                fileId: pData.businessPlan.fileId || null,
+                size: pData.businessPlan.size || 0,
+                type: pData.businessPlan.type || 'application/pdf',
+                category: 'business_plan',
+                source: 'proposal',
+                uploadDate: pData.updatedAt || pData.createdAt || new Date().toISOString()
+              });
+            }
+            if (Array.isArray(pData.attachments)) {
+              propAttachments.push(...pData.attachments);
+            }
+
+            if (!orderData.attachments || orderData.attachments.length === 0) {
+              if (propAttachments.length > 0) {
+                syncedOrderData.attachments = propAttachments;
+                needsOrderDocSync = true;
+              }
+            }
+
+            if (needsOrderDocSync) {
+              updateDoc(doc(db, 'orders', id), {
+                contractDraft: syncedOrderData.contractDraft || null,
+                businessPlan: syncedOrderData.businessPlan || null,
+                attachments: syncedOrderData.attachments || []
+              }).catch(err => console.warn('Could not auto-sync proposal docs to order:', err));
+            }
+
+            setOrder(syncedOrderData);
+          } else {
+            setOrder(orderData);
+          }
+        } catch (e) {
+          console.warn("Could not fetch proposal for order documents:", e);
+          setOrder(orderData);
+        }
+      } else {
+        setOrder(orderData);
+      }
       setLoading(false);
 
       if (orderData.customerId) {
@@ -2018,6 +2265,242 @@ export default function OrderDetail() {
                </div>
             </div>
 
+
+          {/* SECTION: Hồ sơ, Hợp đồng & Tài liệu Đơn hàng */}
+          <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-xl shadow-gray-200/5 overflow-hidden">
+             <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between bg-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-blue-100/60 rounded-xl flex items-center justify-center text-blue-600 shadow-xs">
+                    <FileText size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-gray-900 tracking-tight">Hồ sơ, Hợp đồng & Tài liệu Đơn hàng</h3>
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-0.5">
+                      Tất cả hợp đồng, PAKD, hóa đơn VAT, biên bản nghiệm thu và chứng từ đính kèm
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddOrderDocModal(true)}
+                  className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-blue-700 transition-all shadow-md shadow-blue-200 flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus size={14} /> Tải lên tài liệu mới
+                </button>
+             </div>
+
+             <div className="p-6">
+                {(() => {
+                  // Compile all documents across the order
+                  const allDocs: any[] = [];
+
+                  // 1. Contract from Order or Proposal
+                  const contractObj = order.contractDraft || proposalData?.contractDraft;
+                  if (contractObj && contractObj.url) {
+                    allDocs.push({
+                      id: 'doc_contract_main',
+                      name: contractObj.name || `Hợp đồng - ${order.name}`,
+                      category: 'contract',
+                      categoryLabel: 'Hợp đồng kinh tế',
+                      categoryBadge: 'bg-blue-100 text-blue-700 border-blue-200',
+                      url: contractObj.url,
+                      fileId: contractObj.fileId,
+                      size: contractObj.size,
+                      type: contractObj.type || 'application/pdf',
+                      source: 'Đề xuất PAKD',
+                      uploadDate: contractObj.uploadDate || order.createdAt
+                    });
+                  }
+
+                  // 2. Business Plan from Order or Proposal
+                  const pakdObj = order.businessPlan || proposalData?.businessPlan;
+                  if (pakdObj && pakdObj.url) {
+                    allDocs.push({
+                      id: 'doc_pakd_main',
+                      name: pakdObj.name || `Phương án kinh doanh - ${order.name}`,
+                      category: 'business_plan',
+                      categoryLabel: 'Phương án KD (PAKD)',
+                      categoryBadge: 'bg-purple-100 text-purple-700 border-purple-200',
+                      url: pakdObj.url,
+                      fileId: pakdObj.fileId,
+                      size: pakdObj.size,
+                      type: pakdObj.type || 'application/pdf',
+                      source: 'Đề xuất PAKD',
+                      uploadDate: pakdObj.uploadDate || order.createdAt
+                    });
+                  }
+
+                  // 3. Invoices & Vouchers
+                  if (Array.isArray(order.invoices)) {
+                    order.invoices.forEach((inv: any, idx: number) => {
+                      if (inv.fileUrl) {
+                        allDocs.push({
+                          id: `doc_inv_${inv.id || idx}`,
+                          name: inv.fileName || `Hóa đơn VAT ${inv.invoiceNo ? 'số ' + inv.invoiceNo : ''}`,
+                          category: 'vat_invoice',
+                          categoryLabel: 'Hóa đơn & Chứng từ VAT',
+                          categoryBadge: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                          url: inv.fileUrl,
+                          fileId: inv.fileId,
+                          size: inv.fileSize,
+                          type: inv.mimeType || 'application/pdf',
+                          notes: inv.notes,
+                          amount: inv.amount,
+                          source: `Hóa đơn ngày ${inv.date ? safeFormatDate(inv.date, 'dd/MM/yyyy') : ''}`,
+                          uploadDate: inv.createdAt || inv.date
+                        });
+                      }
+                    });
+                  }
+
+                  // 4. Task attachments
+                  if (Array.isArray(tasks)) {
+                    tasks.forEach((t: any) => {
+                      if (Array.isArray(t.attachments)) {
+                        t.attachments.forEach((att: any, attIdx: number) => {
+                          if (att.url && !allDocs.some(d => d.url === att.url || (d.fileId && d.fileId === att.fileId))) {
+                            allDocs.push({
+                              id: `doc_task_${t.id}_${attIdx}`,
+                              name: att.name || 'Tài liệu công việc',
+                              category: 'task_file',
+                              categoryLabel: t.name || 'Giai đoạn triển khai',
+                              categoryBadge: 'bg-amber-100 text-amber-700 border-amber-200',
+                              url: att.url,
+                              fileId: att.fileId,
+                              size: att.size,
+                              type: att.type || 'application/pdf',
+                              source: `Việc: ${t.name}`,
+                              uploadDate: att.uploadDate || t.createdAt
+                            });
+                          }
+                        });
+                      }
+                    });
+                  }
+
+                  // 5. Direct Order Attachments
+                  if (Array.isArray(order.attachments)) {
+                    order.attachments.forEach((att: any, attIdx: number) => {
+                      if (att.url && !allDocs.some(d => d.url === att.url || (d.fileId && d.fileId === att.fileId))) {
+                        let catLabel = 'Tài liệu đính kèm';
+                        let catBadge = 'bg-gray-100 text-gray-700 border-gray-200';
+                        if (att.category === 'contract') { catLabel = 'Hợp đồng kinh tế'; catBadge = 'bg-blue-100 text-blue-700 border-blue-200'; }
+                        else if (att.category === 'vat_invoice') { catLabel = 'Hóa đơn VAT'; catBadge = 'bg-emerald-100 text-emerald-700 border-emerald-200'; }
+                        else if (att.category === 'acceptance_report') { catLabel = 'Nghiệm thu & Bàn giao'; catBadge = 'bg-indigo-100 text-indigo-700 border-indigo-200'; }
+                        else if (att.category === 'payment_voucher') { catLabel = 'Chứng từ thanh toán'; catBadge = 'bg-teal-100 text-teal-700 border-teal-200'; }
+                        else if (att.category === 'technical') { catLabel = 'Hồ sơ kỹ thuật'; catBadge = 'bg-cyan-100 text-cyan-700 border-cyan-200'; }
+
+                        allDocs.push({
+                          id: att.id || `doc_order_${attIdx}`,
+                          name: att.name || att.fileName || 'Tài liệu đơn hàng',
+                          category: att.category || 'other',
+                          categoryLabel: catLabel,
+                          categoryBadge: catBadge,
+                          url: att.url,
+                          fileId: att.fileId,
+                          size: att.size,
+                          type: att.type || 'application/pdf',
+                          source: att.uploadedBy || 'Đơn hàng',
+                          uploadDate: att.uploadDate || order.createdAt
+                        });
+                      }
+                    });
+                  }
+
+                  if (allDocs.length === 0) {
+                    return (
+                      <div className="py-12 px-4 text-center bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-100">
+                        <FileIcon className="mx-auto text-gray-300 mb-2" size={36} />
+                        <h4 className="text-sm font-black text-gray-700 uppercase tracking-wider mb-1">Chưa có tài liệu đính kèm cho đơn hàng</h4>
+                        <p className="text-xs text-gray-400 max-w-md mx-auto mb-4">
+                          Bạn có thể tải lên Hợp đồng đã ký, Hóa đơn VAT, Biên bản bàn giao nghiệm thu hoặc hồ sơ kỹ thuật để lưu trữ vĩnh viễn và chia sẻ cùng nhóm.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddOrderDocModal(true)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-blue-700 transition-all shadow-md shadow-blue-200 cursor-pointer inline-flex items-center gap-2"
+                        >
+                          <Upload size={14} /> Tải tài liệu ngay
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between text-xs text-gray-500 font-bold">
+                        <span>Đã ghi nhận tổng cộng <strong className="text-blue-600 font-black">{allDocs.length}</strong> tài liệu & chứng từ liên quan:</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {allDocs.map((docItem) => (
+                          <div 
+                            key={docItem.id} 
+                            className="p-4 bg-white border border-gray-100 hover:border-blue-200 rounded-2xl shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0 shadow-xs">
+                                <FileText size={20} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                  <span className={cn("text-[8px] font-black uppercase px-2 py-0.5 rounded-md border", docItem.categoryBadge)}>
+                                    {docItem.categoryLabel}
+                                  </span>
+                                  {docItem.source && (
+                                    <span className="text-[8px] font-bold text-gray-400 truncate max-w-[150px]">
+                                      • {docItem.source}
+                                    </span>
+                                  )}
+                                </div>
+                                <h4 className="text-sm font-black text-gray-900 truncate leading-snug" title={docItem.name}>
+                                  {docItem.name}
+                                </h4>
+                                <div className="flex items-center gap-2 text-[9px] font-bold text-gray-400 mt-1">
+                                  {docItem.size ? <span>{(docItem.size / 1024).toFixed(1)} KB</span> : null}
+                                  {docItem.uploadDate && <span>• {safeFormatDate(docItem.uploadDate, 'HH:mm dd/MM/yyyy')}</span>}
+                                  {docItem.amount ? <span className="text-emerald-600 font-black">• {formatCurrency(docItem.amount)}</span> : null}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between">
+                              <span className="text-[9px] font-bold text-gray-400">
+                                {docItem.url?.startsWith('data:') ? 'Lưu trữ Base64' : (docItem.fileId ? 'Lưu trữ đám mây bảo mật' : 'Lưu trữ máy chủ')}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => downloadFile(docItem.url, docItem.name, docItem.fileId)}
+                                  className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                                >
+                                  <Download size={13} /> Tải về
+                                </button>
+                                {canConfirmInvoice && docItem.category !== 'contract' && docItem.category !== 'business_plan' && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!confirm(`Xác nhận xóa tài liệu "${docItem.name}"?`)) return;
+                                      const filtered = (order.attachments || []).filter((a: any) => a.id !== docItem.id && a.url !== docItem.url);
+                                      await updateDoc(doc(db, 'orders', id!), { attachments: filtered });
+                                      setOrder((prev: any) => ({ ...prev, attachments: filtered }));
+                                    }}
+                                    className="p-1.5 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                    title="Xóa tài liệu"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+             </div>
+          </div>
 
           <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-xl shadow-gray-200/5 overflow-hidden">
              <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between bg-white">
@@ -2738,26 +3221,40 @@ export default function OrderDetail() {
                                      </div>
                                   </div>
                                   <div className="flex items-center gap-1">
-                                     {inv.fileUrl && (
-                                        <a 
-                                          href={inv.fileUrl} 
-                                          target="_blank" 
-                                          rel="noreferrer" 
-                                          className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white transition-all"
+                                     {inv.fileUrl && !inv.fileUrl.startsWith('local-file://') ? (
+                                        <button 
+                                          type="button"
+                                          onClick={() => downloadFile(inv.fileUrl, inv.fileName || `Hoa_don_${inv.invoiceNo || 'VAT'}.pdf`, inv.fileId)}
+                                          className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white transition-all cursor-pointer"
                                           title="Tải chứng từ"
                                         >
-                                           <Download size={10} />
-                                        </a>
+                                           <Download size={12} />
+                                        </button>
+                                      ) : (
+                                        <span className="text-[8px] text-amber-400 font-bold px-1.5 py-0.5 bg-amber-500/20 rounded">Chưa có file</span>
                                       )}
+                                     {canConfirmInvoice && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedInvoiceForUpload(inv);
+                                            invoiceAttachInputRef.current?.click();
+                                          }}
+                                          className="p-1.5 bg-white/5 hover:bg-blue-500/20 hover:text-blue-400 rounded-lg text-gray-400 transition-all cursor-pointer"
+                                          title="Tải lên / Cập nhật chứng từ cho hóa đơn này"
+                                        >
+                                           <Upload size={12} />
+                                        </button>
+                                     )}
                                      {canConfirmInvoice && (
                                         <button 
                                           onClick={() => handleDeleteInvoice(inv.id)}
                                           className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg transition-all" 
                                           title="Xóa hóa đơn"
                                         >
-                                           <Trash2 size={10} />
+                                           <Trash2 size={12} />
                                         </button>
-                                     )}
+                                      )}
                                   </div>
                                </div>
                              );
@@ -3137,6 +3634,144 @@ export default function OrderDetail() {
             </motion.div>
           </div>
         )}
+
+        {/* Hidden input for attaching/updating invoice vouchers */}
+        <input 
+          type="file" 
+          ref={invoiceAttachInputRef} 
+          className="hidden" 
+          onChange={async (e) => {
+            if (e.target.files && e.target.files[0] && selectedInvoiceForUpload) {
+              await handleAttachInvoiceFile(selectedInvoiceForUpload.id, e.target.files[0]);
+              setSelectedInvoiceForUpload(null);
+            }
+          }} 
+        />
+
+        {/* Modal: Tải lên tài liệu mới cho Đơn hàng */}
+        {showAddOrderDocModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAddOrderDocModal(false)} className="absolute inset-0 bg-black/30 backdrop-blur-xs" />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shadow-xs">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Tải lên tài liệu đơn hàng</h3>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Lưu trữ bảo mật & vĩnh viễn trên đám mây</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setShowAddOrderDocModal(false)} className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-all">
+                  <XCircle size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddOrderDocument} className="p-6 space-y-4 overflow-y-auto">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                    Loại tài liệu <span className="text-red-500">*</span>
+                  </label>
+                  <select 
+                    value={orderDocCategory} 
+                    onChange={(e: any) => setOrderDocCategory(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-bold text-gray-800 outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  >
+                    <option value="contract">Hợp đồng kinh tế / Hợp đồng đã ký</option>
+                    <option value="business_plan">Phương án kinh doanh (PAKD)</option>
+                    <option value="vat_invoice">Hóa đơn VAT & Chứng từ thuế</option>
+                    <option value="acceptance_report">Biên bản bàn giao & Nghiệm thu</option>
+                    <option value="payment_voucher">Chứng từ thanh toán / Ủy nhiệm chi</option>
+                    <option value="technical">Hồ sơ kỹ thuật / Bản vẽ / Catalog</option>
+                    <option value="other">Tài liệu khác</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                    Tên hiển thị tài liệu
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="Ví dụ: Hợp đồng kinh tế có dấu đỏ..." 
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none font-bold text-xs text-gray-800 focus:border-blue-500 focus:bg-white transition-all" 
+                    value={orderDocName} 
+                    onChange={e => setOrderDocName(e.target.value)} 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                    Chọn tệp tin từ máy tính <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-blue-500 transition-all cursor-pointer group">
+                    <input 
+                      type="file" 
+                      required
+                      onChange={e => {
+                        if (e.target.files?.[0]) {
+                          setOrderDocFile(e.target.files[0]);
+                          if (!orderDocName) setOrderDocName(e.target.files[0].name);
+                        }
+                      }} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                    />
+                    {orderDocFile ? (
+                      <div className="flex flex-col items-center gap-1.5 text-blue-600">
+                        <FileCheck size={28} />
+                        <p className="text-xs font-black text-gray-900 truncate max-w-xs">{orderDocFile.name}</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">
+                          {(orderDocFile.size / 1024).toFixed(1)} KB • Nhấn để đổi tệp khác
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1.5 text-gray-400 group-hover:text-blue-600 transition-colors">
+                        <Upload size={28} />
+                        <p className="text-xs font-black text-gray-700 uppercase tracking-wider">Kéo thả hoặc nhấn để chọn tệp</p>
+                        <p className="text-[9px] text-gray-400 uppercase tracking-widest">Hỗ trợ PDF, Word, Excel, Ảnh (JPG, PNG)...</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100/60 flex items-start gap-2.5 text-blue-900 text-[11px] leading-relaxed">
+                  <CheckCircle2 size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                  <span>
+                    Tệp tin sau khi tải lên sẽ được mã hóa và lưu trữ dự phòng vĩnh viễn trên cơ sở dữ liệu nội bộ của ứng dụng, không lo bị mất khi máy chủ khởi động lại.
+                  </span>
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowAddOrderDocModal(false)} 
+                    className="flex-1 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 text-xs uppercase tracking-wider transition-all"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={isUploadingOrderDoc || !orderDocFile}
+                    className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-black shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all text-xs uppercase tracking-wider disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isUploadingOrderDoc ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Đang lưu trữ...
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={14} /> Xác nhận tải lên
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
         {showTaskModal && selectedTask && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowTaskModal(false)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
@@ -3768,60 +4403,149 @@ export default function OrderDetail() {
                           <button 
                             type="button" 
                             onClick={() => taskFileInputRef.current?.click()}
-                            className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all flex items-center gap-2"
+                            disabled={isUploadingTaskFile}
+                            className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm"
                           >
-                            <Upload size={14} /> Tải mới
+                            <Upload size={14} /> {isUploadingTaskFile ? 'Đang tải lên...' : 'Tải mới'}
                           </button>
                           <input 
                             ref={taskFileInputRef}
                             type="file" 
+                            multiple
                             className="hidden" 
                             onChange={handleTaskFileChange}
                           />
                         </div>
 
+                        {/* Special Proposal Contract Highlight for Step 1: Ký hợp đồng */}
+                        {(selectedTask.name?.toLowerCase().includes('hợp đồng') || selectedTask.orderIndex === 0) && (proposalData?.contractDraft || order?.contractDraft) && (
+                          <div className="p-4 mb-4 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-purple-50/50 border border-blue-200/80 rounded-2xl shadow-sm">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-blue-200">
+                                  <FileText size={20} />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-blue-600 text-white rounded-md tracking-wider">Hợp đồng đề xuất</span>
+                                    <p className="text-sm font-black text-gray-900 truncate max-w-[240px]">
+                                      {(proposalData?.contractDraft || order?.contractDraft)?.name || 'Hợp đồng kinh tế'}
+                                    </p>
+                                  </div>
+                                  <p className="text-[10px] text-gray-500 font-medium mt-0.5">
+                                    Tài liệu hợp đồng đính kèm từ đề xuất PAKD đã được phê duyệt
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const draft = proposalData?.contractDraft || order?.contractDraft;
+                                    downloadFile(draft?.url, draft?.name || 'Hop_dong.pdf', draft?.fileId);
+                                  }}
+                                  className="px-3 py-1.5 bg-white text-blue-600 border border-blue-200 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Download size={14} /> Tải về
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const draft = proposalData?.contractDraft || order?.contractDraft;
+                                    if (!draft) return;
+                                    const newAtt = {
+                                      name: draft.name || 'Hop_dong.pdf',
+                                      url: draft.url,
+                                      fileId: draft.fileId || null,
+                                      size: draft.size || 0,
+                                      type: draft.type || 'application/pdf',
+                                      uploadDate: new Date().toISOString(),
+                                      source: 'proposal'
+                                    };
+                                    const cur = selectedTask.attachments || [];
+                                    const updated = [...cur, newAtt];
+                                    setSelectedTask({ ...selectedTask, attachments: updated });
+                                    setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, attachments: updated } : t));
+                                    await updateDoc(doc(db, 'tasks', selectedTask.id), { attachments: updated });
+                                    alert('Đã ghim hợp đồng vào công việc thành công!');
+                                  }}
+                                  className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-blue-700 transition-all shadow-md shadow-blue-200 flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Plus size={14} /> Ghim vào việc này
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-1 gap-3">
+                          {isUploadingTaskFile && (
+                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-center gap-3 text-blue-700">
+                              <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                              <span className="text-xs font-bold uppercase tracking-wider">Đang lưu trữ tài liệu an toàn vào cơ sở dữ liệu...</span>
+                            </div>
+                          )}
+
                           {(selectedTask.attachments || []).length === 0 ? (
                             <div className="text-center py-12 bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-100">
                               <FileIcon className="mx-auto text-gray-300 mb-2" size={32} />
                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Chưa có tài liệu đính kèm</p>
-                              <button onClick={() => taskFileInputRef.current?.click()} className="mt-4 px-4 py-2 bg-white border border-gray-200 rounded-xl text-[9px] font-black text-gray-500 uppercase tracking-widest hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">Chọn từ máy tính</button>
+                              <button 
+                                type="button"
+                                onClick={() => taskFileInputRef.current?.click()} 
+                                disabled={isUploadingTaskFile}
+                                className="mt-4 px-4 py-2 bg-white border border-gray-200 rounded-xl text-[9px] font-black text-gray-500 uppercase tracking-widest hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all cursor-pointer shadow-sm"
+                              >
+                                {isUploadingTaskFile ? 'Đang tải lên...' : 'Chọn từ máy tính'}
+                              </button>
                             </div>
                           ) : (
                             selectedTask.attachments.map((file: any, i: number) => (
-                              <div key={i} className="p-4 bg-white border border-gray-50 rounded-2xl flex items-center justify-between hover:border-blue-100 hover:shadow-sm transition-all group">
+                              <div key={i} className="p-4 bg-white border border-gray-100 rounded-2xl flex items-center justify-between hover:border-blue-200 hover:shadow-md transition-all group">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                                  <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
                                     <FileText size={20} />
                                   </div>
                                   <div>
-                                    <p className="text-sm font-black text-gray-900 truncate max-w-[200px]">{file.name}</p>
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase">{(file.size / 1024).toFixed(1)} KB • {safeFormatDate(file.uploadDate || Date.now(), 'HH:mm dd/MM')}</p>
+                                    <p className="text-sm font-black text-gray-900 truncate max-w-[240px]">{file.name}</p>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase">
+                                      {file.size ? (file.size / 1024).toFixed(1) + ' KB • ' : ''}
+                                      {safeFormatDate(file.uploadDate || Date.now(), 'HH:mm dd/MM/yyyy')}
+                                      {file.source === 'proposal' && ' • Từ đề xuất'}
+                                    </p>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {file.url ? (
                                     <button 
                                       type="button"
-                                      onClick={() => downloadFile(file.url, file.name)}
-                                      className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer"
-                                      title="Tải về"
+                                      onClick={() => downloadFile(file.url, file.name, file.fileId)}
+                                      className="p-2 text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 rounded-lg transition-all flex items-center justify-center cursor-pointer shadow-xs"
+                                      title="Tải về tệp"
                                     >
                                       <Download size={16} />
                                     </button>
                                   ) : (
-                                    <button onClick={() => alert('Chức năng xem tệp đang được phát triển')} className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center">
-                                      <ExternalLink size={16} />
+                                    <button 
+                                      type="button"
+                                      onClick={() => alert(`Tệp "${file.name}" chưa có liên kết tải về. Bạn có thể nhấn "Tải mới" để đính kèm lại tệp này.`)} 
+                                      className="p-2 text-amber-500 bg-amber-50 rounded-lg transition-all flex items-center justify-center"
+                                      title="Tệp chưa có link tải"
+                                    >
+                                      <AlertCircle size={16} />
                                     </button>
                                   )}
                                   <button 
+                                    type="button"
                                     onClick={async () => {
-                                      if (!confirm('Xác nhận xóa tài liệu?')) return;
+                                      if (!confirm('Xác nhận xóa tài liệu này?')) return;
                                       const filtered = selectedTask.attachments.filter((_: any, idx: number) => idx !== i);
                                       setSelectedTask({ ...selectedTask, attachments: filtered });
+                                      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, attachments: filtered } : t));
                                       await updateDoc(doc(db, 'tasks', selectedTask.id), { attachments: filtered });
                                     }}
-                                    className="p-2 text-red-300 hover:text-red-600 bg-red-50/50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                                    title="Xóa tài liệu"
                                   >
                                     <Trash2 size={16} />
                                   </button>

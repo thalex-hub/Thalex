@@ -182,9 +182,15 @@ export function getApiUrl(path: string): string {
   return cleanPath;
 }
 
-export async function downloadFile(url: string | undefined, fileName: string) {
+export async function downloadFile(url: string | undefined, fileName: string, fileId?: string) {
   if (!url) {
     alert('Không tìm thấy liên kết tải về cho tệp này. Tệp có thể chưa được tải lên máy chủ.');
+    return;
+  }
+
+  // 0. Handle dummy local-file:// placeholder from legacy upload bugs
+  if (url.startsWith('local-file://')) {
+    alert(`Tệp "${fileName}" chưa được lưu trữ hoàn chỉnh trên máy chủ (do lỗi giới hạn tệp cũ). Vui lòng sử dụng tính năng "Tải mới / Cập nhật tài liệu" để tải tệp lên lại an toàn.`);
     return;
   }
 
@@ -203,7 +209,51 @@ export async function downloadFile(url: string | undefined, fileName: string) {
     }
   }
 
-  // 2. Check if URL is already pointing to a known blocked Firebase Storage bucket
+  // Helper to trigger direct blob download
+  const triggerBlobDownload = (blobUrl: string, name: string) => {
+    const link = document.createElement('a');
+    link.style.display = 'none';
+    link.href = blobUrl;
+    link.download = name || 'download';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => {
+      window.URL.revokeObjectURL(blobUrl);
+    }, 15000);
+  };
+
+  // Extract fid from url if present
+  let extractedFileId = fileId;
+  if (!extractedFileId && url.includes('fid=')) {
+    try {
+      const parsed = new URL(url, window.location.origin);
+      extractedFileId = parsed.searchParams.get('fid') || undefined;
+    } catch (e) {}
+  } else if (!extractedFileId && url.startsWith('firestore://')) {
+    extractedFileId = url.replace('firestore://', '').trim();
+  }
+
+  // 2. Direct Firestore file retrieval if URL is firestore protocol
+  if (url.startsWith('firestore://') && extractedFileId) {
+    try {
+      const { getFileFromStorage } = await import('./storageService');
+      const stored = await getFileFromStorage(extractedFileId);
+      if (stored && stored.dataUrl) {
+        const link = document.createElement('a');
+        link.href = stored.dataUrl;
+        link.download = fileName || stored.name || 'download';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+    } catch (fsErr) {
+      console.error('Firestore storage retrieval failed:', fsErr);
+    }
+  }
+
+  // 3. Check if URL is already pointing to a known blocked Firebase Storage bucket
   const isFirebaseStorage = url.includes('firebasestorage.googleapis.com');
 
   try {
@@ -215,6 +265,23 @@ export async function downloadFile(url: string | undefined, fileName: string) {
     // Check if error response or JSON error
     const contentType = response.headers.get('content-type') || '';
     if (!response.ok || contentType.includes('application/json')) {
+      // Check if we can fallback to persistent Firestore backup
+      if (extractedFileId) {
+        try {
+          const { getFileFromStorage } = await import('./storageService');
+          const stored = await getFileFromStorage(extractedFileId);
+          if (stored && stored.dataUrl) {
+            const link = document.createElement('a');
+            link.href = stored.dataUrl;
+            link.download = fileName || stored.name || 'download';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+          }
+        } catch (e) {}
+      }
+
       const errJson = await response.json().catch(() => null);
       const isBillingError =
         response.status === 402 ||
@@ -229,11 +296,11 @@ export async function downloadFile(url: string | undefined, fileName: string) {
           fileName: fileName || 'Tệp đính kèm',
           title: 'Không thể tải xuống tệp tin',
           message: isPermissionDenied
-            ? 'Dự án đã nâng cấp gói Blaze, tuy nhiên Firebase Storage từ chối truy cập (Lỗi 403: Permission denied). Nguyên nhân do Quy tắc bảo mật (Storage Rules) trên Firebase Console chưa cho phép đọc tệp, hoặc tài khoản thanh toán vừa nâng cấp cần thêm 5 - 15 phút để Google Cloud kích hoạt lại hoàn toàn hạn ngạch.'
-            : (errJson?.message || 'Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị tạm khóa tài khoản thanh toán (Lỗi 402: Billing account is disabled/closed). Google hiện đang khóa quyền đọc các tệp lưu trữ này.'),
+            ? 'Dự án đã nâng cấp gói Blaze, tuy nhiên Firebase Storage từ chối truy cập (Lỗi 403: Permission denied). Nguyên nhân do Quy tắc bảo mật (Storage Rules) trên Firebase Console chưa cho phép đọc tệp.'
+            : (errJson?.message || 'Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị tạm khóa tài khoản thanh toán (Lỗi 402: Billing account is disabled/closed).'),
           recommendation: isPermissionDenied
-            ? 'Vào Firebase Console > Storage > Rules, đặt "allow read: if true;" (hoặc allow read: if request.auth != null;), sau đó nhấn Publish. Nếu vừa kích hoạt Blaze, vui lòng đợi vài phút để hệ thống Google đồng bộ.'
-            : 'Quản trị viên cần kiểm tra và liên kết tài khoản thanh toán (Billing Account) còn hiệu lực trên Google Cloud Console cho đúng Project ID của ứng dụng.'
+            ? 'Vui lòng kiểm tra Storage Rules trên Firebase Console. Với các tệp mới tải lên, hệ thống đã tự động lưu dự phòng trên cơ sở dữ liệu nội bộ.'
+            : 'Quản trị viên cần kiểm tra và liên kết tài khoản thanh toán còn hiệu lực trên Google Cloud Console.'
         });
         return;
       }
@@ -243,35 +310,40 @@ export async function downloadFile(url: string | undefined, fileName: string) {
 
     const blob = await response.blob();
     const objectUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.style.display = 'none';
-    link.href = objectUrl;
-    link.download = fileName || 'download';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    setTimeout(() => {
-      window.URL.revokeObjectURL(objectUrl);
-    }, 15000);
+    triggerBlobDownload(objectUrl, fileName);
     return;
   } catch (error: any) {
     console.error('Download proxy failed:', error);
 
-    // If it's a Firebase Storage URL, NEVER open it in a new tab because it will show Google's raw error JSON!
+    // Fallback to Firestore persistent store if available
+    if (extractedFileId) {
+      try {
+        const { getFileFromStorage } = await import('./storageService');
+        const stored = await getFileFromStorage(extractedFileId);
+        if (stored && stored.dataUrl) {
+          const link = document.createElement('a');
+          link.href = stored.dataUrl;
+          link.download = fileName || stored.name || 'download';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          return;
+        }
+      } catch (e) {}
+    }
+
+    // If it's a Firebase Storage URL, NEVER open it in a new tab
     if (isFirebaseStorage) {
       triggerDownloadErrorModal({
         fileName: fileName || 'Tệp đính kèm',
         title: 'Không thể tải xuống tệp tin',
-        message:
-          'Tệp tin này được lưu trữ trên Firebase Storage nhưng dịch vụ lưu trữ từ chối yêu cầu đọc (Lỗi 403 Permission Denied hoặc Billing Quota).',
-        recommendation:
-          '1. Kiểm tra quy tắc bảo mật (Storage Rules) trên Firebase Console (tab Storage > Rules) đảm bảo có "allow read: if true;".\n2. Đảm bảo đúng Project ID gen-lang-client-0900315510 đã được liên kết thẻ thanh toán và có hạn ngạch.'
+        message: 'Tệp tin này được lưu trữ trên Firebase Storage nhưng dịch vụ từ chối yêu cầu đọc (Lỗi 403 Permission Denied hoặc Quota).',
+        recommendation: 'Bạn có thể tải lại tệp tin mới trực tiếp vào hệ thống để lưu trữ an toàn trên cơ sở dữ liệu nội bộ.'
       });
       return;
     }
 
-    // For other normal external URLs (like external drive links), fall back to opening direct link
+    // For other normal external URLs, attempt direct link
     try {
       const link = document.createElement('a');
       link.href = url;

@@ -615,6 +615,7 @@
     "stock_items": { "schema": "StockItem", "description": "Individual stock entries for aging tracking" },
     "business_expenses": { "schema": "BusinessExpense", "description": "Operating expenses tracking" },
     "stored_files": { "schema": "StoredFile", "description": "Personal and company files" },
+    "file_storage": { "schema": "StoredFile", "description": "Persistent file storage and chunks" },
     "folders": { "schema": "Folder", "description": "User folders" }
   }
 }

@@ -276,6 +276,13 @@ service cloud.firestore {
       allow update, delete: if isDirector() || isHR() || (isSignedIn() && (resource.data.uploadedBy == request.auth.uid || (getUserLegacyId() != '' && resource.data.uploadedBy == getUserLegacyId())));
     }
 
+    match /file_storage/{id} {
+      allow read, create, update, delete: if isSignedIn();
+      match /chunks/{chunkId} {
+        allow read, create, update, delete: if isSignedIn();
+      }
+    }
+
     match /folders/{id} {
       allow read, write: if isSignedIn();
     }

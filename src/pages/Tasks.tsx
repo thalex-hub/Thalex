@@ -550,7 +550,8 @@ export default function Tasks() {
               size: res.size || f.size,
               lastModified: f.lastModified,
               uploadDate: new Date().toISOString(),
-              url: res.url
+              url: res.url,
+              fileId: res.fileId
             };
           } catch (uploadErr) {
             console.error("Lỗi tải tệp lên server:", uploadErr);
@@ -2718,8 +2719,8 @@ export default function Tasks() {
                                   {file.url && (
                                     <button 
                                       type="button"
-                                      onClick={() => downloadFile(file.url, file.name)}
-                                      className="p-2 text-blue-500 hover:text-blue-700 bg-blue-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer"
+                                      onClick={() => downloadFile(file.url, file.name, (file as any).fileId)}
+                                      className="p-2 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all flex items-center justify-center cursor-pointer shadow-sm"
                                       title="Tải về"
                                     >
                                       <Download size={16} />
@@ -2727,7 +2728,8 @@ export default function Tasks() {
                                   )}
                                   <button 
                                     onClick={() => removeFile(i, true)}
-                                    className="p-2 text-red-300 hover:text-red-600 bg-red-50/50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    className="p-2 text-red-400 hover:text-red-600 bg-red-50/50 hover:bg-red-100 rounded-lg transition-all"
+                                    title="Xóa tệp"
                                   >
                                     <Trash2 size={16} />
                                   </button>

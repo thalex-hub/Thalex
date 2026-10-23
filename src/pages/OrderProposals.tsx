@@ -5,7 +5,7 @@ import { uploadFile as uploadFileToServer } from '../lib/storageService';
 import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search, ChevronDown, ChevronUp, RefreshCcw } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput, parseFinancialNumber, withTimeout } from '../lib/utils';
+import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput, parseFinancialNumber, withTimeout, downloadFile } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/authContext';
 import { exportToExcel } from '../lib/excel';
@@ -317,7 +317,8 @@ export default function OrderProposals() {
           name: file.name,
           size: res.size || file.size,
           type: file.type,
-          url: res.url
+          url: res.url,
+          fileId: res.fileId
         };
       };
 
@@ -631,6 +632,28 @@ export default function OrderProposals() {
           ? Number(proposal.contractValueWithVAT)
           : (sell + sellVAT);
 
+        const orderAttachments = [
+          ...(proposal.contractDraft ? [{
+            name: proposal.contractDraft.name || `Hop_dong_${proposal.name}`,
+            url: proposal.contractDraft.url,
+            fileId: proposal.contractDraft.fileId || null,
+            size: proposal.contractDraft.size || 0,
+            type: proposal.contractDraft.type || 'application/pdf',
+            category: 'contract',
+            uploadDate: new Date().toISOString()
+          }] : []),
+          ...(proposal.businessPlan ? [{
+            name: proposal.businessPlan.name || `PAKD_${proposal.name}`,
+            url: proposal.businessPlan.url,
+            fileId: proposal.businessPlan.fileId || null,
+            size: proposal.businessPlan.size || 0,
+            type: proposal.businessPlan.type || 'application/pdf',
+            category: 'business_plan',
+            uploadDate: new Date().toISOString()
+          }] : []),
+          ...(proposal.attachments || [])
+        ];
+
         const orderRef = await addDoc(collection(db, 'orders'), {
           proposalId: id,
           customerId: proposal.customerId,
@@ -657,6 +680,10 @@ export default function OrderProposals() {
           status: 'contract_signed',
           responsibleUserId: proposal.createdBy,
           followers: proposal.followers || [],
+          contractDraft: proposal.contractDraft || null,
+          businessPlan: proposal.businessPlan || null,
+          attachments: orderAttachments,
+          contracts: proposal.contractDraft ? [proposal.contractDraft] : [],
           createdAt: new Date().toISOString()
         });
 
@@ -708,6 +735,19 @@ export default function OrderProposals() {
         ];
 
         for (const [index, t] of subTasks.entries()) {
+          const taskAttachments: any[] = [];
+          if (index === 0 && proposal.contractDraft) {
+            taskAttachments.push({
+              name: proposal.contractDraft.name || `Hop_dong_${proposal.name}.pdf`,
+              url: proposal.contractDraft.url,
+              fileId: proposal.contractDraft.fileId || null,
+              size: proposal.contractDraft.size || 0,
+              type: proposal.contractDraft.type || 'application/pdf',
+              uploadDate: new Date().toISOString(),
+              source: 'proposal'
+            });
+          }
+
           await addDoc(collection(db, 'tasks'), {
             name: `${t.name} – ${proposal.name}`,
             parentId: '',
@@ -727,7 +767,8 @@ export default function OrderProposals() {
             dueDate: new Date(Date.now() + t.days * 24 * 60 * 60 * 1000).toISOString(),
             createdAt: new Date().toISOString(),
             type: 'task',
-            orderIndex: index
+            orderIndex: index,
+            attachments: taskAttachments
           });
         }
       }
@@ -1299,40 +1340,36 @@ export default function OrderProposals() {
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
                            {viewingProposal.contractDraft && (
-                             <a 
-                               href={viewingProposal.contractDraft.url} 
-                               target={viewingProposal.contractDraft.url.includes('mock-url') ? '_self' : '_blank'} 
-                               rel="noopener noreferrer" 
-                               className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 transition-all group shadow-sm"
-                               onClick={(e) => {
-                                 if (viewingProposal.contractDraft.url.includes('mock-url')) {
-                                   e.preventDefault();
-                                 }
-                               }}
+                             <button 
+                               type="button"
+                               onClick={() => downloadFile(viewingProposal.contractDraft.url, viewingProposal.contractDraft.name || 'Hop_Dong_Du_Kien', viewingProposal.contractDraft.fileId)}
+                               className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 hover:shadow-sm transition-all group text-left cursor-pointer"
+                               title={viewingProposal.contractDraft.name || "Tải HĐ Dự kiến"}
                              >
                                 <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                    <Paperclip size={16} />
                                 </div>
-                                <span className="text-[10px] font-bold text-gray-600 uppercase">HĐ Dự kiến</span>
-                             </a>
+                                <div className="min-w-0">
+                                   <span className="text-[10px] font-bold text-gray-700 uppercase block truncate">HĐ Dự kiến</span>
+                                   <span className="text-[9px] text-gray-400 block truncate">{viewingProposal.contractDraft.name || 'Tải về'}</span>
+                                </div>
+                             </button>
                            )}
                            {viewingProposal.businessPlan && (
-                             <a 
-                               href={viewingProposal.businessPlan.url} 
-                               target={viewingProposal.businessPlan.url.includes('mock-url') ? '_self' : '_blank'} 
-                               rel="noopener noreferrer" 
-                               className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 transition-all group shadow-sm"
-                               onClick={(e) => {
-                                 if (viewingProposal.businessPlan.url.includes('mock-url')) {
-                                   e.preventDefault();
-                                 }
-                               }}
+                             <button 
+                               type="button"
+                               onClick={() => downloadFile(viewingProposal.businessPlan.url, viewingProposal.businessPlan.name || 'PAKD', viewingProposal.businessPlan.fileId)}
+                               className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 hover:shadow-sm transition-all group text-left cursor-pointer"
+                               title={viewingProposal.businessPlan.name || "Tải PAKD"}
                              >
                                 <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                    <TrendingUp size={16} />
                                 </div>
-                                <span className="text-[10px] font-bold text-gray-600 uppercase">PAKD</span>
-                             </a>
+                                <div className="min-w-0">
+                                   <span className="text-[10px] font-bold text-gray-700 uppercase block truncate">PAKD</span>
+                                   <span className="text-[9px] text-gray-400 block truncate">{viewingProposal.businessPlan.name || 'Tải về'}</span>
+                                </div>
+                             </button>
                            )}
                         </div>
                       </div>

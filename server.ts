@@ -602,7 +602,19 @@ app.get("/api/download", async (req, res) => {
       const filePath = path.join(process.cwd(), "uploads", decodeURIComponent(relPart));
       if (fs.existsSync(filePath)) {
         return res.download(filePath, filename);
+      } else {
+        return res.status(404).json({
+          error: "FILE_NOT_FOUND_ON_DISK",
+          message: "Tệp tin này chưa có trên bộ nhớ đệm máy chủ. Hệ thống sẽ truy xuất từ cơ sở dữ liệu lưu trữ đám mây.",
+        });
       }
+    }
+
+    if (!fileUrl.startsWith("http://") && !fileUrl.startsWith("https://")) {
+      return res.status(400).json({
+        error: "INVALID_URL",
+        message: "Đường dẫn tệp tin không hợp lệ.",
+      });
     }
 
     // 4. Fetch external URL

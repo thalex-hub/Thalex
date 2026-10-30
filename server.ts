@@ -560,7 +560,7 @@ app.get("/api/download", async (req, res) => {
 
     // 1. Check if rawUrl is a local uploads path (e.g. /uploads/... or uploads/...)
     if (rawUrl.startsWith("/uploads/") || rawUrl.startsWith("uploads/")) {
-      const cleanRel = rawUrl.replace(/^\/?uploads\//, "");
+      const cleanRel = rawUrl.replace(/^\/?uploads\//, "").split("?")[0];
       const decodedRel = decodeURIComponent(cleanRel);
       const filePath = path.join(process.cwd(), "uploads", decodedRel);
 

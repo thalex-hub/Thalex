@@ -43,6 +43,7 @@ import {
   PlusCircle,
   FileBox as FileIcon,
   MessageCircle,
+  AlertTriangle,
   Link as LinkIcon,
   Eye
 } from 'lucide-react';
@@ -220,6 +221,43 @@ export default function OrderDetail() {
       });
     }
   }, [user, isAdmin, isDirector, isSuperAdmin, appUser]);
+
+  React.useEffect(() => {
+    const handleFileReplaced = (e: any) => {
+      const detail = e.detail;
+      if (detail && detail.orderId === id && detail.newDoc) {
+        setOrder((prev: any) => {
+          if (!prev) return prev;
+          const next = { ...prev };
+          const isPakd = detail.category === 'business_plan' || detail.docId === 'doc_pakd_main' || detail.newDoc?.name?.toLowerCase().includes('pakd');
+          const isContract = detail.category === 'contract' || detail.docId === 'doc_contract_main' || detail.newDoc?.name?.toLowerCase().includes('hợp đồng');
+
+          if (isPakd) {
+            next.businessPlan = detail.newDoc;
+          } else if (isContract) {
+            next.contractDraft = detail.newDoc;
+          }
+
+          if (Array.isArray(next.attachments)) {
+            const idx = next.attachments.findIndex((a: any) => 
+              (detail.docId && a.id === detail.docId) || 
+              (a.name && a.name === detail.newDoc.name)
+            );
+            if (idx >= 0) {
+              const updated = [...next.attachments];
+              updated[idx] = { ...updated[idx], ...detail.newDoc };
+              next.attachments = updated;
+            } else {
+              next.attachments = [...next.attachments, detail.newDoc];
+            }
+          }
+          return next;
+        });
+      }
+    };
+    window.addEventListener('app-file-replaced', handleFileReplaced);
+    return () => window.removeEventListener('app-file-replaced', handleFileReplaced);
+  }, [id]);
 
   const safeFormatDate = (date: any, formatStr: string) => {
     try {
@@ -769,12 +807,28 @@ export default function OrderDetail() {
         updatedAt: new Date().toISOString()
       };
 
-      if (orderDocCategory === 'contract' && !order?.contractDraft) {
+      if (orderDocCategory === 'contract') {
         updatePayload.contractDraft = newDoc;
+      } else if (orderDocCategory === 'business_plan') {
+        updatePayload.businessPlan = newDoc;
       }
 
       await updateDoc(doc(db, 'orders', id), updatePayload);
       setOrder((prev: any) => ({ ...prev, ...updatePayload }));
+
+      // If this order has a linked proposal, sync businessPlan or contractDraft to it
+      if (order?.proposalId) {
+        try {
+          const propRef = doc(db, 'order_proposals', order.proposalId);
+          if (orderDocCategory === 'business_plan') {
+            await updateDoc(propRef, { businessPlan: newDoc });
+          } else if (orderDocCategory === 'contract') {
+            await updateDoc(propRef, { contractDraft: newDoc });
+          }
+        } catch (pErr) {
+          console.warn('Could not sync doc to proposal:', pErr);
+        }
+      }
 
       // If this is a contract, also sync to task 1 (1. Ký hợp đồng)
       if (orderDocCategory === 'contract') {
@@ -798,6 +852,90 @@ export default function OrderDetail() {
       alert(`Không thể tải tài liệu lên: ${err?.message || 'Vui lòng thử lại'}`);
     } finally {
       setIsUploadingOrderDoc(false);
+    }
+  };
+
+  const handleReplaceDocItem = async (docItem: any, file?: File) => {
+    if (!id || !file) return;
+
+    try {
+      const uploadRes = await uploadFile(file, 'orders');
+      const newDoc = {
+        id: docItem.id && !docItem.id.startsWith('doc_') ? docItem.id : Math.random().toString(36).substring(2, 9),
+        name: file.name,
+        fileName: file.name,
+        category: docItem.category || 'other',
+        url: uploadRes.url,
+        fileId: uploadRes.fileId || null,
+        size: file.size,
+        type: file.type || 'application/octet-stream',
+        uploadDate: new Date().toISOString(),
+        uploadedBy: user?.displayName || user?.email || 'Người dùng'
+      };
+
+      const updatePayload: any = {
+        updatedAt: new Date().toISOString()
+      };
+
+      if (docItem.category === 'business_plan' || docItem.id === 'doc_pakd_main') {
+        updatePayload.businessPlan = newDoc;
+      } else if (docItem.category === 'contract' || docItem.id === 'doc_contract_main') {
+        updatePayload.contractDraft = newDoc;
+      } else if (docItem.category === 'vat_invoice') {
+        const updatedInvoices = (order?.invoices || []).map((inv: any) => {
+          if (inv.fileUrl === docItem.url || inv.fileName === docItem.name || inv.id === docItem.id) {
+            return { ...inv, fileUrl: uploadRes.url, fileId: uploadRes.fileId || null, fileName: file.name, fileSize: file.size };
+          }
+          return inv;
+        });
+        updatePayload.invoices = updatedInvoices;
+      }
+
+      // Also update or add to attachments array
+      const existingAtts = Array.isArray(order?.attachments) ? order.attachments : [];
+      const attIndex = existingAtts.findIndex((a: any) => a.id === docItem.id || a.url === docItem.url || a.name === docItem.name);
+      if (attIndex >= 0) {
+        const newAtts = [...existingAtts];
+        newAtts[attIndex] = { ...newAtts[attIndex], ...newDoc };
+        updatePayload.attachments = newAtts;
+      } else {
+        updatePayload.attachments = [...existingAtts, newDoc];
+      }
+
+      await updateDoc(doc(db, 'orders', id), updatePayload);
+      setOrder((prev: any) => ({ ...prev, ...updatePayload }));
+
+      // Sync to proposal if relevant
+      if (order?.proposalId) {
+        try {
+          const propRef = doc(db, 'order_proposals', order.proposalId);
+          if (docItem.category === 'business_plan' || docItem.id === 'doc_pakd_main') {
+            await updateDoc(propRef, { businessPlan: newDoc });
+          } else if (docItem.category === 'contract' || docItem.id === 'doc_contract_main') {
+            await updateDoc(propRef, { contractDraft: newDoc });
+          }
+        } catch (pe) {}
+      }
+
+      // Sync to contract task if relevant
+      if (docItem.category === 'contract' || docItem.id === 'doc_contract_main') {
+        const contractTask = tasks.find(t => t.name?.toLowerCase().includes('hợp đồng') || t.orderIndex === 0);
+        if (contractTask) {
+          const updatedTaskAtts = [...(contractTask.attachments || []), newDoc];
+          await updateDoc(doc(db, 'tasks', contractTask.id), {
+            attachments: updatedTaskAtts,
+            updatedAt: new Date().toISOString()
+          });
+          setTasks(prev => prev.map(t => t.id === contractTask.id ? { ...t, attachments: updatedTaskAtts } : t));
+        }
+      }
+
+      alert(`Đã cập nhật tệp "${file.name}" thành công!`);
+      // Trigger instant download of the new file
+      downloadFile(newDoc.url, newDoc.name, newDoc.fileId);
+    } catch (err: any) {
+      console.error('Error replacing doc item:', err);
+      alert(`Không thể cập nhật tệp: ${err?.message || 'Vui lòng thử lại'}`);
     }
   };
 
@@ -2464,18 +2602,51 @@ export default function OrderDetail() {
                               </div>
                             </div>
 
-                            <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between">
-                              <span className="text-[9px] font-bold text-gray-400">
-                                {docItem.url?.startsWith('data:') ? 'Lưu trữ Base64' : (docItem.fileId ? 'Lưu trữ đám mây bảo mật' : 'Lưu trữ máy chủ')}
-                              </span>
-                              <div className="flex items-center gap-1.5">
+                            <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between flex-wrap gap-2">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[9px] font-bold text-gray-400">
+                                  {docItem.url?.startsWith('data:') ? 'Lưu trữ Base64' : (docItem.fileId ? 'Lưu trữ đám mây' : 'Lưu trữ máy chủ')}
+                                </span>
+                                {docItem.url?.includes('firebasestorage.googleapis.com') && (
+                                  <span className="text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                    <AlertTriangle size={10} /> Lưu trữ Firebase cũ
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <button
                                   type="button"
-                                  onClick={() => downloadFile(docItem.url, docItem.name, docItem.fileId)}
+                                  onClick={() => downloadFile(docItem.url, docItem.name, docItem.fileId, {
+                                    orderId: id,
+                                    proposalId: order?.proposalId,
+                                    category: docItem.category,
+                                    docId: docItem.id,
+                                    fallbackData: docItem.data
+                                  })}
                                   className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                                 >
                                   <Download size={13} /> Tải về
                                 </button>
+
+                                {/* Quick Replace/Update File Button */}
+                                <label 
+                                  className="px-2.5 py-1.5 bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-700 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer shadow-xs border border-gray-200 hover:border-blue-300"
+                                  title="Tải lên tệp mới để thay thế và lưu trữ vĩnh viễn"
+                                >
+                                  <Upload size={12} />
+                                  <span>Thay tệp</span>
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      if (e.target.files?.[0]) {
+                                        handleReplaceDocItem(docItem, e.target.files[0]);
+                                      }
+                                    }}
+                                  />
+                                </label>
+
                                 {canConfirmInvoice && docItem.category !== 'contract' && docItem.category !== 'business_plan' && (
                                   <button
                                     type="button"
@@ -2485,7 +2656,7 @@ export default function OrderDetail() {
                                       await updateDoc(doc(db, 'orders', id!), { attachments: filtered });
                                       setOrder((prev: any) => ({ ...prev, attachments: filtered }));
                                     }}
-                                    className="p-1.5 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                    className="p-1.5 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
                                     title="Xóa tài liệu"
                                   >
                                     <Trash2 size={13} />

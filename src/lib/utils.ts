@@ -182,7 +182,33 @@ export function getApiUrl(path: string): string {
   return cleanPath;
 }
 
-export async function downloadFile(url: string | undefined, fileName: string, fileId?: string) {
+export async function downloadFile(
+  url: string | undefined, 
+  fileName: string, 
+  fileId?: string,
+  extraOptions?: {
+    orderId?: string;
+    proposalId?: string;
+    category?: string;
+    docId?: string;
+    fallbackData?: string;
+  }
+) {
+  // If fallbackData is provided and valid, download directly
+  if (extraOptions?.fallbackData && extraOptions.fallbackData.startsWith('data:')) {
+    try {
+      const link = document.createElement('a');
+      link.href = extraOptions.fallbackData;
+      link.download = fileName || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    } catch (e) {
+      console.error('Error downloading fallbackData:', e);
+    }
+  }
+
   if (!url) {
     alert('Không tìm thấy liên kết tải về cho tệp này. Tệp có thể chưa được tải lên máy chủ.');
     return;
@@ -296,11 +322,14 @@ export async function downloadFile(url: string | undefined, fileName: string, fi
           fileName: fileName || 'Tệp đính kèm',
           title: 'Không thể tải xuống tệp tin',
           message: isPermissionDenied
-            ? 'Dự án đã nâng cấp gói Blaze, tuy nhiên Firebase Storage từ chối truy cập (Lỗi 403: Permission denied). Nguyên nhân do Quy tắc bảo mật (Storage Rules) trên Firebase Console chưa cho phép đọc tệp.'
+            ? 'Tệp tin này được lưu trữ trên Firebase Storage nhưng dịch vụ từ chối yêu cầu đọc (Lỗi 403: Permission denied).'
             : (errJson?.message || 'Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị tạm khóa tài khoản thanh toán (Lỗi 402: Billing account is disabled/closed).'),
-          recommendation: isPermissionDenied
-            ? 'Vui lòng kiểm tra Storage Rules trên Firebase Console. Với các tệp mới tải lên, hệ thống đã tự động lưu dự phòng trên cơ sở dữ liệu nội bộ.'
-            : 'Quản trị viên cần kiểm tra và liên kết tài khoản thanh toán còn hiệu lực trên Google Cloud Console.'
+          recommendation: 'Bạn có thể tải lại tệp tin mới trực tiếp vào hệ thống ngay bên dưới để lưu trữ an toàn trên cơ sở dữ liệu nội bộ.',
+          orderId: extraOptions?.orderId,
+          proposalId: extraOptions?.proposalId,
+          category: extraOptions?.category,
+          docId: extraOptions?.docId,
+          rawUrl: url
         });
         return;
       }
@@ -338,7 +367,12 @@ export async function downloadFile(url: string | undefined, fileName: string, fi
         fileName: fileName || 'Tệp đính kèm',
         title: 'Không thể tải xuống tệp tin',
         message: 'Tệp tin này được lưu trữ trên Firebase Storage nhưng dịch vụ từ chối yêu cầu đọc (Lỗi 403 Permission Denied hoặc Quota).',
-        recommendation: 'Bạn có thể tải lại tệp tin mới trực tiếp vào hệ thống để lưu trữ an toàn trên cơ sở dữ liệu nội bộ.'
+        recommendation: 'Bạn có thể tải lại tệp tin mới trực tiếp vào hệ thống ngay bên dưới để lưu trữ an toàn trên cơ sở dữ liệu nội bộ.',
+        orderId: extraOptions?.orderId,
+        proposalId: extraOptions?.proposalId,
+        category: extraOptions?.category,
+        docId: extraOptions?.docId,
+        rawUrl: url
       });
       return;
     }

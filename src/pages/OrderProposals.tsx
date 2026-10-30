@@ -1342,7 +1342,11 @@ export default function OrderProposals() {
                            {viewingProposal.contractDraft && (
                              <button 
                                type="button"
-                               onClick={() => downloadFile(viewingProposal.contractDraft.url, viewingProposal.contractDraft.name || 'Hop_Dong_Du_Kien', viewingProposal.contractDraft.fileId)}
+                               onClick={() => downloadFile(viewingProposal.contractDraft.url, viewingProposal.contractDraft.name || 'Hop_Dong_Du_Kien', viewingProposal.contractDraft.fileId, {
+                                 proposalId: viewingProposal.id,
+                                 category: 'contract',
+                                 fallbackData: viewingProposal.contractDraft.data
+                               })}
                                className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 hover:shadow-sm transition-all group text-left cursor-pointer"
                                title={viewingProposal.contractDraft.name || "Tải HĐ Dự kiến"}
                              >
@@ -1358,7 +1362,11 @@ export default function OrderProposals() {
                            {viewingProposal.businessPlan && (
                              <button 
                                type="button"
-                               onClick={() => downloadFile(viewingProposal.businessPlan.url, viewingProposal.businessPlan.name || 'PAKD', viewingProposal.businessPlan.fileId)}
+                               onClick={() => downloadFile(viewingProposal.businessPlan.url, viewingProposal.businessPlan.name || 'PAKD', viewingProposal.businessPlan.fileId, {
+                                 proposalId: viewingProposal.id,
+                                 category: 'business_plan',
+                                 fallbackData: viewingProposal.businessPlan.data
+                               })}
                                className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 hover:shadow-sm transition-all group text-left cursor-pointer"
                                title={viewingProposal.businessPlan.name || "Tải PAKD"}
                              >

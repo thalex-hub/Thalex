@@ -1,9 +1,10 @@
 import React from 'react';
-import { AlertTriangle, X, ShieldAlert, CheckCircle2, FileQuestion, Upload, Loader2, Sparkles, Download } from 'lucide-react';
+import { AlertTriangle, X, ShieldAlert, CheckCircle2, FileQuestion, Upload, Loader2, Sparkles, RefreshCw, ExternalLink, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { uploadFile } from '../lib/storageService';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { downloadFile } from '../lib/utils';
 
 export interface DownloadErrorInfo {
   title?: string;
@@ -27,8 +28,10 @@ export function triggerDownloadErrorModal(info: DownloadErrorInfo) {
 export default function DownloadErrorModal() {
   const [errorInfo, setErrorInfo] = React.useState<DownloadErrorInfo | null>(null);
   const [isUploading, setIsUploading] = React.useState(false);
+  const [isRetrying, setIsRetrying] = React.useState(false);
   const [uploadSuccess, setUploadSuccess] = React.useState<string | null>(null);
   const [uploadErrorMsg, setUploadErrorMsg] = React.useState<string | null>(null);
+  const [copiedRules, setCopiedRules] = React.useState(false);
 
   React.useEffect(() => {
     const handleDownloadError = (e: Event) => {
@@ -37,6 +40,8 @@ export default function DownloadErrorModal() {
       setUploadSuccess(null);
       setUploadErrorMsg(null);
       setIsUploading(false);
+      setIsRetrying(false);
+      setCopiedRules(false);
     };
 
     window.addEventListener('app-download-error', handleDownloadError);
@@ -44,6 +49,37 @@ export default function DownloadErrorModal() {
       window.removeEventListener('app-download-error', handleDownloadError);
     };
   }, []);
+
+  const handleRetryDownload = async () => {
+    if (!errorInfo?.rawUrl) return;
+    setIsRetrying(true);
+    setUploadErrorMsg(null);
+
+    try {
+      await downloadFile(errorInfo.rawUrl, errorInfo.fileName || 'document', undefined, {
+        orderId: errorInfo.orderId,
+        proposalId: errorInfo.proposalId,
+        category: errorInfo.category,
+        docId: errorInfo.docId
+      });
+      // If no exception, close modal
+      setTimeout(() => {
+        setErrorInfo(null);
+      }, 500);
+    } catch (err: any) {
+      console.error('Retry download failed:', err);
+      setUploadErrorMsg('Vẫn chưa thể tải tệp. Vui lòng kiểm tra lại Storage Rules trên Firebase Console đã được bấm "Publish" chưa.');
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  const copyRuleCode = () => {
+    const code = `rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    match /{allPaths=**} {\n      allow read, write: if request.auth != null;\n    }\n  }\n}`;
+    navigator.clipboard.writeText(code);
+    setCopiedRules(true);
+    setTimeout(() => setCopiedRules(false), 2000);
+  };
 
   const handleFileReplacement = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -180,67 +216,132 @@ export default function DownloadErrorModal() {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="bg-white rounded-2xl shadow-2xl border border-red-100 max-w-lg w-full overflow-hidden"
+          className="bg-white rounded-3xl shadow-2xl border border-red-100 max-w-xl w-full overflow-hidden my-6"
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-red-500 via-rose-500 to-amber-500 p-5 text-white flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-md">
+              <div className="p-2.5 bg-white/20 rounded-2xl backdrop-blur-md">
                 <ShieldAlert className="w-6 h-6 text-white" />
               </div>
               <div>
                 <h3 className="font-bold text-lg leading-tight">
                   {errorInfo.title || 'Không thể tải tệp tin'}
                 </h3>
-                <p className="text-xs text-white/80 mt-0.5">
-                  Lỗi truy cập Firebase Storage (Quyền truy cập bị từ chối / 403-402)
+                <p className="text-xs text-white/90 mt-0.5">
+                  Lỗi quyền truy cập Firebase Storage (403 Permission Denied)
                 </p>
               </div>
             </div>
             <button
               onClick={() => setErrorInfo(null)}
-              className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+              className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
             {errorInfo.fileName && (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3">
                 <FileQuestion className="w-5 h-5 text-slate-500 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-medium text-slate-400">Tệp tin được yêu cầu:</div>
-                  <div className="text-sm font-bold text-slate-800 truncate" title={errorInfo.fileName}>
+                  <div className="text-xs font-semibold text-slate-400">Tệp tin được yêu cầu:</div>
+                  <div className="text-sm font-black text-slate-800 truncate" title={errorInfo.fileName}>
                     {errorInfo.fileName}
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="text-sm text-slate-600 leading-relaxed bg-amber-50/70 border border-amber-200/80 rounded-xl p-3.5 flex gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold text-amber-900 block mb-1">Chi tiết lỗi:</span>
-                {errorInfo.message ||
-                  'Tệp tin này được lưu trữ trên Firebase Storage nhưng dịch vụ từ chối yêu cầu đọc (Lỗi 403 Permission Denied hoặc Quota).'}
+            <div className="text-xs text-slate-700 leading-relaxed bg-amber-50/80 border border-amber-200 rounded-2xl p-4 space-y-1.5">
+              <div className="flex items-center gap-2 font-bold text-amber-900">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Nguyên nhân sự cố:</span>
+              </div>
+              <p className="text-slate-600">
+                Dự án của bạn đã ở gói <strong>Blaze Pay-as-you-go</strong>. Tuy nhiên, dịch vụ <strong>Firebase Storage</strong> có bộ quy tắc bảo mật riêng (Storage Rules). Khi quy tắc này chưa cho phép quyền đọc công khai hoặc yêu cầu xác thực, Firebase sẽ chặn truy xuất tệp bằng mã lỗi 403.
+              </p>
+            </div>
+
+            {/* SECTION 1: Fix Storage Rules to download all existing files */}
+            <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl p-4 text-xs space-y-3">
+              <div className="font-bold text-emerald-950 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-sm">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Cách khôi phục để tải được tất cả các tệp đã tải lên trước đó:
+                </div>
+              </div>
+              
+              <ol className="list-decimal pl-4 space-y-1.5 text-emerald-900 font-medium leading-relaxed">
+                <li>
+                  Mở <strong>Firebase Console</strong> &gt; Nhấn vào mục <strong>Storage</strong> ở menu bên trái (ngay trên mục Firestore).
+                </li>
+                <li>
+                  Chuyển sang thẻ <strong>Rules (Quy tắc)</strong>.
+                </li>
+                <li>
+                  Dán quy tắc bảo mật cho phép đọc và bấm <strong>Publish (Xuất bản)</strong>:
+                </li>
+              </ol>
+
+              {/* Code block with copy button */}
+              <div className="relative bg-slate-900 text-slate-200 font-mono text-[11px] p-3 rounded-xl">
+                <button
+                  type="button"
+                  onClick={copyRuleCode}
+                  className="absolute top-2 right-2 px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center gap-1 text-[10px] font-sans font-bold transition-all cursor-pointer"
+                >
+                  {copiedRules ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                  <span>{copiedRules ? 'Đã sao chép' : 'Sao chép mã'}</span>
+                </button>
+                <pre className="overflow-x-auto pr-24 whitespace-pre leading-relaxed">{`rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}`}</pre>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleRetryDownload}
+                  disabled={isRetrying}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md shadow-emerald-200 active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
+                  <span>{isRetrying ? 'Đang thử tải lại...' : 'Thử tải lại tệp ngay'}</span>
+                </button>
+
+                <a
+                  href="https://console.firebase.google.com/project/gen-lang-client-0900315510/storage/rules"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-all"
+                >
+                  <ExternalLink size={12} />
+                  <span>Mở Storage Rules trong tab mới</span>
+                </a>
               </div>
             </div>
 
-            {/* Quick Replacement Action Box */}
-            <div className="bg-blue-50/90 border border-blue-200 rounded-2xl p-4 text-xs space-y-3">
-              <div className="font-bold text-blue-950 flex items-center gap-1.5 text-sm">
+            {/* SECTION 2: Or upload replacement file directly */}
+            <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-4 text-xs space-y-2.5">
+              <div className="font-bold text-blue-950 flex items-center gap-1.5 text-xs">
                 <Sparkles className="w-4 h-4 text-blue-600" />
-                Khắc phục ngay bằng cách tải tệp mới:
+                Hoặc tải tệp phiên bản mới thay thế trực tiếp vào hệ thống:
               </div>
               <p className="text-blue-800 leading-relaxed font-medium">
-                Chọn tệp từ máy tính của bạn để thay thế tệp bị lỗi này. Hệ thống sẽ lưu trữ tệp vào máy chủ nội bộ & cơ sở dữ liệu để truy xuất vĩnh viễn không bị chặn.
+                Nếu bạn có tệp tin trên máy tính, bạn có thể tải lên thay thế ngay. Tệp sẽ được lưu trữ an toàn trên máy chủ nội bộ.
               </p>
 
               {uploadSuccess ? (
@@ -249,8 +350,8 @@ export default function DownloadErrorModal() {
                   <span>{uploadSuccess}</span>
                 </div>
               ) : (
-                <div className="pt-1">
-                  <label className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md shadow-blue-200 active:scale-98">
+                <div className="pt-0.5">
+                  <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md shadow-blue-200 active:scale-98">
                     {isUploading ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -259,7 +360,7 @@ export default function DownloadErrorModal() {
                     ) : (
                       <>
                         <Upload className="w-4 h-4" />
-                        <span>Chọn tệp thay thế từ máy tính ({errorInfo.fileName ? errorInfo.fileName.split('.').pop()?.toUpperCase() : 'Mọi định dạng'})</span>
+                        <span>Chọn tệp thay thế từ máy tính ({errorInfo.fileName ? errorInfo.fileName.split('.').pop()?.toUpperCase() : 'DOCX / XLSX / PDF'})</span>
                       </>
                     )}
                     <input
@@ -275,23 +376,16 @@ export default function DownloadErrorModal() {
                 </div>
               )}
             </div>
-
-            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-[11px] text-slate-500 space-y-1">
-              <div className="font-bold text-slate-700 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
-                Gợi ý cho Quản trị viên:
-              </div>
-              <p>
-                Để phục hồi hàng loạt các tệp cũ trên Firebase Storage, vui lòng kiểm tra Storage Rules và kích hoạt lại tài khoản thanh toán trên Google Cloud Console.
-              </p>
-            </div>
           </div>
 
           {/* Footer */}
-          <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-100 flex justify-end">
+          <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-[11px] text-slate-400 font-medium">
+              Dự án: gen-lang-client-0900315510
+            </span>
             <button
               onClick={() => setErrorInfo(null)}
-              className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95 cursor-pointer"
+              className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
             >
               Đã hiểu & Đóng
             </button>

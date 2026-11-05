@@ -279,14 +279,69 @@ export async function downloadFile(
     }
   }
 
-  // 3. Check if URL is already pointing to a known blocked Firebase Storage bucket
-  const isFirebaseStorage = url.includes('firebasestorage.googleapis.com');
+  // 3. Attempt direct Firebase Storage Web SDK download if URL points to Firebase Storage
+  const isFirebaseStorage = url.includes('firebasestorage.googleapis.com') || url.startsWith('gs://');
+
+  if (isFirebaseStorage) {
+    try {
+      const { ref, getBlob, getDownloadURL } = await import('firebase/storage');
+      const { storage } = await import('./firebase');
+
+      let storageRef;
+      try {
+        storageRef = ref(storage, url);
+      } catch (refErr) {
+        const match = url.match(/\/o\/([^?]+)/);
+        if (match) {
+          storageRef = ref(storage, decodeURIComponent(match[1]));
+        }
+      }
+
+      if (storageRef) {
+        try {
+          const blob = await getBlob(storageRef);
+          const objectUrl = window.URL.createObjectURL(blob);
+          triggerBlobDownload(objectUrl, fileName);
+          return;
+        } catch (getBlobErr: any) {
+          console.warn('[downloadFile] Firebase Storage client getBlob failed, trying fresh URL...', getBlobErr);
+          try {
+            const freshUrl = await getDownloadURL(storageRef);
+            if (freshUrl && freshUrl !== url) {
+              const freshRes = await fetch(freshUrl);
+              if (freshRes.ok) {
+                const b = await freshRes.blob();
+                const freshObjectUrl = window.URL.createObjectURL(b);
+                triggerBlobDownload(freshObjectUrl, fileName);
+                return;
+              }
+            }
+          } catch (freshErr) {
+            console.warn('[downloadFile] getDownloadURL failed:', freshErr);
+          }
+        }
+      }
+    } catch (sdkInitErr) {
+      console.warn('[downloadFile] Firebase Storage SDK init failed:', sdkInitErr);
+    }
+  }
 
   try {
-    // Attempt download using backend proxy
+    // Attempt download using backend proxy with authentication token
+    let reqHeaders: Record<string, string> = {};
+    try {
+      const { auth } = await import('./firebase');
+      if (auth.currentUser) {
+        const token = await auth.currentUser.getIdToken().catch(() => null);
+        if (token) {
+          reqHeaders['Authorization'] = `Bearer ${token}`;
+        }
+      }
+    } catch (e) {}
+
     const proxyUrl = getApiUrl(`/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName || 'download')}`);
     
-    const response = await fetch(proxyUrl);
+    const response = await fetch(proxyUrl, { headers: reqHeaders });
     
     // Check if error response or JSON error
     const contentType = response.headers.get('content-type') || '';
@@ -322,9 +377,9 @@ export async function downloadFile(
           fileName: fileName || 'Tệp đính kèm',
           title: 'Không thể tải xuống tệp tin',
           message: isPermissionDenied
-            ? 'Tệp tin này được lưu trữ trên Firebase Storage nhưng dịch vụ từ chối yêu cầu đọc (Lỗi 403: Permission denied).'
+            ? 'Dự án đã ở gói Blaze, tuy nhiên Firebase Storage từ chối quyền đọc (Lỗi 403: Permission denied). Nguyên nhân: Quy tắc bảo mật Storage Rules trên Firebase Console chưa cho phép đọc tệp.'
             : (errJson?.message || 'Tệp tin này được lưu trữ trên Firebase Storage của Google Cloud nhưng dự án đã bị tạm khóa tài khoản thanh toán (Lỗi 402: Billing account is disabled/closed).'),
-          recommendation: 'Bạn có thể tải lại tệp tin mới trực tiếp vào hệ thống ngay bên dưới để lưu trữ an toàn trên cơ sở dữ liệu nội bộ.',
+          recommendation: 'Để tải lại các tệp này, vui lòng mở Firebase Console > mục Storage > thẻ Rules và cập nhật quyền đọc (allow read: if request.auth != null;). Hoặc bạn có thể tải tệp mới lên thay thế ngay bên dưới.',
           orderId: extraOptions?.orderId,
           proposalId: extraOptions?.proposalId,
           category: extraOptions?.category,

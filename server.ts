@@ -617,12 +617,31 @@ app.get("/api/download", async (req, res) => {
       });
     }
 
-    // 4. Fetch external URL
-    const response = await fetch(fileUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; ThalexWorkspace/1.0)",
-      },
+    // 4. Fetch external URL with client authorization if available
+    const authHeader = req.headers.authorization;
+    const fetchHeaders: Record<string, string> = {
+      "User-Agent": "Mozilla/5.0 (compatible; ThalexWorkspace/1.0)",
+    };
+
+    if (authHeader && fileUrl.includes("firebasestorage.googleapis.com")) {
+      const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+      fetchHeaders["Authorization"] = `Firebase ${token}`;
+    }
+
+    let response = await fetch(fileUrl, {
+      headers: fetchHeaders,
     });
+
+    // If Authorization: Firebase failed with 403, retry with Authorization: Bearer
+    if (!response.ok && response.status === 403 && authHeader && fileUrl.includes("firebasestorage.googleapis.com")) {
+      const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+      response = await fetch(fileUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; ThalexWorkspace/1.0)",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+    }
 
     if (!response.ok) {
       const responseText = await response.text().catch(() => "");

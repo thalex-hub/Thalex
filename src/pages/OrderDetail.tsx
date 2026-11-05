@@ -2432,39 +2432,53 @@ export default function OrderDetail() {
                   // Compile all documents across the order
                   const allDocs: any[] = [];
 
+                  // Helper to detect true category from file name / mime type
+                  const detectTrueCategory = (doc: any, defaultCat: 'contract' | 'business_plan') => {
+                    const fname = (doc?.name || doc?.fileName || '').toLowerCase();
+                    const isPakd = fname.includes('pakd') || fname.includes('phương án') || fname.includes('.xls') || fname.includes('.xlsx') || fname.includes('.csv');
+                    const isContract = fname.includes('hợp đồng') || fname.includes('hop dong') || fname.includes('hop_dong') || fname.includes('contract');
+                    if (isPakd && !isContract) return 'business_plan';
+                    if (isContract && !isPakd) return 'contract';
+                    return defaultCat;
+                  };
+
                   // 1. Contract from Order or Proposal
-                  const contractObj = order.contractDraft || proposalData?.contractDraft;
-                  if (contractObj && contractObj.url) {
+                  const rawContract = order.contractDraft || proposalData?.contractDraft;
+                  if (rawContract && rawContract.url) {
+                    const actualCat = detectTrueCategory(rawContract, 'contract');
+                    const isPakd = actualCat === 'business_plan';
                     allDocs.push({
                       id: 'doc_contract_main',
-                      name: contractObj.name || `Hợp đồng - ${order.name}`,
-                      category: 'contract',
-                      categoryLabel: 'Hợp đồng kinh tế',
-                      categoryBadge: 'bg-blue-100 text-blue-700 border-blue-200',
-                      url: contractObj.url,
-                      fileId: contractObj.fileId,
-                      size: contractObj.size,
-                      type: contractObj.type || 'application/pdf',
+                      name: rawContract.name || (isPakd ? `Phương án kinh doanh - ${order.name}` : `Hợp đồng - ${order.name}`),
+                      category: actualCat,
+                      categoryLabel: isPakd ? 'Phương án KD (PAKD)' : 'Hợp đồng kinh tế',
+                      categoryBadge: isPakd ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-blue-100 text-blue-700 border-blue-200',
+                      url: rawContract.url,
+                      fileId: rawContract.fileId,
+                      size: rawContract.size,
+                      type: rawContract.type || (isPakd ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf'),
                       source: 'Đề xuất PAKD',
-                      uploadDate: contractObj.uploadDate || order.createdAt
+                      uploadDate: rawContract.uploadDate || order.createdAt
                     });
                   }
 
                   // 2. Business Plan from Order or Proposal
-                  const pakdObj = order.businessPlan || proposalData?.businessPlan;
-                  if (pakdObj && pakdObj.url) {
+                  const rawPakd = order.businessPlan || proposalData?.businessPlan;
+                  if (rawPakd && rawPakd.url) {
+                    const actualCat = detectTrueCategory(rawPakd, 'business_plan');
+                    const isContract = actualCat === 'contract';
                     allDocs.push({
                       id: 'doc_pakd_main',
-                      name: pakdObj.name || `Phương án kinh doanh - ${order.name}`,
-                      category: 'business_plan',
-                      categoryLabel: 'Phương án KD (PAKD)',
-                      categoryBadge: 'bg-purple-100 text-purple-700 border-purple-200',
-                      url: pakdObj.url,
-                      fileId: pakdObj.fileId,
-                      size: pakdObj.size,
-                      type: pakdObj.type || 'application/pdf',
+                      name: rawPakd.name || (isContract ? `Hợp đồng kinh tế - ${order.name}` : `Phương án kinh doanh - ${order.name}`),
+                      category: actualCat,
+                      categoryLabel: isContract ? 'Hợp đồng kinh tế' : 'Phương án KD (PAKD)',
+                      categoryBadge: isContract ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-purple-100 text-purple-700 border-purple-200',
+                      url: rawPakd.url,
+                      fileId: rawPakd.fileId,
+                      size: rawPakd.size,
+                      type: rawPakd.type || (isContract ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf'),
                       source: 'Đề xuất PAKD',
-                      uploadDate: pakdObj.uploadDate || order.createdAt
+                      uploadDate: rawPakd.uploadDate || order.createdAt
                     });
                   }
 

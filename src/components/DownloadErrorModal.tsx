@@ -3,7 +3,7 @@ import { AlertTriangle, X, ShieldAlert, CheckCircle2, FileQuestion, Upload, Load
 import { motion, AnimatePresence } from 'motion/react';
 import { uploadFile } from '../lib/storageService';
 import { db } from '../lib/firebase';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { downloadFile } from '../lib/utils';
 
 export interface DownloadErrorInfo {
@@ -162,9 +162,9 @@ export default function DownloadErrorModal() {
 
       // 3. If a proposalId was associated with this download
       if (errorInfo?.proposalId) {
+        const isPakd = errorInfo.category === 'business_plan' || errorInfo.fileName?.toLowerCase().includes('pakd');
         try {
           const propRef = doc(db, 'order_proposals', errorInfo.proposalId);
-          const isPakd = errorInfo.category === 'business_plan' || errorInfo.fileName?.toLowerCase().includes('pakd');
           if (isPakd) {
             await updateDoc(propRef, { businessPlan: newDocObj });
           } else {
@@ -172,6 +172,21 @@ export default function DownloadErrorModal() {
           }
         } catch (propErr) {
           console.warn('Could not update proposal with replacement file:', propErr);
+        }
+
+        // If not already updated via orderId, try to find and update any order that was created from this proposal
+        if (!errorInfo?.orderId) {
+          try {
+            const qOrders = query(collection(db, 'orders'), where('proposalId', '==', errorInfo.proposalId), limit(1));
+            const snap = await getDocs(qOrders);
+            if (!snap.empty) {
+              const matchedOrderDoc = snap.docs[0];
+              await updateDoc(doc(db, 'orders', matchedOrderDoc.id), {
+                [isPakd ? 'businessPlan' : 'contractDraft']: newDocObj,
+                updatedAt: new Date().toISOString()
+              });
+            }
+          } catch (oe) {}
         }
       }
 

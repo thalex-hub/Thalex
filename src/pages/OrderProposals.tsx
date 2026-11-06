@@ -2,7 +2,7 @@ import React from 'react';
 import { db } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, or, getDoc, getDocs, deleteDoc, limit } from 'firebase/firestore';
 import { uploadFile as uploadFileToServer } from '../lib/storageService';
-import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search, ChevronDown, ChevronUp, RefreshCcw } from 'lucide-react';
+import { FileText, Plus, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, TrendingUp, User, PieChart, Shield, HelpCircle, Users, Layers, Upload, Paperclip, FileSpreadsheet, Pencil, UserPlus, Trash2, Search, ChevronDown, ChevronUp, RefreshCcw, Download, AlertTriangle, Loader2 } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { cn, formatCurrency, formatPercent, formatCurrencyInput, parseCurrencyInput, parseFinancialNumber, withTimeout, downloadFile } from '../lib/utils';
@@ -284,6 +284,144 @@ export default function OrderProposals() {
       unsubProposals();
     };
   }, [canSeeAll, user, appUser, allUsers]);
+
+  const [replacingCategory, setReplacingCategory] = React.useState<string | null>(null);
+
+  // Listen for file replacements from DownloadErrorModal or other tabs
+  React.useEffect(() => {
+    const handleReplaced = (e: any) => {
+      const detail = e.detail;
+      if (!detail) return;
+      if (viewingProposal && (detail.proposalId === viewingProposal.id || (detail.orderId && viewingProposal.orderId === detail.orderId))) {
+        const isPakd = detail.category === 'business_plan' || detail.newDoc?.name?.toLowerCase().includes('pakd');
+        setViewingProposal((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            ...(isPakd ? { businessPlan: detail.newDoc } : { contractDraft: detail.newDoc })
+          };
+        });
+      }
+      setProposals(prev => prev.map(p => {
+        if (p.id === detail.proposalId || (detail.orderId && p.orderId === detail.orderId)) {
+          const isPakd = detail.category === 'business_plan' || detail.newDoc?.name?.toLowerCase().includes('pakd');
+          return {
+            ...p,
+            ...(isPakd ? { businessPlan: detail.newDoc } : { contractDraft: detail.newDoc })
+          };
+        }
+        return p;
+      }));
+    };
+    window.addEventListener('app-file-replaced', handleReplaced);
+    return () => window.removeEventListener('app-file-replaced', handleReplaced);
+  }, [viewingProposal]);
+
+  const handleReplaceProposalDoc = async (docItem: any, file: File) => {
+    if (!viewingProposal || !file) return;
+
+    setReplacingCategory(docItem.category || docItem.id);
+    try {
+      // 1. Upload to local server /uploads/ and persistent Firestore file_storage
+      const uploadRes = await uploadFileToServer(file, 'proposals');
+
+      const newDoc = {
+        name: file.name,
+        fileName: file.name,
+        url: uploadRes.url,
+        fileId: uploadRes.fileId || null,
+        size: file.size,
+        type: file.type || 'application/octet-stream',
+        category: docItem.category,
+        uploadDate: new Date().toISOString()
+      };
+
+      const updatePayload: any = {
+        updatedAt: new Date().toISOString()
+      };
+
+      if (docItem.category === 'business_plan' || docItem.id === 'doc_pakd_proposal') {
+        updatePayload.businessPlan = newDoc;
+      } else if (docItem.category === 'contract' || docItem.id === 'doc_contract_proposal') {
+        updatePayload.contractDraft = newDoc;
+      } else {
+        const existingAtts = Array.isArray(viewingProposal.attachments) ? viewingProposal.attachments : [];
+        const attIdx = existingAtts.findIndex((a: any) => a.id === docItem.id || a.url === docItem.url || a.name === docItem.name);
+        if (attIdx >= 0) {
+          const newAtts = [...existingAtts];
+          newAtts[attIdx] = { ...newAtts[attIdx], ...newDoc };
+          updatePayload.attachments = newAtts;
+        } else {
+          updatePayload.attachments = [...existingAtts, newDoc];
+        }
+      }
+
+      // 2. Update order_proposals in Firestore
+      const propRef = doc(db, 'order_proposals', viewingProposal.id);
+      await updateDoc(propRef, updatePayload);
+
+      // 3. Update local state
+      setViewingProposal((prev: any) => ({ ...prev, ...updatePayload }));
+      setProposals((prev: any[]) => prev.map(p => p.id === viewingProposal.id ? { ...p, ...updatePayload } : p));
+
+      // 4. Also sync to linked order if present
+      const targetOrderId = viewingProposal.orderId;
+      if (targetOrderId) {
+        try {
+          const orderRef = doc(db, 'orders', targetOrderId);
+          const orderSnap = await getDoc(orderRef);
+          if (orderSnap.exists()) {
+            const orderUpdate: any = { updatedAt: new Date().toISOString() };
+            if (docItem.category === 'business_plan' || docItem.id === 'doc_pakd_proposal') {
+              orderUpdate.businessPlan = newDoc;
+            } else if (docItem.category === 'contract' || docItem.id === 'doc_contract_proposal') {
+              orderUpdate.contractDraft = newDoc;
+            }
+            await updateDoc(orderRef, orderUpdate);
+          }
+        } catch (oe) {
+          console.warn('Could not sync doc replacement to order:', oe);
+        }
+      } else {
+        try {
+          const qOrder = query(collection(db, 'orders'), where('proposalId', '==', viewingProposal.id), limit(1));
+          const qSnap = await getDocs(qOrder);
+          if (!qSnap.empty) {
+            const foundOrderId = qSnap.docs[0].id;
+            const orderUpdate: any = { updatedAt: new Date().toISOString() };
+            if (docItem.category === 'business_plan' || docItem.id === 'doc_pakd_proposal') {
+              orderUpdate.businessPlan = newDoc;
+            } else if (docItem.category === 'contract' || docItem.id === 'doc_contract_proposal') {
+              orderUpdate.contractDraft = newDoc;
+            }
+            await updateDoc(doc(db, 'orders', foundOrderId), orderUpdate);
+          }
+        } catch (qe) {}
+      }
+
+      // 5. Notify other components
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('app-file-replaced', {
+          detail: {
+            proposalId: viewingProposal.id,
+            orderId: viewingProposal.orderId,
+            category: docItem.category,
+            docId: docItem.id,
+            newDoc
+          }
+        }));
+      }
+
+      alert(`Đã cập nhật tệp "${file.name}" thành công!`);
+      // Trigger instant download
+      downloadFile(newDoc.url, newDoc.name, newDoc.fileId);
+    } catch (err: any) {
+      console.error('Error replacing proposal document:', err);
+      alert(`Không thể thay thế tệp: ${err?.message || 'Vui lòng thử lại'}`);
+    } finally {
+      setReplacingCategory(null);
+    }
+  };
 
   // Removed automatic healDatabase to save quota. It should be a manual admin action if needed.
 
@@ -1335,51 +1473,173 @@ export default function OrderProposals() {
                       </div>
 
                       <div>
-                        <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                           <FileSpreadsheet size={14} className="text-indigo-600" /> Hồ sơ đính kèm
+                        <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center justify-between">
+                           <span className="flex items-center gap-2">
+                             <FileSpreadsheet size={14} className="text-indigo-600" /> Hồ sơ đính kèm
+                           </span>
                         </h4>
-                        <div className="grid grid-cols-2 gap-3">
-                           {viewingProposal.contractDraft && (
-                             <button 
-                               type="button"
-                               onClick={() => downloadFile(viewingProposal.contractDraft.url, viewingProposal.contractDraft.name || 'Hop_Dong_Du_Kien', viewingProposal.contractDraft.fileId, {
-                                 proposalId: viewingProposal.id,
-                                 category: 'contract',
-                                 fallbackData: viewingProposal.contractDraft.data
-                               })}
-                               className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 hover:shadow-sm transition-all group text-left cursor-pointer"
-                               title={viewingProposal.contractDraft.name || "Tải HĐ Dự kiến"}
-                             >
-                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                   <Paperclip size={16} />
+
+                        {(() => {
+                          const detectTrueCategory = (docItem: any, defaultCat: 'contract' | 'business_plan') => {
+                            const fname = (docItem?.name || docItem?.fileName || '').toLowerCase();
+                            const isPakd = fname.includes('pakd') || fname.includes('phương án') || fname.includes('.xls') || fname.includes('.xlsx') || fname.includes('.csv');
+                            const isContract = fname.includes('hợp đồng') || fname.includes('hop dong') || fname.includes('hop_dong') || fname.includes('contract');
+                            if (isPakd && !isContract) return 'business_plan';
+                            if (isContract && !isPakd) return 'contract';
+                            return defaultCat;
+                          };
+
+                          const proposalDocs: any[] = [];
+
+                          if (viewingProposal.contractDraft && (viewingProposal.contractDraft.url || viewingProposal.contractDraft.name)) {
+                            const actualCat = detectTrueCategory(viewingProposal.contractDraft, 'contract');
+                            const isPakd = actualCat === 'business_plan';
+                            proposalDocs.push({
+                              id: 'doc_contract_proposal',
+                              name: viewingProposal.contractDraft.name || (isPakd ? 'Phương án KD (PAKD)' : 'Hợp đồng dự kiến'),
+                              category: actualCat,
+                              categoryLabel: isPakd ? 'Phương án KD (PAKD)' : 'HĐ Dự kiến',
+                              categoryBadge: isPakd ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-blue-100 text-blue-700 border-blue-200',
+                              url: viewingProposal.contractDraft.url,
+                              fileId: viewingProposal.contractDraft.fileId,
+                              size: viewingProposal.contractDraft.size,
+                              type: viewingProposal.contractDraft.type,
+                              data: viewingProposal.contractDraft.data,
+                              uploadDate: viewingProposal.contractDraft.uploadDate || viewingProposal.createdAt
+                            });
+                          }
+
+                          if (viewingProposal.businessPlan && (viewingProposal.businessPlan.url || viewingProposal.businessPlan.name)) {
+                            const actualCat = detectTrueCategory(viewingProposal.businessPlan, 'business_plan');
+                            const isContract = actualCat === 'contract';
+                            proposalDocs.push({
+                              id: 'doc_pakd_proposal',
+                              name: viewingProposal.businessPlan.name || (isContract ? 'Hợp đồng dự kiến' : 'Phương án KD (PAKD)'),
+                              category: actualCat,
+                              categoryLabel: isContract ? 'HĐ Dự kiến' : 'Phương án KD (PAKD)',
+                              categoryBadge: isContract ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-purple-100 text-purple-700 border-purple-200',
+                              url: viewingProposal.businessPlan.url,
+                              fileId: viewingProposal.businessPlan.fileId,
+                              size: viewingProposal.businessPlan.size,
+                              type: viewingProposal.businessPlan.type,
+                              data: viewingProposal.businessPlan.data,
+                              uploadDate: viewingProposal.businessPlan.uploadDate || viewingProposal.createdAt
+                            });
+                          }
+
+                          if (Array.isArray(viewingProposal.attachments)) {
+                            viewingProposal.attachments.forEach((att: any, idx: number) => {
+                              if (att && (att.url || att.name)) {
+                                proposalDocs.push({
+                                  id: att.id || `doc_att_${idx}`,
+                                  name: att.name || att.fileName || `Tài liệu đính kèm ${idx + 1}`,
+                                  category: att.category || 'other',
+                                  categoryLabel: att.categoryLabel || 'Tài liệu bổ sung',
+                                  categoryBadge: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                                  url: att.url,
+                                  fileId: att.fileId,
+                                  size: att.size,
+                                  type: att.type,
+                                  data: att.data,
+                                  uploadDate: att.uploadDate || viewingProposal.createdAt
+                                });
+                              }
+                            });
+                          }
+
+                          if (proposalDocs.length === 0) {
+                            return (
+                              <div className="p-4 bg-gray-50 border border-dashed border-gray-200 rounded-2xl text-center text-xs text-gray-400">
+                                Chưa có hồ sơ hoặc tệp đính kèm nào được tải lên cho đề xuất này.
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {proposalDocs.map((docItem) => (
+                                <div 
+                                  key={docItem.id}
+                                  className="p-3.5 bg-white border border-gray-100 hover:border-indigo-200 rounded-2xl shadow-xs transition-all flex flex-col justify-between group"
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between mb-1.5 gap-1 flex-wrap">
+                                      <span className={cn("text-[8px] font-black uppercase px-2 py-0.5 rounded-md border", docItem.categoryBadge)}>
+                                        {docItem.categoryLabel}
+                                      </span>
+                                      {docItem.size ? (
+                                        <span className="text-[9px] font-bold text-gray-400">
+                                          {(docItem.size / 1024).toFixed(1)} KB
+                                        </span>
+                                      ) : null}
+                                    </div>
+
+                                    <div className="flex items-start gap-2.5 my-1">
+                                      <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0 mt-0.5 shadow-xs">
+                                        {docItem.category === 'contract' ? <Paperclip size={16} /> : <TrendingUp size={16} />}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <h5 className="text-xs font-black text-gray-800 line-clamp-2 leading-tight" title={docItem.name}>
+                                          {docItem.name}
+                                        </h5>
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-[8px] font-bold text-gray-400">
+                                        {docItem.url?.startsWith('data:') ? 'Lưu trữ Base64' : (docItem.fileId ? 'Lưu trữ đám mây' : 'Lưu trữ máy chủ')}
+                                      </span>
+                                      {docItem.url?.includes('firebasestorage.googleapis.com') && (
+                                        <span className="text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                          <AlertTriangle size={9} /> Firebase cũ
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-3 pt-2.5 border-t border-gray-50 flex items-center justify-end gap-1.5">
+                                    <button 
+                                      type="button"
+                                      onClick={() => downloadFile(docItem.url, docItem.name, docItem.fileId, {
+                                        proposalId: viewingProposal.id,
+                                        orderId: viewingProposal.orderId,
+                                        category: docItem.category,
+                                        docId: docItem.id,
+                                        fallbackData: docItem.data
+                                      })}
+                                      className="px-2.5 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                                      title="Tải tệp tin về máy"
+                                    >
+                                      <Download size={12} /> Tải về
+                                    </button>
+
+                                    <label 
+                                      className="px-2.5 py-1.5 bg-gray-50 hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer shadow-xs border border-gray-200 hover:border-indigo-300"
+                                      title="Tải lên tệp tin mới để thay thế và lưu trữ an toàn"
+                                    >
+                                      {replacingCategory === docItem.id || replacingCategory === docItem.category ? (
+                                        <Loader2 size={12} className="animate-spin text-indigo-600" />
+                                      ) : (
+                                        <Upload size={12} />
+                                      )}
+                                      <span>{replacingCategory === docItem.id || replacingCategory === docItem.category ? 'Đang tải...' : 'Thay tệp'}</span>
+                                      <input
+                                        type="file"
+                                        className="hidden"
+                                        disabled={replacingCategory !== null}
+                                        onChange={(e) => {
+                                          if (e.target.files?.[0]) {
+                                            handleReplaceProposalDoc(docItem, e.target.files[0]);
+                                          }
+                                        }}
+                                      />
+                                    </label>
+                                  </div>
                                 </div>
-                                <div className="min-w-0">
-                                   <span className="text-[10px] font-bold text-gray-700 uppercase block truncate">HĐ Dự kiến</span>
-                                   <span className="text-[9px] text-gray-400 block truncate">{viewingProposal.contractDraft.name || 'Tải về'}</span>
-                                </div>
-                             </button>
-                           )}
-                           {viewingProposal.businessPlan && (
-                             <button 
-                               type="button"
-                               onClick={() => downloadFile(viewingProposal.businessPlan.url, viewingProposal.businessPlan.name || 'PAKD', viewingProposal.businessPlan.fileId, {
-                                 proposalId: viewingProposal.id,
-                                 category: 'business_plan',
-                                 fallbackData: viewingProposal.businessPlan.data
-                               })}
-                               className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-200 hover:shadow-sm transition-all group text-left cursor-pointer"
-                               title={viewingProposal.businessPlan.name || "Tải PAKD"}
-                             >
-                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                   <TrendingUp size={16} />
-                                </div>
-                                <div className="min-w-0">
-                                   <span className="text-[10px] font-bold text-gray-700 uppercase block truncate">PAKD</span>
-                                   <span className="text-[9px] text-gray-400 block truncate">{viewingProposal.businessPlan.name || 'Tải về'}</span>
-                                </div>
-                             </button>
-                           )}
-                        </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                    </div>
 

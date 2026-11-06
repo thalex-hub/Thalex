@@ -641,6 +641,62 @@ app.get("/api/download", async (req, res) => {
           "Authorization": `Bearer ${token}`
         }
       });
+
+      // Try stripping expired or invalid query parameter token
+      if (!response.ok && response.status === 403) {
+        try {
+          const u = new URL(fileUrl);
+          if (u.searchParams.has("token")) {
+            u.searchParams.delete("token");
+            const cleanUrl = u.toString();
+            response = await fetch(cleanUrl, {
+              headers: {
+                "User-Agent": "Mozilla/5.0 (compatible; ThalexWorkspace/1.0)",
+                "Authorization": `Firebase ${token}`
+              }
+            });
+            if (!response.ok && response.status === 403) {
+              response = await fetch(cleanUrl, {
+                headers: {
+                  "User-Agent": "Mozilla/5.0 (compatible; ThalexWorkspace/1.0)",
+                  "Authorization": `Bearer ${token}`
+                }
+              });
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    // If still not ok, check if the file exists locally in uploads
+    if (!response.ok && filename && filename !== "download") {
+      try {
+        const uploadsDir = path.join(process.cwd(), "uploads");
+        if (fs.existsSync(uploadsDir)) {
+          const cleanFname = filename.toLowerCase();
+          const findFile = (dir: string): string | null => {
+            const list = fs.readdirSync(dir, { withFileTypes: true });
+            for (const item of list) {
+              const fullPath = path.join(dir, item.name);
+              if (item.isDirectory()) {
+                const found = findFile(fullPath);
+                if (found) return found;
+              } else if (item.isFile()) {
+                const itemLower = item.name.toLowerCase();
+                if (itemLower === cleanFname || itemLower.includes(cleanFname) || cleanFname.includes(itemLower)) {
+                  return fullPath;
+                }
+              }
+            }
+            return null;
+          };
+          const matched = findFile(uploadsDir);
+          if (matched) {
+            console.log(`[DOWNLOAD FALLBACK] Found local file on disk: ${matched}`);
+            return res.download(matched, filename);
+          }
+        }
+      } catch (e) {}
     }
 
     if (!response.ok) {
